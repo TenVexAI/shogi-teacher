@@ -22,6 +22,7 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-pixel: var(--font-pixel-code);
+  --font-shogi: var(--font-shogi);
 }
 
 body {
@@ -51,4 +52,87 @@ html {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #8a6fd1;
+}
+
+/* Traditional Shogi piece shape (pentagonal) */
+.shogi-piece {
+  position: relative;
+  width: 40px;
+  height: 44px;
+  background: linear-gradient(to bottom, #f5deb3 0%, #daa520 100%);
+  clip-path: polygon(50% 0%, 90% 15%, 100% 100%, 0% 100%, 10% 15%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.shogi-piece::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  background: linear-gradient(to bottom, #f5e6d3 0%, #e8c68a 100%);
+  clip-path: polygon(50% 0%, 90% 15%, 100% 100%, 0% 100%, 10% 15%);
+  z-index: 0;
+}
+
+.shogi-piece-text {
+  position: relative;
+  z-index: 1;
+}
+
+/* Smaller Shogi piece indicator for current turn */
+.shogi-piece-indicator {
+  width: 14px;
+  height: 16px;
+  clip-path: polygon(50% 0%, 90% 15%, 100% 100%, 0% 100%, 10% 15%);
+}
+
+/* White piece slightly smaller to compensate for optical illusion */
+.shogi-piece-indicator.bg-white {
+  width: 13px;
+  height: 15px;
+}
+
+/* Markdown prose styling for chat messages */
+.prose {
+  color: var(--text-primary);
+}
+
+.prose p {
+  margin-bottom: 0.75em;
+}
+
+.prose p:last-child {
+  margin-bottom: 0;
+}
+
+.prose strong {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.prose ul, .prose ol {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+  padding-left: 1.5em;
+}
+
+.prose li {
+  margin-top: 0.25em;
+  margin-bottom: 0.25em;
+}
+
+.prose code {
+  background-color: rgba(255, 255, 255, 0.1);
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+
+.prose h1, .prose h2, .prose h3 {
+  color: var(--text-primary);
+  font-weight: 700;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
 }

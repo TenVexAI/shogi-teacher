@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Yuji_Mai } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
 
@@ -14,9 +14,15 @@ const geistMono = Geist_Mono({
 });
 
 const pixelCode = localFont({
-  src: "../public/fonts/PixelCode-Medium.otf",
+  src: "../public/fonts/PixelCode-Light.otf",
   variable: "--font-pixel-code",
   weight: "500",
+});
+
+const shogiFont = Yuji_Mai({
+  variable: "--font-shogi",
+  weight: "400",
+  subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
@@ -32,7 +38,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${pixelCode.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${pixelCode.variable} ${shogiFont.variable} antialiased`}
       >
         {children}
       </body>

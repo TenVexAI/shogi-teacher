@@ -32,19 +32,29 @@ export default function MoveHistory({ moves, currentTurn, isClockRunning = false
 
     const formatTime = (ms: number) => {
         const totalSeconds = Math.floor(ms / 1000);
-        const minutes = Math.floor(totalSeconds / 60);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
         const seconds = totalSeconds % 60;
+        
+        if (hours > 0) {
+            return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
         return `${minutes}:${seconds.toString().padStart(2, '0')}`;
     };
 
     const formatDuration = (ms: number) => {
-        const seconds = Math.floor(ms / 1000);
-        if (seconds < 60) {
-            return `${seconds}s`;
+        const totalSeconds = Math.floor(ms / 1000);
+        if (totalSeconds < 60) {
+            return `${totalSeconds}s`;
         }
-        const minutes = Math.floor(seconds / 60);
-        const remainingSeconds = seconds % 60;
-        return `${minutes}m ${remainingSeconds}s`;
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        
+        if (hours > 0) {
+            return `${hours}h ${minutes}m ${seconds}s`;
+        }
+        return `${minutes}m ${seconds}s`;
     };
 
     return (
@@ -52,10 +62,12 @@ export default function MoveHistory({ moves, currentTurn, isClockRunning = false
             <div className="bg-linear-to-r from-accent-cyan to-accent-purple text-white p-4 rounded-t-lg">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h2 className="text-xl font-bold font-pixel drop-shadow-lg">Move History</h2>
-                        <p className="text-sm opacity-90">
-                            Current Turn: {currentTurn === 'b' ? '⚫ Black' : '⚪ White'}
-                        </p>
+                        <h2 className="text-xl font-bold font-pixel drop-shadow-lg mb-1">Move History</h2>
+                        <div className="flex items-center gap-2 text-sm opacity-90">
+                            <span>Current Turn:</span>
+                            <div className={`shogi-piece-indicator ${currentTurn === 'b' ? 'bg-black' : 'bg-white'}`}></div>
+                            <span>{currentTurn === 'b' ? 'Black' : 'White'}</span>
+                        </div>
                     </div>
                     <div className="text-right">
                         <div className="text-3xl font-bold font-pixel drop-shadow-lg">{moves.length}</div>
@@ -71,37 +83,35 @@ export default function MoveHistory({ moves, currentTurn, isClockRunning = false
                         <p className="text-sm mt-2">Start the clock and make your first move!</p>
                     </div>
                 ) : (
-                    <div className="space-y-0.5">
+                    <div className="space-y-0.1">
                         {moves.map((move, index) => (
                             <div
                                 key={index}
-                                className="flex items-center justify-between px-2 py-1 hover:bg-background-primary rounded transition-colors"
+                                className="flex items-center justify-between py-1 hover:bg-background-primary rounded transition-colors"
                             >
-                                {/* Left side: Turn number box and move notation */}
+                                {/* Left side: Move number, piece indicator, and move notation */}
                                 <div className="flex items-center gap-2">
-                                    <div 
-                                        className={`shrink-0 w-8 h-7 flex items-center justify-center rounded font-bold text-xs ${
-                                            move.player === 'b'
-                                                ? 'bg-accent-purple text-white'
-                                                : 'bg-background-primary text-text-primary border border-border'
-                                        }`}
-                                    >
-                                        {move.moveNumber}
+                                    <span className="text-text-secondary text-xs font-semibold w-8 text-right">
+                                        {move.moveNumber}:
+                                    </span>
+                                    
+                                    <div className="w-4 flex items-center justify-center">
+                                        <div className={`shogi-piece-indicator ${move.player === 'b' ? 'bg-black' : 'bg-white'}`}></div>
                                     </div>
                                     
-                                    <div className="font-mono font-semibold text-text-primary text-sm">
+                                    <div className="font-mono font-semibold text-text-primary text-sm text-left">
                                         {move.move}
                                     </div>
                                 </div>
                                 
                                 {/* Right side: Times */}
                                 <div className="flex items-center gap-2 text-xs">
-                                    <div className="text-text-secondary">
-                                        {formatTime(move.timestamp)}
+                                    <div className="text-text-secondary bg-background-primary border border-border px-2 py-1 rounded text-right min-w-[60px]">
+                                        +{formatDuration(move.timeSinceLastMove)}
                                     </div>
                                     
-                                    <div className="text-text-secondary bg-background-primary border border-border px-2 py-1 rounded">
-                                        +{formatDuration(move.timeSinceLastMove)}
+                                    <div className="text-text-secondary text-left min-w-[50px]">
+                                        {formatTime(move.timestamp)}
                                     </div>
                                 </div>
                             </div>
@@ -124,19 +134,19 @@ export default function MoveHistory({ moves, currentTurn, isClockRunning = false
                             </button>
                             <button
                                 onClick={onClockToggle}
-                                className={`px-4 py-2 rounded-lg font-semibold text-sm transition-colors font-pixel drop-shadow-lg ${
+                                className={`w-12 h-10 rounded-lg font-semibold text-lg transition-colors drop-shadow-lg font-pixel flex items-center justify-center ${
                                     isClockRunning
                                         ? 'bg-red-500 hover:bg-red-600 text-white'
                                         : 'bg-accent-purple hover:bg-[#8a6fd1] text-white'
                                 }`}
                             >
-                                {isClockRunning ? '⏸ Pause' : '▶ Start'}
+                                {isClockRunning ? '⏸' : '▶'}
                             </button>
                         </div>
                         
                         <div className="text-right">
                             <div className="text-xs text-text-secondary mb-1">Game Time</div>
-                            <div className="text-2xl font-bold font-pixel text-text-primary drop-shadow-lg">
+                            <div className="text-xl font-bold font-pixel text-text-primary drop-shadow-lg">
                                 {formatTime(gameTime)}
                             </div>
                         </div>

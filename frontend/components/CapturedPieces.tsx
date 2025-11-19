@@ -29,7 +29,7 @@ export default function CapturedPieces({ pieces, color, onPieceDrop }: CapturedP
                             onClick={() => onPieceDrop?.(piece)}
                             title={`Click to drop ${PIECE_SYMBOLS[piece]}`}
                         >
-                            <span className="text-lg">{PIECE_SYMBOLS[piece]}</span>
+                            <span className="text-lg font-shogi">{PIECE_SYMBOLS[piece]}</span>
                             {count > 1 && <span className="text-xs">×{count}</span>}
                         </div>
                     ))

@@ -19,6 +19,8 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isClockRunning, setIsClockRunning] = useState(false);
+  const [showClockStartModal, setShowClockStartModal] = useState(false);
+  const [pendingMove, setPendingMove] = useState<string | null>(null);
   const [moveHistory, setMoveHistory] = useState<MoveRecord[]>([]);
   const [moveCount, setMoveCount] = useState(0);
   const [gameTime, setGameTime] = useState(0);
@@ -83,20 +85,8 @@ export default function Home() {
     }
   };
 
-  const handleMove = async (move: string) => {
+  const executeMove = async (move: string) => {
     if (!gameState) return;
-
-    // Prevent moves if clock is not running
-    if (!isClockRunning) {
-      setMessages(prev => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: '⏸️ Please start the clock before making a move!'
-        }
-      ]);
-      return;
-    }
 
     try {
       setIsLoading(true);
@@ -123,6 +113,12 @@ export default function Home() {
       // Make the move
       const newState = await makeMove(gameState.sfen, move);
       setGameState(newState);
+
+      // Play sound effect based on which player moved
+      const soundFile = gameState.turn === 'b' ? '/sounds/shogi_sound_black.mp3' : '/sounds/shogi_sound_white.mp3';
+      const audio = new Audio(soundFile);
+      audio.volume = 0.5; // Set volume to 50%
+      audio.play().catch(err => console.log('Audio play failed:', err));
 
       // Add move to history using standard notation from backend
       const newMoveCount = moveCount + 1;
@@ -207,6 +203,19 @@ export default function Home() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleMove = async (move: string) => {
+    if (!gameState) return;
+
+    // Show modal if clock is not running
+    if (!isClockRunning) {
+      setPendingMove(move);
+      setShowClockStartModal(true);
+      return;
+    }
+
+    await executeMove(move);
   };
 
   const handleSendMessage = async (message: string) => {
@@ -313,6 +322,39 @@ export default function Home() {
     }
   };
 
+  const handleStartClockAndMove = async () => {
+    setShowClockStartModal(false);
+    setIsClockRunning(true);
+    clockStartTimeRef.current = Date.now();
+    lastMoveTimeRef.current = Date.now();
+    
+    setMessages(prev => [
+      ...prev,
+      {
+        role: 'assistant',
+        content: 'Clock started!'
+      }
+    ]);
+    
+    if (pendingMove) {
+      await executeMove(pendingMove);
+      setPendingMove(null);
+    }
+  };
+
+  const handleDeclineClockStart = () => {
+    setShowClockStartModal(false);
+    setPendingMove(null);
+    
+    setMessages(prev => [
+      ...prev,
+      {
+        role: 'assistant',
+        content: 'When you\'re ready, start the clock to make your next move.'
+      }
+    ]);
+  };
+
   return (
     <main className="min-h-screen bg-background-primary p-8">
       <div className="max-w-7xl mx-auto">
@@ -322,9 +364,35 @@ export default function Home() {
           onSave={handleSaveConfig}
         />
 
-        <div className="flex gap-6">
+        {/* Clock Start Confirmation Modal */}
+        {showClockStartModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+            <div className="bg-background-secondary border border-border rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+              <h2 className="text-xl font-bold text-text-primary mb-4">Start the Clock?</h2>
+              <p className="text-text-secondary mb-6">
+                Would you like to start the clock to make this move?
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={handleDeclineClockStart}
+                  className="px-4 py-2 bg-background-primary border border-border text-text-primary rounded-lg hover:bg-background-secondary transition-colors"
+                >
+                  No
+                </button>
+                <button
+                  onClick={handleStartClockAndMove}
+                  className="px-4 py-2 bg-accent-purple text-white rounded-lg hover:bg-[#8a6fd1] transition-colors"
+                >
+                  Yes
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-6 h-[max(700px,calc(100vh-4rem))]">
           {/* Left Column: Move History with Clock */}
-          <div className="w-80 h-[700px]">
+          <div className="w-[300px] flex-shrink-0 h-full">
             <MoveHistory 
               moves={moveHistory} 
               currentTurn={(gameState?.turn as 'b' | 'w') || 'b'}
@@ -352,7 +420,7 @@ export default function Home() {
           </div>
 
           {/* Right Column: Chat Interface */}
-          <div className="flex-1 h-[700px]">
+          <div className="w-[500px] flex-shrink-0 h-full">
             <ChatInterface
               messages={messages}
               onSendMessage={handleSendMessage}

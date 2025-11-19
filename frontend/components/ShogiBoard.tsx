@@ -199,7 +199,7 @@ export default function ShogiBoard({ gameState, onMove }: ShogiBoardProps) {
                     </div>
 
                     {/* The actual board */}
-                    <div className="border-4 border-amber-900 bg-amber-100 p-2">
+                    <div className="border-4 border-gray-700 bg-amber-100 p-2">
                         {board.map((row, rowIndex) => (
                             <div key={rowIndex} className="flex">
                                 {row.map((piece, colIndex) => {
@@ -213,7 +213,7 @@ export default function ShogiBoard({ gameState, onMove }: ShogiBoardProps) {
                                             key={`${rowIndex}-${colIndex}`}
                                             onClick={() => handleSquareClick(rowIndex, colIndex)}
                                             className={`
-                        w-12 h-12 border border-amber-700 flex items-center justify-center
+                        w-12 h-12 border border-gray-700 flex items-center justify-center
                         cursor-pointer hover:bg-amber-200 transition-colors
                         ${isSelected(rowIndex, colIndex) ? 'bg-blue-300' : ''}
                         ${isLegalMove(rowIndex, colIndex) ? 'bg-green-200' : ''}
@@ -221,12 +221,11 @@ export default function ShogiBoard({ gameState, onMove }: ShogiBoardProps) {
                       `}
                                         >
                                             {piece && (
-                                                <span
-                                                    className={`text-2xl font-bold select-none text-black ${isWhitePiece ? 'rotate-180' : ''
-                                                        }`}
-                                                >
-                                                    {pieceSymbol}
-                                                </span>
+                                                <div className={`shogi-piece ${isWhitePiece ? 'rotate-180' : ''}`}>
+                                                    <span className="shogi-piece-text text-2xl font-bold select-none text-black font-shogi">
+                                                        {pieceSymbol}
+                                                    </span>
+                                                </div>
                                             )}
                                         </div>
                                     );
