@@ -5,11 +5,16 @@ import { useState, useEffect } from 'react';
 interface ConfigModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (apiKey: string) => Promise<void>;
+    onSave: (apiKey: string, useLLM: boolean, showBestMove: boolean) => Promise<void>;
+    currentUseLLM?: boolean;
+    currentApiKey?: string;
+    currentShowBestMove?: boolean;
 }
 
-export default function ConfigModal({ isOpen, onClose, onSave }: ConfigModalProps) {
+export default function ConfigModal({ isOpen, onClose, onSave, currentUseLLM = true, currentApiKey = '', currentShowBestMove = false }: ConfigModalProps) {
     const [apiKey, setApiKey] = useState('');
+    const [useLLM, setUseLLM] = useState(currentUseLLM);
+    const [showBestMove, setShowBestMove] = useState(currentShowBestMove);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
@@ -18,8 +23,12 @@ export default function ConfigModal({ isOpen, onClose, onSave }: ConfigModalProp
         if (!isOpen) {
             setError('');
             setSuccess(false);
+            setApiKey('');
+        } else {
+            setUseLLM(currentUseLLM);
+            setShowBestMove(currentShowBestMove);
         }
-    }, [isOpen]);
+    }, [isOpen, currentUseLLM, currentShowBestMove]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -28,12 +37,11 @@ export default function ConfigModal({ isOpen, onClose, onSave }: ConfigModalProp
         setIsSaving(true);
 
         try {
-            await onSave(apiKey);
+            await onSave(apiKey, useLLM, showBestMove);
             setSuccess(true);
-            setApiKey('');
             setTimeout(() => {
                 onClose();
-            }, 1500);
+            }, 1000);
         } catch {
             setError('Failed to save configuration. Please try again.');
         } finally {
@@ -66,12 +74,47 @@ export default function ConfigModal({ isOpen, onClose, onSave }: ConfigModalProp
                             id="apiKey"
                             value={apiKey}
                             onChange={(e) => setApiKey(e.target.value)}
-                            placeholder="sk-ant-..."
+                            placeholder={currentApiKey ? '••••••••••••••••' : 'sk-ant-...'}
                             className="w-full px-3 py-2 bg-background-primary border border-border text-text-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-purple placeholder:text-text-secondary"
-                            required
+                            required={useLLM && !currentApiKey}
                         />
                         <p className="text-xs text-text-secondary mt-1">
-                            Get your API key from <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer" className="text-accent-purple hover:text-accent-cyan hover:underline">console.anthropic.com</a>
+                            {currentApiKey 
+                                ? 'Leave empty to keep existing key. Enter a new key to update.'
+                                : 'Get your API key from console.anthropic.com'
+                            }
+                        </p>
+                    </div>
+
+                    <div className="mb-4">
+                        <label className="flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={useLLM}
+                                onChange={(e) => setUseLLM(e.target.checked)}
+                                className="w-4 h-4 text-accent-purple bg-background-primary border-border rounded focus:ring-accent-purple focus:ring-2"
+                            />
+                            <span className="ml-2 text-sm text-text-primary">
+                                Enable LLM Analysis
+                            </span>
+                        </label>
+                        <p className="text-xs text-text-secondary mt-1 ml-6">
+                            When disabled, only engine analysis will be shown (no AI explanations)
+                        </p>
+                    </div>
+
+                    <div className="mb-4">
+                        <label className="flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={showBestMove}
+                                onChange={(e) => setShowBestMove(e.target.checked)}
+                                className="w-4 h-4 text-accent-purple bg-background-primary border-border rounded focus:ring-accent-purple focus:ring-2"
+                            />
+                            <span className="ml-2 text-sm text-text-primary">Show Best Move Button</span>
+                        </label>
+                        <p className="text-xs text-text-secondary mt-1 ml-6">
+                            Display a button to automatically play the engine&apos;s recommended move
                         </p>
                     </div>
 

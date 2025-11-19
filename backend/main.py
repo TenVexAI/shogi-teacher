@@ -177,8 +177,18 @@ async def get_config():
     """Get current configuration (API key masked for security)"""
     from config_handler import load_config, get_api_key
     api_key = get_api_key()
+    
+    # Return masked key if it exists (show first 7 chars + "..." for identification)
+    masked_key = ""
+    if api_key:
+        if len(api_key) > 10:
+            masked_key = api_key[:7] + "..." + "•" * 10
+        else:
+            masked_key = "•" * 16
+    
     return {
         "has_api_key": bool(api_key),
+        "claude_api_key": masked_key,
         "api_key_source": "config" if load_config().get("claude_api_key") else "env" if api_key else "none"
     }
 

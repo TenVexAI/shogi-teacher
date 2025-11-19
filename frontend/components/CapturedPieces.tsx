@@ -14,23 +14,38 @@ export default function CapturedPieces({ pieces, color, onPieceDrop }: CapturedP
     const colorName = color === 'b' ? 'Black' : 'White';
     const bgColor = color === 'b' ? 'bg-gray-800' : 'bg-gray-100';
     const textColor = color === 'b' ? 'text-white' : 'text-gray-800';
+    const alignClass = color === 'b' ? 'text-right justify-end' : 'text-left justify-start';
+
+    // Flatten pieces array to show each piece individually
+    const individualPieces: string[] = [];
+    Object.entries(pieces).forEach(([piece, count]) => {
+        for (let i = 0; i < count; i++) {
+            individualPieces.push(piece);
+        }
+    });
 
     return (
-        <div className={`${bgColor} ${textColor} p-3 rounded-lg`}>
-            <div className="text-sm font-semibold mb-2 font-pixel drop-shadow-lg">{colorName}&apos;s Captured Pieces</div>
-            <div className="flex flex-wrap gap-2">
-                {Object.entries(pieces).length === 0 ? (
+        <div className={`${bgColor} ${textColor} p-3 rounded-lg w-[524px] min-h-[80px]`}>
+            <div className={`text-sm font-semibold mb-2 font-pixel drop-shadow-lg ${alignClass}`}>
+                {colorName}&apos;s Captured Pieces
+            </div>
+            <div className={`flex flex-wrap gap-2 ${alignClass}`}>
+                {individualPieces.length === 0 ? (
                     <div className="text-xs opacity-60">None</div>
                 ) : (
-                    Object.entries(pieces).map(([piece, count]) => (
+                    individualPieces.map((piece, index) => (
                         <div
-                            key={piece}
-                            className="flex items-center gap-1 bg-opacity-20 bg-white px-2 py-1 rounded cursor-pointer hover:bg-opacity-30 transition-colors"
+                            key={`${piece}-${index}`}
+                            className="shogi-piece cursor-pointer hover:scale-110 transition-transform"
                             onClick={() => onPieceDrop?.(piece)}
                             title={`Click to drop ${PIECE_SYMBOLS[piece]}`}
+                            style={{
+                                transform: color === 'w' ? 'rotate(180deg)' : 'none',
+                            }}
                         >
-                            <span className="text-lg font-shogi">{PIECE_SYMBOLS[piece]}</span>
-                            {count > 1 && <span className="text-xs">×{count}</span>}
+                            <span className="shogi-piece-text text-3xl font-bold select-none text-black font-shogi">
+                                {PIECE_SYMBOLS[piece]}
+                            </span>
                         </div>
                     ))
                 )}

@@ -12,6 +12,11 @@ interface Position {
 interface ShogiBoardProps {
     gameState: GameState;
     onMove: (move: string) => void;
+    showBestMove?: boolean;
+    onBestMove?: () => void;
+    isLoading?: boolean;
+    showCheckNotification?: boolean;
+    isCheck?: boolean;
 }
 
 const PIECE_SYMBOLS: { [key: string]: string } = {
@@ -81,7 +86,7 @@ function positionToUsi(from: Position, to: Position): string {
     return `${fromCol}${fromRow}${toCol}${toRow}`;
 }
 
-export default function ShogiBoard({ gameState, onMove }: ShogiBoardProps) {
+export default function ShogiBoard({ gameState, onMove, showBestMove = false, onBestMove, isLoading = false, showCheckNotification = true }: ShogiBoardProps) {
     const board = useMemo(() => parseSfen(gameState.sfen), [gameState.sfen]);
     const [selectedSquare, setSelectedSquare] = useState<Position | null>(null);
     const [selectedDropPiece, setSelectedDropPiece] = useState<string | null>(null);
@@ -168,6 +173,10 @@ export default function ShogiBoard({ gameState, onMove }: ShogiBoardProps) {
         return legalMoves.some(m => m.row === row && m.col === col);
     };
 
+    const attackerColor = gameState.turn === 'b' ? 'White' : 'Black';
+    const defenderColor = gameState.turn === 'b' ? 'Black' : 'White';
+    const isGameOver = gameState.is_game_over;
+
     return (
         <div className="flex flex-col items-center gap-4">
             {/* White's captured pieces (top) */}
@@ -176,6 +185,21 @@ export default function ShogiBoard({ gameState, onMove }: ShogiBoardProps) {
                 color="w"
                 onPieceDrop={gameState.turn === 'w' ? handleDropPieceSelect : undefined}
             />
+
+            {/* Reserved space for check notification (top - White's side) */}
+            <div className="h-6 flex items-center justify-center">
+                {showCheckNotification && gameState.turn === 'w' && (
+                    isGameOver ? (
+                        <div className="font-bold text-base font-pixel text-accent-cyan">
+                            🏆 Checkmate! {gameState.winner === 'b' ? 'Black' : 'White'} Wins!
+                        </div>
+                    ) : gameState.in_check ? (
+                        <div className="font-semibold text-sm font-pixel animate-color-shift">
+                            ⚠️ {attackerColor} put {defenderColor} in Check!
+                        </div>
+                    ) : null
+                )}
+            </div>
 
             <div className="inline-block">
                 {/* Column numbers (9 to 1) */}
@@ -208,6 +232,8 @@ export default function ShogiBoard({ gameState, onMove }: ShogiBoardProps) {
                                     const isWhitePiece = piece && piece.toLowerCase() === piece && piece !== '+';
                                     const pieceSymbol = piece ? PIECE_SYMBOLS[piece] || piece : '';
 
+                                    const isPromoted = piece && piece.startsWith('+');
+                                    
                                     return (
                                         <div
                                             key={`${rowIndex}-${colIndex}`}
@@ -222,7 +248,7 @@ export default function ShogiBoard({ gameState, onMove }: ShogiBoardProps) {
                                         >
                                             {piece && (
                                                 <div className={`shogi-piece ${isWhitePiece ? 'rotate-180' : ''}`}>
-                                                    <span className="shogi-piece-text text-2xl font-bold select-none text-black font-shogi">
+                                                    <span className={`shogi-piece-text text-3xl font-bold select-none font-shogi ${isPromoted ? 'text-red-600' : 'text-black'}`}>
                                                         {pieceSymbol}
                                                     </span>
                                                 </div>
@@ -236,12 +262,45 @@ export default function ShogiBoard({ gameState, onMove }: ShogiBoardProps) {
                 </div>
             </div>
 
+            {/* Reserved space for check notification (bottom - Black's side) */}
+            <div className="h-6 flex items-center justify-center">
+                {showCheckNotification && gameState.turn === 'b' && (
+                    isGameOver ? (
+                        <div className="font-bold text-base font-pixel text-accent-cyan">
+                            🏆 Checkmate! {gameState.winner === 'b' ? 'Black' : 'White'} Wins!
+                        </div>
+                    ) : gameState.in_check ? (
+                        <div className="font-semibold text-sm font-pixel animate-color-shift">
+                            ⚠️ {attackerColor} put {defenderColor} in Check!
+                        </div>
+                    ) : null
+                )}
+            </div>
+
             {/* Black's captured pieces (bottom) */}
             <CapturedPieces
                 pieces={gameState.pieces_in_hand.b}
                 color="b"
                 onPieceDrop={gameState.turn === 'b' ? handleDropPieceSelect : undefined}
             />
+
+            {/* Best Move Button (centered below black's captured pieces) */}
+            {showBestMove && onBestMove && (
+                <button
+                    onClick={onBestMove}
+                    disabled={isLoading || isGameOver}
+                    className="flex items-center gap-3 px-6 py-3 rounded-lg font-bold transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed bg-accent-cyan text-background-primary"
+                >
+                    <div 
+                        className="shogi-piece-indicator"
+                        style={{
+                            background: gameState.turn === 'b' ? '#000' : '#fff',
+                            transform: gameState.turn === 'w' ? 'rotate(180deg)' : 'none',
+                        }}
+                    />
+                    <span className="font-pixel">Best Move</span>
+                </button>
+            )}
 
             {selectedDropPiece && (
                 <div className="text-sm text-purple-600 font-semibold">

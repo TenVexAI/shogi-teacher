@@ -136,3 +136,17 @@ html {
   margin-top: 1em;
   margin-bottom: 0.5em;
 }
+
+/* Color-shifting animation for check notifications */
+@keyframes color-shift {
+  0%, 100% {
+    color: #12e6c8;
+  }
+  50% {
+    color: #a287f4;
+  }
+}
+
+.animate-color-shift {
+  animation: color-shift 5s ease-in-out infinite;
+}

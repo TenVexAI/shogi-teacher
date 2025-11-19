@@ -20,9 +20,10 @@ interface MoveHistoryPropsExtended extends MoveHistoryProps {
     onClockToggle?: () => void;
     gameTime?: number;
     onNewGame?: () => void;
+    isGameOver?: boolean;
 }
 
-export default function MoveHistory({ moves, currentTurn, isClockRunning = false, onClockToggle, gameTime = 0, onNewGame }: MoveHistoryPropsExtended) {
+export default function MoveHistory({ moves, currentTurn, isClockRunning = false, onClockToggle, gameTime = 0, onNewGame, isGameOver = false }: MoveHistoryPropsExtended) {
     const bottomRef = useRef<HTMLDivElement>(null);
     const [showNewGameModal, setShowNewGameModal] = useState(false);
 
@@ -134,7 +135,8 @@ export default function MoveHistory({ moves, currentTurn, isClockRunning = false
                             </button>
                             <button
                                 onClick={onClockToggle}
-                                className={`w-12 h-10 rounded-lg font-semibold text-lg transition-colors drop-shadow-lg font-pixel flex items-center justify-center ${
+                                disabled={isGameOver}
+                                className={`w-12 h-10 rounded-lg font-semibold text-lg transition-colors drop-shadow-lg font-pixel flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed ${
                                     isClockRunning
                                         ? 'bg-red-500 hover:bg-red-600 text-white'
                                         : 'bg-accent-purple hover:bg-[#8a6fd1] text-white'

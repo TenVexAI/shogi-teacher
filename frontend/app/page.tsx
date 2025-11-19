@@ -5,7 +5,7 @@ import ShogiBoard from '@/components/ShogiBoard';
 import ChatInterface from '@/components/ChatInterface';
 import ConfigModal from '@/components/ConfigModal';
 import MoveHistory, { MoveRecord } from '@/components/MoveHistory';
-import { getGameState, makeMove, analyzePosition, explainPosition, updateConfig } from '@/lib/api';
+import { getGameState, makeMove, analyzePosition, explainPosition, updateConfig, getConfig } from '@/lib/api';
 import { GameState } from '@/types/game';
 
 interface Message {
@@ -19,8 +19,14 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isClockRunning, setIsClockRunning] = useState(false);
+  const [useLLM, setUseLLM] = useState(true);
+  const [currentApiKey, setCurrentApiKey] = useState<string>('');
+  const [showBestMove, setShowBestMove] = useState(false);
   const [showClockStartModal, setShowClockStartModal] = useState(false);
   const [pendingMove, setPendingMove] = useState<string | null>(null);
+  const [cachedHintAnalysis, setCachedHintAnalysis] = useState<{ bestmove: string; score_cp: number; mate: number | null; info: string } | null>(null);
+  const [cachedHintSfen, setCachedHintSfen] = useState<string | null>(null);
+  const [cachedHintTurn, setCachedHintTurn] = useState<string | null>(null);
   const [moveHistory, setMoveHistory] = useState<MoveRecord[]>([]);
   const [moveCount, setMoveCount] = useState(0);
   const [gameTime, setGameTime] = useState(0);
@@ -29,9 +35,17 @@ export default function Home() {
   const accumulatedTimeRef = useRef<number>(0);
 
   useEffect(() => {
-    // Initialize game
+    // Initialize game and load config
     loadInitialGame();
+    loadConfig();
   }, []);
+
+  // Stop clock when game ends
+  useEffect(() => {
+    if (gameState?.is_game_over && isClockRunning) {
+      setIsClockRunning(false);
+    }
+  }, [gameState?.is_game_over, isClockRunning]);
 
   // Update game time when clock is running
   useEffect(() => {
@@ -56,6 +70,19 @@ export default function Home() {
       if (intervalId) clearInterval(intervalId);
     };
   }, [isClockRunning]);
+
+  const loadConfig = async () => {
+    try {
+      const config = await getConfig();
+      if (config.claude_api_key) {
+        setCurrentApiKey(config.claude_api_key);
+      }
+    } catch (error) {
+      console.error('Failed to load config:', error);
+      // Don't block the app if config loading fails
+      // User can still configure via the settings modal
+    }
+  };
 
   const loadInitialGame = async () => {
     try {
@@ -102,12 +129,20 @@ export default function Home() {
         clockStartTimeRef.current = currentTime;
       }
 
-      // Analyze BEFORE the move to compare with what player chose
+      // Use cached hint analysis if available for this position AND same turn, otherwise analyze
       let preMoveAnalysis = null;
-      try {
-        preMoveAnalysis = await analyzePosition(gameState.sfen);
-      } catch (e) {
-        console.error('Pre-move analysis failed:', e);
+      if (cachedHintSfen === gameState.sfen && cachedHintTurn === gameState.turn && cachedHintAnalysis) {
+        preMoveAnalysis = cachedHintAnalysis;
+        // Clear cache after use
+        setCachedHintAnalysis(null);
+        setCachedHintSfen(null);
+        setCachedHintTurn(null);
+      } else {
+        try {
+          preMoveAnalysis = await analyzePosition(gameState.sfen);
+        } catch (e) {
+          console.error('Pre-move analysis failed:', e);
+        }
       }
 
       // Make the move
@@ -135,13 +170,6 @@ export default function Home() {
       // Try to get analysis and explanation for the new position
       try {
         const postMoveAnalysis = await analyzePosition(newState.sfen);
-        const explanation = await explainPosition(newState.sfen, {
-          ...postMoveAnalysis,
-          player_move: move,
-          engine_suggestion: preMoveAnalysis?.bestmove,
-          pre_move_score: preMoveAnalysis?.score_cp
-        });
-
         const playerColor = gameState.turn === 'b' ? 'Black' : 'White';
         const nextColor = newState.turn === 'b' ? 'Black' : 'White';
 
@@ -154,7 +182,22 @@ export default function Home() {
           message += `✓ Excellent! You played the engine's top choice!\n\n`;
         }
 
-        message += `${explanation.explanation}\n\n`;
+        // Add LLM explanation if enabled
+        if (useLLM) {
+          try {
+            const explanation = await explainPosition(newState.sfen, {
+              ...postMoveAnalysis,
+              player_move: move,
+              engine_suggestion: preMoveAnalysis?.bestmove,
+              pre_move_score: preMoveAnalysis?.score_cp
+            });
+            message += `${explanation.explanation}\n\n`;
+          } catch (llmError) {
+            console.error('LLM explanation failed:', llmError);
+            // Continue with engine-only analysis
+          }
+        }
+
         message += `**Now it's ${nextColor}'s turn**\n`;
         message += `Best move for ${nextColor}: ${postMoveAnalysis.bestmove}\n`;
         message += `Position evaluation: ${postMoveAnalysis.mate ? `Mate in ${postMoveAnalysis.mate}` : `${postMoveAnalysis.score_cp} centipawns`}\n`;
@@ -187,7 +230,7 @@ export default function Home() {
           ...prev,
           {
             role: 'assistant',
-            content: `Move played: ${move}\n\n⚠️ Analysis unavailable. Make sure:\n- YaneuraOu.exe is in backend/engine/\n- Claude API key is configured in settings\n\nYou can still play without analysis!`
+            content: `Move played: ${move}\n\n⚠️ Engine analysis unavailable. Make sure YaneuraOu.exe is in backend/engine/\n\nYou can still play without analysis!`
           }
         ]);
       }
@@ -228,26 +271,58 @@ export default function Home() {
       // Get analysis for current position
       const analysis = await analyzePosition(gameState.sfen);
 
-      // Get explanation with user's question as context
-      const explanation = await explainPosition(
-        gameState.sfen,
-        { ...analysis, user_question: message }
-      );
+      if (useLLM) {
+        // Get LLM explanation with user's question as context
+        const explanation = await explainPosition(
+          gameState.sfen,
+          { ...analysis, user_question: message }
+        );
 
-      setMessages(prev => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: explanation.explanation
+        setMessages(prev => [
+          ...prev,
+          {
+            role: 'assistant',
+            content: explanation.explanation
+          }
+        ]);
+      } else {
+        // Show engine analysis only
+        const currentColor = gameState.turn === 'b' ? 'Black' : 'White';
+        let response = `**Current Position Analysis**\n\n`;
+        response += `Turn: ${currentColor}\n`;
+        response += `Best move: ${analysis.bestmove}\n`;
+        response += `Evaluation: ${analysis.mate ? `Mate in ${analysis.mate}` : `${analysis.score_cp} centipawns`}\n`;
+        
+        if (analysis.info) {
+          const pvMatch = analysis.info.match(/pv (.+)$/);
+          if (pvMatch) {
+            const allTokens = pvMatch[1].split(' ');
+            const moves = allTokens.filter((token: string) =>
+              token.length >= 4 && token.length <= 5 && /^\d[a-i]\d[a-i]\+?$/.test(token)
+            );
+            if (moves.length > 0) {
+              response += `\nExpected continuation: ${moves.join(' ')}`;
+            }
+          }
         }
-      ]);
+
+        setMessages(prev => [
+          ...prev,
+          {
+            role: 'assistant',
+            content: response
+          }
+        ]);
+      }
     } catch (error) {
       console.error('Failed to get response:', error);
       setMessages(prev => [
         ...prev,
         {
           role: 'assistant',
-          content: '⚠️ AI teacher unavailable. Please configure:\n- YaneuraOu.exe in backend/engine/\n- Claude API key in settings\n\nYou can still play and practice moves!'
+          content: useLLM 
+            ? '⚠️ AI teacher unavailable. Please configure:\n- YaneuraOu.exe in backend/engine/\n- Claude API key in settings\n\nYou can still play and practice moves!'
+            : '⚠️ Engine analysis unavailable. Make sure YaneuraOu.exe is in backend/engine/'
         }
       ]);
     } finally {
@@ -265,6 +340,12 @@ export default function Home() {
     setIsLoading(true);
     try {
       const analysis = await analyzePosition(gameState.sfen);
+      
+      // Cache this analysis for use when the move is made
+      setCachedHintAnalysis(analysis);
+      setCachedHintSfen(gameState.sfen);
+      setCachedHintTurn(gameState.turn);
+      
       const playerColor = gameState.turn === 'b' ? 'Black' : 'White';
 
       let hintMessage = `💡 **Hint for ${playerColor}:**\n\nEngine suggests: **${analysis.bestmove}**\n\nEvaluation: ${analysis.mate ? `Mate in ${analysis.mate}` : `${analysis.score_cp} centipawns`}\n`;
@@ -310,8 +391,14 @@ export default function Home() {
     }
   };
 
-  const handleSaveConfig = async (apiKey: string) => {
-    await updateConfig(apiKey);
+  const handleSaveConfig = async (apiKey: string, useLLMSetting: boolean, showBestMoveSetting: boolean) => {
+    // Only update API key if a new one was provided
+    if (apiKey && apiKey.trim()) {
+      await updateConfig(apiKey);
+      setCurrentApiKey(apiKey);
+    }
+    setUseLLM(useLLMSetting);
+    setShowBestMove(showBestMoveSetting);
   };
 
   const handleClockToggle = () => {
@@ -319,6 +406,35 @@ export default function Home() {
     if (!isClockRunning && clockStartTimeRef.current === 0) {
       clockStartTimeRef.current = Date.now();
       lastMoveTimeRef.current = Date.now();
+    }
+  };
+
+  const handleBestMove = async () => {
+    if (!gameState || isLoading) return;
+
+    try {
+      setIsLoading(true);
+      // Get the best move from engine
+      const analysis = await analyzePosition(gameState.sfen);
+      
+      // Cache it for the move execution
+      setCachedHintAnalysis(analysis);
+      setCachedHintSfen(gameState.sfen);
+      setCachedHintTurn(gameState.turn);
+      
+      // Execute the best move
+      await handleMove(analysis.bestmove);
+    } catch (error) {
+      console.error('Failed to get best move:', error);
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: '⚠️ Could not get best move. Engine analysis unavailable.'
+        }
+      ]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -362,6 +478,9 @@ export default function Home() {
           isOpen={isConfigOpen}
           onClose={() => setIsConfigOpen(false)}
           onSave={handleSaveConfig}
+          currentUseLLM={useLLM}
+          currentApiKey={currentApiKey}
+          currentShowBestMove={showBestMove}
         />
 
         {/* Clock Start Confirmation Modal */}
@@ -400,18 +519,20 @@ export default function Home() {
               onClockToggle={handleClockToggle}
               gameTime={gameTime}
               onNewGame={handleNewGame}
+              isGameOver={gameState?.is_game_over || false}
             />
           </div>
 
           {/* Center Column: Board */}
           <div className="flex-1 flex flex-col items-center gap-4">
             {gameState ? (
-              <>
-                {gameState.in_check && (
-                  <div className="text-accent-cyan font-semibold text-xl">⚠️ Check!</div>
-                )}
-                <ShogiBoard gameState={gameState} onMove={handleMove} />
-              </>
+              <ShogiBoard 
+                gameState={gameState} 
+                onMove={handleMove}
+                showBestMove={showBestMove}
+                onBestMove={handleBestMove}
+                isLoading={isLoading}
+              />
             ) : (
               <div className="flex items-center justify-center h-96">
                 <div className="text-text-secondary">Loading game...</div>
