@@ -12,9 +12,10 @@ interface ChatInterfaceProps {
     onSendMessage: (message: string) => void;
     isLoading?: boolean;
     onGetHint?: () => void;
+    onOpenSettings?: () => void;
 }
 
-export default function ChatInterface({ messages, onSendMessage, isLoading, onGetHint }: ChatInterfaceProps) {
+export default function ChatInterface({ messages, onSendMessage, isLoading, onGetHint, onOpenSettings }: ChatInterfaceProps) {
     const [input, setInput] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -37,8 +38,24 @@ export default function ChatInterface({ messages, onSendMessage, isLoading, onGe
     return (
         <div className="flex flex-col h-full bg-white rounded-lg shadow-lg border border-gray-200">
             <div className="bg-linear-to-r from-blue-600 to-purple-600 text-white p-4 rounded-t-lg">
-                <h2 className="text-xl font-bold">Shogi Teacher</h2>
-                <p className="text-sm opacity-90">Ask questions about the position or request analysis</p>
+                <div className="flex items-start justify-between">
+                    <div>
+                        <h2 className="text-xl font-bold">Shogi Teacher</h2>
+                        <p className="text-sm opacity-90">Ask questions about the position or request analysis</p>
+                    </div>
+                    {onOpenSettings && (
+                        <button
+                            onClick={onOpenSettings}
+                            className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                            title="Settings"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                        </button>
+                    )}
+                </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -90,6 +107,13 @@ export default function ChatInterface({ messages, onSendMessage, isLoading, onGe
                         disabled={isLoading}
                         className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                     />
+                    <button
+                        type="submit"
+                        disabled={isLoading || !input.trim()}
+                        className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                    >
+                        Send
+                    </button>
                     {onGetHint && (
                         <button
                             type="button"
@@ -105,13 +129,6 @@ export default function ChatInterface({ messages, onSendMessage, isLoading, onGe
                             </svg>
                         </button>
                     )}
-                    <button
-                        type="submit"
-                        disabled={isLoading || !input.trim()}
-                        className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-                    >
-                        Send
-                    </button>
                 </div>
             </form>
         </div>

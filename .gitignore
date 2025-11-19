@@ -39,6 +39,10 @@ Thumbs.db
 .env.test.local
 .env.production.local
 
+# Config files with API keys
+backend/config.json
+config.json
+
 # Testing
 .coverage
 htmlcov/

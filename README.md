@@ -4,8 +4,8 @@ An interactive shogi learning platform that combines a strong game engine with c
 
 ## Architecture
 
-- **Backend (Python/FastAPI)**: Game engine, USI integration, Gemini AI
-- **Frontend (Next.js/React)**: Interactive board, chat interface
+- **Backend (Python/FastAPI)**: Game engine, USI integration, Claude AI
+- **Frontend (Next.js/React)**: Interactive board, chat interface, move history with clock
 - **Engine**: YaneuraOu (USI-compatible shogi engine)
 
 ## Setup
@@ -36,9 +36,18 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-5. Configure environment:
-   - Copy `.env` and add your Gemini API key
-   - Ensure `YaneuraOu.exe` is in `backend/engine/`
+5. Configure API key (choose one method):
+   
+   **Option A: Using config.json (Recommended)**
+   - Copy `backend/config.json.example` to `backend/config.json`
+   - Add your Claude API key to `config.json`
+   - You can also configure this via the settings UI in the app
+   
+   **Option B: Using .env file**
+   - Create a `.env` file in the backend directory
+   - Add: `CLAUDE_API_KEY=your-api-key-here`
+   
+   **Note**: Ensure `YaneuraOu.exe` is in `backend/engine/`
 
 6. Run the backend:
 ```bash
@@ -72,17 +81,21 @@ npm run dev
 ## Features
 
 - **Interactive Gameplay**: Play complete games with move-by-move feedback
-- **AI Analysis**: Engine-powered position evaluation
-- **Contextual Explanations**: Natural language teaching from Gemini
-- **Visual Board**: Interactive shogi board with piece movement
+- **Move History**: Track all moves with timestamps and time per move
+- **Game Clock**: Built-in timer with start/pause controls
+- **AI Analysis**: Engine-powered position evaluation with best move suggestions
+- **Contextual Explanations**: Natural language teaching from Claude AI
+- **Visual Board**: Interactive shogi board with proper piece orientation
 - **Chat Interface**: Ask questions and get personalized guidance
+- **Hint System**: Get hints for the best move in any position
+- **Standard Notation**: Moves displayed in readable shogi notation (e.g., P-7f, Sx6h)
 
 ## Technology Stack
 
-- **Backend**: Python 3.14, FastAPI, python-shogi, google-generativeai
+- **Backend**: Python 3.14, FastAPI, python-shogi, anthropic (Claude API)
 - **Frontend**: Next.js 16, React, TypeScript, TailwindCSS
 - **Engine**: YaneuraOu (USI protocol)
-- **AI**: Google Gemini 1.5 Flash
+- **AI**: Claude 3.5 Haiku
 
 ## License
 
