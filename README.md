@@ -2,6 +2,9 @@
 
 An interactive shogi learning platform that combines a strong game engine with conversational AI to provide personalized, context-aware instruction.
 
+> [!IMPORTANT]
+> **Python Version Requirement**: This project requires **Python 3.13.x** due to a subprocess bug in Python 3.14.0 on Windows. Python 3.14.1+ should work once released.
+
 ## Architecture
 
 - **Backend (Python/FastAPI)**: Game engine, USI integration, Gemini AI

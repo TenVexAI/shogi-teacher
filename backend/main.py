@@ -3,10 +3,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import os
+import sys
 import shogi
 from dotenv import load_dotenv
 from engine import ShogiEngine
 from llm import GeminiTeacher
+
+# Fix for Windows asyncio subprocess support
+if sys.platform == 'win32':
+    import asyncio
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 load_dotenv()
 
@@ -42,6 +48,7 @@ class GameState(BaseModel):
     in_check: bool
     is_game_over: bool
     winner: Optional[str] = None
+    pieces_in_hand: Dict[str, Dict[str, int]] = {"b": {}, "w": {}}  # e.g. {"b": {"P": 2, "S": 1}, "w": {"P": 1}}
 
 class AnalysisRequest(BaseModel):
     sfen: str
@@ -92,12 +99,20 @@ async def make_move(request: MoveRequest):
 @app.post("/analyze")
 async def analyze_position(request: AnalysisRequest):
     try:
+        print(f"Analyzing position: {request.sfen}")
         analysis = await engine.analyze(request.sfen)
+        print(f"Analysis complete: {analysis}")
         return analysis
-    except FileNotFoundError:
-         raise HTTPException(status_code=500, detail="Engine binary not found")
+    except FileNotFoundError as e:
+        error_msg = f"Engine binary not found: {e}"
+        print(error_msg)
+        raise HTTPException(status_code=500, detail=error_msg)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        error_msg = f"Analysis error: {type(e).__name__}: {str(e)}"
+        print(error_msg)
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=error_msg)
 
 @app.post("/explain")
 async def explain_position(sfen: str, analysis: Dict[str, Any]):
@@ -105,12 +120,30 @@ async def explain_position(sfen: str, analysis: Dict[str, Any]):
     return {"explanation": explanation}
 
 def _build_game_state(board: shogi.Board) -> GameState:
+    # Extract pieces in hand from board
+    pieces_in_hand = {"b": {}, "w": {}}
+    
+    # Black's pieces in hand
+    for piece_type in shogi.PIECE_TYPES:
+        count = board.pieces_in_hand[shogi.BLACK][piece_type]
+        if count > 0:
+            piece_symbol = shogi.PIECE_SYMBOLS[piece_type].upper()  # P, L, N, S, G, B, R
+            pieces_in_hand["b"][piece_symbol] = count
+    
+    # White's pieces in hand  
+    for piece_type in shogi.PIECE_TYPES:
+        count = board.pieces_in_hand[shogi.WHITE][piece_type]
+        if count > 0:
+            piece_symbol = shogi.PIECE_SYMBOLS[piece_type].upper()
+            pieces_in_hand["w"][piece_symbol] = count
+    
     return GameState(
         sfen=board.sfen(),
         turn="b" if board.turn == shogi.BLACK else "w",
         legal_moves=[m.usi() for m in board.legal_moves],
         in_check=board.is_check(),
         is_game_over=board.is_game_over(),
-        winner="b" if board.turn == shogi.WHITE else "w" if board.is_game_over() else None # Simplified winner logic
+        winner="b" if board.turn == shogi.WHITE else "w" if board.is_game_over() else None, # Simplified winner logic
+        pieces_in_hand=pieces_in_hand
     )
 

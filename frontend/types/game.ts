@@ -10,6 +10,10 @@ export interface GameState {
     in_check: boolean;
     is_game_over: boolean;
     winner: string | null;
+    pieces_in_hand: {
+        b: { [piece: string]: number };
+        w: { [piece: string]: number };
+    };
 }
 
 export interface Analysis {

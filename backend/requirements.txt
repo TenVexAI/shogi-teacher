@@ -1,3 +1,4 @@
+# Add chess engine library for robust USI communication
 fastapi
 uvicorn
 python-shogi

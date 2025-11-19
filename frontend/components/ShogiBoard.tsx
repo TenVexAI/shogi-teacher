@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { GameState } from '@/types/game';
+import CapturedPieces from './CapturedPieces';
 
 interface Position {
     row: number;
@@ -83,6 +84,7 @@ function positionToUsi(from: Position, to: Position): string {
 export default function ShogiBoard({ gameState, onMove }: ShogiBoardProps) {
     const [board, setBoard] = useState<(string | null)[][]>([]);
     const [selectedSquare, setSelectedSquare] = useState<Position | null>(null);
+    const [selectedDropPiece, setSelectedDropPiece] = useState<string | null>(null);
     const [legalMoves, setLegalMoves] = useState<Position[]>([]);
 
     useEffect(() => {
@@ -90,7 +92,48 @@ export default function ShogiBoard({ gameState, onMove }: ShogiBoardProps) {
         setBoard(parsedBoard);
     }, [gameState.sfen]);
 
+    const handleDropPieceSelect = (piece: string) => {
+        // Clear any selected square
+        setSelectedSquare(null);
+        setLegalMoves([]);
+
+        // Toggle drop piece selection
+        if (selectedDropPiece === piece) {
+            setSelectedDropPiece(null);
+        } else {
+            setSelectedDropPiece(piece);
+
+            // Find legal drop squares for this piece
+            const dropMoves: Position[] = [];
+            gameState.legal_moves.forEach(usi => {
+                // Drop moves are in format: P*5e (piece*square)
+                if (usi.includes('*') && usi.startsWith(piece)) {
+                    const squarePart = usi.split('*')[1];
+                    const col = 9 - parseInt(squarePart[0]);
+                    const row = squarePart.charCodeAt(1) - 'a'.charCodeAt(0);
+                    dropMoves.push({ row, col });
+                }
+            });
+            setLegalMoves(dropMoves);
+        }
+    };
+
     const handleSquareClick = (row: number, col: number) => {
+        // If a drop piece is selected, try to drop it
+        if (selectedDropPiece) {
+            const isLegalDrop = legalMoves.some(m => m.row === row && m.col === col);
+            if (isLegalDrop) {
+                const col_usi = 9 - col;
+                const row_usi = String.fromCharCode('a'.charCodeAt(0) + row);
+                const dropMove = `${selectedDropPiece}*${col_usi}${row_usi}`;
+                onMove(dropMove);
+            }
+            setSelectedDropPiece(null);
+            setLegalMoves([]);
+            return;
+        }
+
+        // Normal piece movement logic
         if (!selectedSquare) {
             // Select a piece
             if (board[row]?.[col]) {
@@ -99,9 +142,11 @@ export default function ShogiBoard({ gameState, onMove }: ShogiBoardProps) {
                 // Calculate legal moves for this piece
                 const moves: Position[] = [];
                 gameState.legal_moves.forEach(usi => {
-                    const positions = usiToPosition(usi);
-                    if (positions && positions.from.row === row && positions.from.col === col) {
-                        moves.push(positions.to);
+                    if (!usi.includes('*')) {  // Skip drop moves
+                        const positions = usiToPosition(usi);
+                        if (positions && positions.from.row === row && positions.from.col === col) {
+                            moves.push(positions.to);
+                        }
                     }
                 });
                 setLegalMoves(moves);
@@ -130,6 +175,13 @@ export default function ShogiBoard({ gameState, onMove }: ShogiBoardProps) {
 
     return (
         <div className="flex flex-col items-center gap-4">
+            {/* White's captured pieces (top) */}
+            <CapturedPieces
+                pieces={gameState.pieces_in_hand.w}
+                color="w"
+                onPieceDrop={gameState.turn === 'w' ? handleDropPieceSelect : undefined}
+            />
+
             <div className="inline-block border-4 border-amber-900 bg-amber-100 p-2">
                 {board.map((row, rowIndex) => (
                     <div key={rowIndex} className="flex">
@@ -146,6 +198,7 @@ export default function ShogiBoard({ gameState, onMove }: ShogiBoardProps) {
                     cursor-pointer hover:bg-amber-200 transition-colors
                     ${isSelected(rowIndex, colIndex) ? 'bg-blue-300' : ''}
                     ${isLegalMove(rowIndex, colIndex) ? 'bg-green-200' : ''}
+                    ${selectedDropPiece && isLegalMove(rowIndex, colIndex) ? 'bg-purple-200' : ''}
                   `}
                                 >
                                     {piece && (
@@ -163,15 +216,18 @@ export default function ShogiBoard({ gameState, onMove }: ShogiBoardProps) {
                 ))}
             </div>
 
-            <div className="text-sm text-gray-600">
-                Turn: {gameState.turn === 'b' ? 'Black (先手)' : 'White (後手)'}
-                {gameState.in_check && <span className="ml-2 text-red-600 font-bold">CHECK!</span>}
-                {gameState.is_game_over && (
-                    <span className="ml-2 text-green-600 font-bold">
-                        Game Over - Winner: {gameState.winner}
-                    </span>
-                )}
-            </div>
+            {/* Black's captured pieces (bottom) */}
+            <CapturedPieces
+                pieces={gameState.pieces_in_hand.b}
+                color="b"
+                onPieceDrop={gameState.turn === 'b' ? handleDropPieceSelect : undefined}
+            />
+
+            {selectedDropPiece && (
+                <div className="text-sm text-purple-600 font-semibold">
+                    Selected piece to drop: {PIECE_SYMBOLS[selectedDropPiece]} - Click a highlighted square
+                </div>
+            )}
         </div>
     );
 }
