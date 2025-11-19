@@ -314,7 +314,7 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-linear-to-br from-slate-50 to-blue-50 p-8">
+    <main className="min-h-screen bg-background-primary p-8">
       <div className="max-w-7xl mx-auto">
         <ConfigModal
           isOpen={isConfigOpen}
@@ -340,13 +340,13 @@ export default function Home() {
             {gameState ? (
               <>
                 {gameState.in_check && (
-                  <div className="text-red-600 font-semibold text-xl">⚠️ Check!</div>
+                  <div className="text-accent-cyan font-semibold text-xl">⚠️ Check!</div>
                 )}
                 <ShogiBoard gameState={gameState} onMove={handleMove} />
               </>
             ) : (
               <div className="flex items-center justify-center h-96">
-                <div className="text-gray-400">Loading game...</div>
+                <div className="text-text-secondary">Loading game...</div>
               </div>
             )}
           </div>

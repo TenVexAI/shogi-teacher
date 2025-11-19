@@ -36,11 +36,11 @@ export default function ChatInterface({ messages, onSendMessage, isLoading, onGe
     };
 
     return (
-        <div className="flex flex-col h-full bg-white rounded-lg shadow-lg border border-gray-200">
-            <div className="bg-linear-to-r from-blue-600 to-purple-600 text-white p-4 rounded-t-lg">
+        <div className="flex flex-col h-full bg-background-secondary rounded-lg shadow-lg border border-border">
+            <div className="bg-linear-to-r from-accent-purple to-accent-cyan text-white p-4 rounded-t-lg">
                 <div className="flex items-start justify-between">
                     <div>
-                        <h2 className="text-xl font-bold">Shogi Teacher</h2>
+                        <h2 className="text-xl font-bold font-pixel drop-shadow-lg">Shogi Teacher</h2>
                         <p className="text-sm opacity-90">Ask questions about the position or request analysis</p>
                     </div>
                     {onOpenSettings && (
@@ -60,7 +60,7 @@ export default function ChatInterface({ messages, onSendMessage, isLoading, onGe
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {messages.length === 0 && (
-                    <div className="text-center text-gray-400 mt-8">
+                    <div className="text-center text-text-secondary mt-8">
                         <p className="text-lg">Welcome to Shogi Teacher!</p>
                         <p className="text-sm mt-2">Make a move or ask a question to get started.</p>
                     </div>
@@ -73,8 +73,8 @@ export default function ChatInterface({ messages, onSendMessage, isLoading, onGe
                     >
                         <div
                             className={`max-w-[80%] rounded-lg p-3 ${message.role === 'user'
-                                    ? 'bg-blue-500 text-white'
-                                    : 'bg-gray-100 text-gray-800'
+                                    ? 'bg-accent-purple text-white'
+                                    : 'bg-background-primary border border-border text-text-primary'
                                 }`}
                         >
                             <p className="whitespace-pre-wrap">{message.content}</p>
@@ -84,11 +84,11 @@ export default function ChatInterface({ messages, onSendMessage, isLoading, onGe
 
                 {isLoading && (
                     <div className="flex justify-start">
-                        <div className="bg-gray-100 text-gray-800 rounded-lg p-3">
+                        <div className="bg-background-primary border border-border text-text-primary rounded-lg p-3">
                             <div className="flex space-x-2">
-                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                                <div className="w-2 h-2 bg-accent-purple rounded-full animate-bounce"></div>
+                                <div className="w-2 h-2 bg-accent-purple rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                                <div className="w-2 h-2 bg-accent-purple rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                             </div>
                         </div>
                     </div>
@@ -97,7 +97,7 @@ export default function ChatInterface({ messages, onSendMessage, isLoading, onGe
                 <div ref={messagesEndRef} />
             </div>
 
-            <form onSubmit={handleSubmit} className="p-4 border-t border-gray-200">
+            <form onSubmit={handleSubmit} className="p-4 border-t border-border">
                 <div className="flex gap-2">
                     <input
                         type="text"
@@ -105,12 +105,12 @@ export default function ChatInterface({ messages, onSendMessage, isLoading, onGe
                         onChange={(e) => setInput(e.target.value)}
                         placeholder="Ask about the position..."
                         disabled={isLoading}
-                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                        className="flex-1 px-4 py-2 bg-background-primary border border-border text-text-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-purple disabled:opacity-50 placeholder:text-text-secondary"
                     />
                     <button
                         type="submit"
                         disabled={isLoading || !input.trim()}
-                        className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                        className="px-6 py-2 bg-accent-purple text-white rounded-lg hover:bg-[#8a6fd1] disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-pixel drop-shadow-lg"
                     >
                         Send
                     </button>
@@ -119,7 +119,7 @@ export default function ChatInterface({ messages, onSendMessage, isLoading, onGe
                             type="button"
                             onClick={onGetHint}
                             disabled={isLoading}
-                            className="p-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                            className="p-2 bg-accent-cyan text-white rounded-lg hover:bg-[#0fc9ad] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                             title="Get Hint"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

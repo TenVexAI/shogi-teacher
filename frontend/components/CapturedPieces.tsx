@@ -17,7 +17,7 @@ export default function CapturedPieces({ pieces, color, onPieceDrop }: CapturedP
 
     return (
         <div className={`${bgColor} ${textColor} p-3 rounded-lg`}>
-            <div className="text-sm font-semibold mb-2">{colorName}'s Captured Pieces</div>
+            <div className="text-sm font-semibold mb-2 font-pixel drop-shadow-lg">{colorName}&apos;s Captured Pieces</div>
             <div className="flex flex-wrap gap-2">
                 {Object.entries(pieces).length === 0 ? (
                     <div className="text-xs opacity-60">None</div>

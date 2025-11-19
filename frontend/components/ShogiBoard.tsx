@@ -179,10 +179,9 @@ export default function ShogiBoard({ gameState, onMove }: ShogiBoardProps) {
 
             <div className="inline-block">
                 {/* Column numbers (9 to 1) */}
-                <div className="flex">
-                    <div className="w-8"></div>
+                <div className="flex" style={{ marginLeft: '44px' }}>
                     {[9, 8, 7, 6, 5, 4, 3, 2, 1].map(num => (
-                        <div key={num} className="w-12 h-6 flex items-center justify-center text-sm font-semibold text-gray-700">
+                        <div key={num} className="w-12 h-8 flex items-center justify-center text-sm font-semibold text-text-primary font-pixel drop-shadow-lg">
                             {num}
                         </div>
                     ))}
@@ -191,9 +190,9 @@ export default function ShogiBoard({ gameState, onMove }: ShogiBoardProps) {
                 {/* Board with row letters */}
                 <div className="flex">
                     {/* Row letters (a to i) */}
-                    <div className="flex flex-col">
+                    <div className="flex flex-col justify-center">
                         {['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'].map(letter => (
-                            <div key={letter} className="w-8 h-12 flex items-center justify-center text-sm font-semibold text-gray-700">
+                            <div key={letter} className="w-8 h-12 flex items-center justify-center text-sm font-semibold text-text-primary font-pixel drop-shadow-lg">
                                 {letter}
                             </div>
                         ))}
