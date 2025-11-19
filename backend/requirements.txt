@@ -2,5 +2,5 @@
 fastapi
 uvicorn
 python-shogi
-google-generativeai
+anthropic
 python-dotenv

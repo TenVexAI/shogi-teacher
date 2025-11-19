@@ -1,20 +1,18 @@
-import google.generativeai as genai
-import os
+from anthropic import Anthropic
 from typing import Dict, Any
+from config_handler import get_api_key
 
-class GeminiTeacher:
+class ClaudeTeacher:
     def __init__(self):
-        api_key = os.getenv("GEMINI_API_KEY")
+        api_key = get_api_key()
         if api_key:
-            genai.configure(api_key=api_key)
-            # Use gemini-1.5-pro for better reliability
-            self.model = genai.GenerativeModel('gemini-1.5-pro')
+            self.client = Anthropic(api_key=api_key)
         else:
-            self.model = None
+            self.client = None
 
     async def explain(self, sfen: str, analysis: Dict[str, Any], context: str = "") -> str:
-        if not self.model:
-            return "Gemini API key not found. Please set GEMINI_API_KEY in .env."
+        if not self.client:
+            return "Claude API key not found. Please set CLAUDE_API_KEY in .env or configure it in settings."
         
         best_move = analysis.get("bestmove", "unknown")
         score_cp = analysis.get("score_cp", 0)
@@ -61,7 +59,13 @@ class GeminiTeacher:
         """
         
         try:
-            response = await self.model.generate_content_async(prompt)
-            return response.text
+            message = self.client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=1024,
+                messages=[
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            return message.content[0].text
         except Exception as e:
             return f"Error generating explanation: {e}"

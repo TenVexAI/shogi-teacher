@@ -37,7 +37,7 @@ export async function analyzePosition(sfen: string) {
     return response.json();
 }
 
-export async function explainPosition(sfen: string, analysis: any) {
+export async function explainPosition(sfen: string, analysis: Record<string, unknown>) {
     const response = await fetch(`${API_BASE_URL}/explain?sfen=${encodeURIComponent(sfen)}`, {
         method: 'POST',
         headers: {
@@ -47,6 +47,28 @@ export async function explainPosition(sfen: string, analysis: any) {
     });
     if (!response.ok) {
         throw new Error('Failed to get explanation');
+    }
+    return response.json();
+}
+
+export async function getConfig() {
+    const response = await fetch(`${API_BASE_URL}/config`);
+    if (!response.ok) {
+        throw new Error('Failed to get configuration');
+    }
+    return response.json();
+}
+
+export async function updateConfig(apiKey: string) {
+    const response = await fetch(`${API_BASE_URL}/config`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ claude_api_key: apiKey }),
+    });
+    if (!response.ok) {
+        throw new Error('Failed to update configuration');
     }
     return response.json();
 }

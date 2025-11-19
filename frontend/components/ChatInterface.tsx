@@ -11,9 +11,10 @@ interface ChatInterfaceProps {
     messages: Message[];
     onSendMessage: (message: string) => void;
     isLoading?: boolean;
+    onGetHint?: () => void;
 }
 
-export default function ChatInterface({ messages, onSendMessage, isLoading }: ChatInterfaceProps) {
+export default function ChatInterface({ messages, onSendMessage, isLoading, onGetHint }: ChatInterfaceProps) {
     const [input, setInput] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -35,7 +36,7 @@ export default function ChatInterface({ messages, onSendMessage, isLoading }: Ch
 
     return (
         <div className="flex flex-col h-full bg-white rounded-lg shadow-lg border border-gray-200">
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 rounded-t-lg">
+            <div className="bg-linear-to-r from-blue-600 to-purple-600 text-white p-4 rounded-t-lg">
                 <h2 className="text-xl font-bold">Shogi Teacher</h2>
                 <p className="text-sm opacity-90">Ask questions about the position or request analysis</p>
             </div>
@@ -89,6 +90,21 @@ export default function ChatInterface({ messages, onSendMessage, isLoading }: Ch
                         disabled={isLoading}
                         className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                     />
+                    {onGetHint && (
+                        <button
+                            type="button"
+                            onClick={onGetHint}
+                            disabled={isLoading}
+                            className="p-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                            title="Get Hint"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/>
+                                <path d="M9 18h6"/>
+                                <path d="M10 22h4"/>
+                            </svg>
+                        </button>
+                    )}
                     <button
                         type="submit"
                         disabled={isLoading || !input.trim()}

@@ -14,6 +14,7 @@ export interface GameState {
         b: { [piece: string]: number };
         w: { [piece: string]: number };
     };
+    last_move_notation?: string | null;
 }
 
 export interface Analysis {

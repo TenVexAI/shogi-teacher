@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { GameState } from '@/types/game';
 import CapturedPieces from './CapturedPieces';
 
@@ -82,15 +82,10 @@ function positionToUsi(from: Position, to: Position): string {
 }
 
 export default function ShogiBoard({ gameState, onMove }: ShogiBoardProps) {
-    const [board, setBoard] = useState<(string | null)[][]>([]);
+    const board = useMemo(() => parseSfen(gameState.sfen), [gameState.sfen]);
     const [selectedSquare, setSelectedSquare] = useState<Position | null>(null);
     const [selectedDropPiece, setSelectedDropPiece] = useState<string | null>(null);
     const [legalMoves, setLegalMoves] = useState<Position[]>([]);
-
-    useEffect(() => {
-        const parsedBoard = parseSfen(gameState.sfen);
-        setBoard(parsedBoard);
-    }, [gameState.sfen]);
 
     const handleDropPieceSelect = (piece: string) => {
         // Clear any selected square
@@ -182,38 +177,65 @@ export default function ShogiBoard({ gameState, onMove }: ShogiBoardProps) {
                 onPieceDrop={gameState.turn === 'w' ? handleDropPieceSelect : undefined}
             />
 
-            <div className="inline-block border-4 border-amber-900 bg-amber-100 p-2">
-                {board.map((row, rowIndex) => (
-                    <div key={rowIndex} className="flex">
-                        {row.map((piece, colIndex) => {
-                            const isWhitePiece = piece && piece.toUpperCase() === piece && piece !== '+';
-                            const pieceSymbol = piece ? PIECE_SYMBOLS[piece] || piece : '';
+            <div className="inline-block">
+                {/* Column numbers (9 to 1) */}
+                <div className="flex">
+                    <div className="w-8"></div>
+                    {[9, 8, 7, 6, 5, 4, 3, 2, 1].map(num => (
+                        <div key={num} className="w-12 h-6 flex items-center justify-center text-sm font-semibold text-gray-700">
+                            {num}
+                        </div>
+                    ))}
+                </div>
 
-                            return (
-                                <div
-                                    key={`${rowIndex}-${colIndex}`}
-                                    onClick={() => handleSquareClick(rowIndex, colIndex)}
-                                    className={`
-                    w-12 h-12 border border-amber-700 flex items-center justify-center
-                    cursor-pointer hover:bg-amber-200 transition-colors
-                    ${isSelected(rowIndex, colIndex) ? 'bg-blue-300' : ''}
-                    ${isLegalMove(rowIndex, colIndex) ? 'bg-green-200' : ''}
-                    ${selectedDropPiece && isLegalMove(rowIndex, colIndex) ? 'bg-purple-200' : ''}
-                  `}
-                                >
-                                    {piece && (
-                                        <span
-                                            className={`text-2xl font-bold select-none ${isWhitePiece ? 'rotate-180' : ''
-                                                }`}
-                                        >
-                                            {pieceSymbol}
-                                        </span>
-                                    )}
-                                </div>
-                            );
-                        })}
+                {/* Board with row letters */}
+                <div className="flex">
+                    {/* Row letters (a to i) */}
+                    <div className="flex flex-col">
+                        {['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'].map(letter => (
+                            <div key={letter} className="w-8 h-12 flex items-center justify-center text-sm font-semibold text-gray-700">
+                                {letter}
+                            </div>
+                        ))}
                     </div>
-                ))}
+
+                    {/* The actual board */}
+                    <div className="border-4 border-amber-900 bg-amber-100 p-2">
+                        {board.map((row, rowIndex) => (
+                            <div key={rowIndex} className="flex">
+                                {row.map((piece, colIndex) => {
+                                    // In this SFEN: uppercase = Black (bottom), lowercase = White (top)
+                                    // Black pieces should be right-side up, White pieces should be upside down
+                                    const isWhitePiece = piece && piece.toLowerCase() === piece && piece !== '+';
+                                    const pieceSymbol = piece ? PIECE_SYMBOLS[piece] || piece : '';
+
+                                    return (
+                                        <div
+                                            key={`${rowIndex}-${colIndex}`}
+                                            onClick={() => handleSquareClick(rowIndex, colIndex)}
+                                            className={`
+                        w-12 h-12 border border-amber-700 flex items-center justify-center
+                        cursor-pointer hover:bg-amber-200 transition-colors
+                        ${isSelected(rowIndex, colIndex) ? 'bg-blue-300' : ''}
+                        ${isLegalMove(rowIndex, colIndex) ? 'bg-green-200' : ''}
+                        ${selectedDropPiece && isLegalMove(rowIndex, colIndex) ? 'bg-purple-200' : ''}
+                      `}
+                                        >
+                                            {piece && (
+                                                <span
+                                                    className={`text-2xl font-bold select-none text-black ${isWhitePiece ? 'rotate-180' : ''
+                                                        }`}
+                                                >
+                                                    {pieceSymbol}
+                                                </span>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ))}
+                    </div>
+                </div>
             </div>
 
             {/* Black's captured pieces (bottom) */}
