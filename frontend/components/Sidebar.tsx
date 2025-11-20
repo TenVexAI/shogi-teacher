@@ -1,13 +1,32 @@
-import React from 'react';
-import { Settings, Power, Volume2, VolumeX } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Settings, Power, Volume2, VolumeX, BookOpen } from 'lucide-react';
 
 interface SidebarProps {
   onOpenSettings: () => void;
   allSoundsEnabled: boolean;
   onToggleAllSounds: () => void;
+  onOpenLearn: () => void;
 }
 
-export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllSounds }: SidebarProps) {
+export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllSounds, onOpenLearn }: SidebarProps) {
+  const [isLearnWindowOpen, setIsLearnWindowOpen] = useState(false);
+
+  useEffect(() => {
+    // Check if running in Electron
+    const isElectron = typeof window !== 'undefined' && 'electron' in window && (window as any).electron;
+    
+    if (isElectron) {
+      // Check initial state
+      (window as any).electron.isLearnWindowOpen().then(setIsLearnWindowOpen);
+      
+      // Listen for state changes
+      const cleanup = (window as any).electron.onLearnWindowStateChange((isOpen: boolean) => {
+        setIsLearnWindowOpen(isOpen);
+      });
+      
+      return cleanup;
+    }
+  }, []);
   const handleShutdown = () => {
     // Check if running in Electron
     const isElectron = typeof window !== 'undefined' && 'electron' in window;
@@ -25,7 +44,21 @@ export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllS
 
   return (
     <div className="w-12 h-full bg-background-secondary flex flex-col items-center py-4 shrink-0 border-r border-border">
-      {/* Top section - can add more buttons here later */}
+      {/* Top section - Learn button */}
+      <div className="flex flex-col gap-4">
+        <button
+          onClick={onOpenLearn}
+          className="w-10 h-10 flex items-center justify-center group transition-colors"
+          title={isLearnWindowOpen ? "Close Learn Window" : "Learn to Play"}
+        >
+          <BookOpen className={`w-6 h-6 transition-colors ${
+            isLearnWindowOpen 
+              ? 'sound-active group-hover:!text-red-500' 
+              : 'text-text-secondary group-hover:text-accent-cyan'
+          }`} />
+        </button>
+      </div>
+
       <div className="flex-1"></div>
 
       {/* Bottom section - Sound, Settings and Shutdown */}
@@ -38,7 +71,7 @@ export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllS
         >
           {allSoundsEnabled ? (
             <>
-              <Volume2 className="w-6 h-6 text-accent-cyan transition-opacity group-hover:opacity-0" />
+              <Volume2 className="w-6 h-6 transition-opacity group-hover:opacity-0 sound-active" />
               <VolumeX className="w-6 h-6 text-red-500 transition-opacity opacity-0 group-hover:opacity-100 absolute" />
             </>
           ) : (

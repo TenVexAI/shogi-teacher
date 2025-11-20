@@ -1,14 +1,22 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, session, ipcMain } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const axios = require('axios');
 const isDev = process.env.NODE_ENV === 'development';
 
 let mainWindow;
+let learnWindow = null;
 let backendProcess = null;
 const BACKEND_PORT = 8000;
 const BACKEND_URL = `http://localhost:${BACKEND_PORT}`;
+
+// Clear cache in development to fix icon issues
+if (isDev) {
+  app.whenReady().then(() => {
+    session.defaultSession.clearCache();
+  });
+}
 
 // Start the Python backend
 async function startBackend() {
@@ -94,6 +102,11 @@ function createWindow() {
     show: false // Don't show until backend is ready
   });
 
+  // Don't allow window.open, use IPC instead
+  mainWindow.webContents.setWindowOpenHandler(() => {
+    return { action: 'deny' };
+  });
+
   // Load the app
   if (isDev) {
     mainWindow.loadURL('http://localhost:3000');
@@ -117,6 +130,64 @@ function createWindow() {
     mainWindow = null;
   });
 }
+
+// Create learn window
+function createLearnWindow() {
+  if (learnWindow) {
+    learnWindow.focus();
+    return;
+  }
+
+  learnWindow = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    icon: path.join(__dirname, '../public/icon.png'),
+    title: 'Learn to Play Shogi',
+    autoHideMenuBar: true,
+    backgroundColor: '#141414',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js')
+    }
+  });
+
+  const learnUrl = isDev ? 'http://localhost:3000/learn' : path.join(__dirname, '../out/learn/index.html');
+  
+  if (isDev) {
+    learnWindow.loadURL(learnUrl);
+  } else {
+    learnWindow.loadFile(learnUrl);
+  }
+
+  learnWindow.on('closed', () => {
+    learnWindow = null;
+    // Notify main window that learn window closed
+    if (mainWindow) {
+      mainWindow.webContents.send('learn-window-state-changed', false);
+    }
+  });
+
+  // Notify main window that learn window opened
+  if (mainWindow) {
+    mainWindow.webContents.send('learn-window-state-changed', true);
+  }
+}
+
+// IPC Handlers
+ipcMain.handle('open-learn-window', () => {
+  createLearnWindow();
+});
+
+ipcMain.handle('close-learn-window', () => {
+  if (learnWindow) {
+    learnWindow.close();
+  }
+});
+
+ipcMain.handle('is-learn-window-open', () => {
+  return learnWindow !== null;
+});
 
 app.whenReady().then(() => {
   createWindow();

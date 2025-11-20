@@ -77,13 +77,48 @@ function usiToPosition(usi: string): { from: Position; to: Position } | null {
     };
 }
 
-function positionToUsi(from: Position, to: Position): string {
+function positionToUsi(from: Position, to: Position, promote: boolean = false): string {
     const fromCol = 9 - from.col;
     const fromRow = String.fromCharCode('a'.charCodeAt(0) + from.row);
     const toCol = 9 - to.col;
     const toRow = String.fromCharCode('a'.charCodeAt(0) + to.row);
 
-    return `${fromCol}${fromRow}${toCol}${toRow}`;
+    return `${fromCol}${fromRow}${toCol}${toRow}${promote ? '+' : ''}`;
+}
+
+// Check if a piece can promote
+function canPromote(piece: string, fromRow: number, toRow: number, isBlack: boolean): boolean {
+    // Already promoted pieces can't promote again
+    if (piece.startsWith('+')) return false;
+    // Gold and King can't promote
+    const pieceType = piece.toLowerCase();
+    if (pieceType === 'g' || pieceType === 'k') return false;
+    
+    // Check if move is in or to promotion zone (last 3 rows)
+    if (isBlack) {
+        return fromRow <= 2 || toRow <= 2;
+    } else {
+        return fromRow >= 6 || toRow >= 6;
+    }
+}
+
+// Check if a piece MUST promote (would be unable to move otherwise)
+function mustPromote(piece: string, toRow: number, isBlack: boolean): boolean {
+    const pieceType = piece.toLowerCase();
+    
+    if (isBlack) {
+        // Pawn or Lance on last row
+        if ((pieceType === 'p' || pieceType === 'l') && toRow === 0) return true;
+        // Knight on last 2 rows
+        if (pieceType === 'n' && toRow <= 1) return true;
+    } else {
+        // Pawn or Lance on last row
+        if ((pieceType === 'p' || pieceType === 'l') && toRow === 8) return true;
+        // Knight on last 2 rows
+        if (pieceType === 'n' && toRow >= 7) return true;
+    }
+    
+    return false;
 }
 
 export default function ShogiBoard({ gameState, onMove, showBestMove = false, onBestMove, isLoading = false, showCheckNotification = true }: ShogiBoardProps) {
@@ -91,6 +126,8 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
     const [selectedSquare, setSelectedSquare] = useState<Position | null>(null);
     const [selectedDropPiece, setSelectedDropPiece] = useState<string | null>(null);
     const [legalMoves, setLegalMoves] = useState<Position[]>([]);
+    const [showPromotionDialog, setShowPromotionDialog] = useState(false);
+    const [pendingMove, setPendingMove] = useState<{ from: Position; to: Position; piece: string } | null>(null);
 
     const handleDropPieceSelect = (piece: string) => {
         // Clear any selected square
@@ -156,8 +193,31 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
             const isLegalMove = legalMoves.some(m => m.row === row && m.col === col);
 
             if (isLegalMove) {
-                const usiMove = positionToUsi(selectedSquare, { row, col });
-                onMove(usiMove);
+                const piece = board[selectedSquare.row]?.[selectedSquare.col];
+                if (!piece) return;
+
+                const isBlack = gameState.turn === 'b';
+                const fromRow = selectedSquare.row;
+                const toRow = row;
+
+                // Check if promotion is possible
+                if (canPromote(piece, fromRow, toRow, isBlack)) {
+                    // Check if promotion is forced
+                    if (mustPromote(piece, toRow, isBlack)) {
+                        // Auto-promote
+                        const usiMove = positionToUsi(selectedSquare, { row, col }, true);
+                        onMove(usiMove);
+                    } else {
+                        // Show promotion dialog
+                        setPendingMove({ from: selectedSquare, to: { row, col }, piece });
+                        setShowPromotionDialog(true);
+                        return; // Don't clear selection yet
+                    }
+                } else {
+                    // No promotion possible, just move
+                    const usiMove = positionToUsi(selectedSquare, { row, col });
+                    onMove(usiMove);
+                }
             }
 
             setSelectedSquare(null);
@@ -171,6 +231,18 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
 
     const isLegalMove = (row: number, col: number) => {
         return legalMoves.some(m => m.row === row && m.col === col);
+    };
+
+    const handlePromote = (promote: boolean) => {
+        if (!pendingMove) return;
+        
+        const usiMove = positionToUsi(pendingMove.from, pendingMove.to, promote);
+        onMove(usiMove);
+        
+        setShowPromotionDialog(false);
+        setPendingMove(null);
+        setSelectedSquare(null);
+        setLegalMoves([]);
     };
 
     const attackerColor = gameState.turn === 'b' ? 'White' : 'Black';
@@ -305,6 +377,31 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
             {selectedDropPiece && (
                 <div className="text-sm text-purple-600 font-semibold">
                     Selected piece to drop: {PIECE_SYMBOLS[selectedDropPiece]} - Click a highlighted square
+                </div>
+            )}
+
+            {/* Promotion Dialog */}
+            {showPromotionDialog && pendingMove && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-background-secondary border-2 border-border rounded-lg p-6 shadow-xl">
+                        <h3 className="text-xl font-bold text-text-primary mb-4 font-pixel">
+                            Promote {PIECE_SYMBOLS[pendingMove.piece]}?
+                        </h3>
+                        <div className="flex gap-4">
+                            <button
+                                onClick={() => handlePromote(true)}
+                                className="px-6 py-3 bg-accent-cyan text-background-primary rounded-lg hover:bg-[#0fc9ad] transition-colors font-pixel font-bold"
+                            >
+                                Yes, Promote
+                            </button>
+                            <button
+                                onClick={() => handlePromote(false)}
+                                className="px-6 py-3 bg-background-primary border border-border text-text-primary rounded-lg hover:bg-background-secondary transition-colors font-pixel"
+                            >
+                                No, Keep
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

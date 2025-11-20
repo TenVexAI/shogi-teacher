@@ -43,6 +43,20 @@ div[style*="position: fixed"][style*="bottom"][style*="right"] {
   pointer-events: none !important;
 }
 
+/* Sound icon color cycling animation */
+@keyframes soundColorCycle {
+  0%, 100% { 
+    color: var(--accent-cyan);
+  }
+  50% { 
+    color: var(--accent-purple);
+  }
+}
+
+.sound-active {
+  animation: soundColorCycle 5s ease-in-out infinite;
+}
+
 /* Smooth scrolling */
 html {
   scroll-behavior: smooth;
@@ -72,7 +86,7 @@ html {
   width: 40px;
   height: 44px;
   background: linear-gradient(to bottom, #f5deb3 0%, #daa520 100%);
-  clip-path: polygon(50% 0%, 90% 15%, 100% 100%, 0% 100%, 10% 15%);
+  clip-path: polygon(50% 0%, 90% 20%, 100% 100%, 0% 100%, 10% 20%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -84,7 +98,7 @@ html {
   position: absolute;
   inset: 2px;
   background: linear-gradient(to bottom, #f5e6d3 0%, #e8c68a 100%);
-  clip-path: polygon(50% 0%, 90% 15%, 100% 100%, 0% 100%, 10% 15%);
+  clip-path: polygon(50% 0%, 90% 20%, 100% 100%, 0% 100%, 10% 20%);
   z-index: 0;
 }
 
@@ -97,7 +111,7 @@ html {
 .shogi-piece-indicator {
   width: 14px;
   height: 16px;
-  clip-path: polygon(50% 0%, 90% 15%, 100% 100%, 0% 100%, 10% 15%);
+  clip-path: polygon(50% 0%, 90% 20%, 100% 100%, 0% 100%, 10% 20%);
 }
 
 /* White piece slightly smaller to compensate for optical illusion */

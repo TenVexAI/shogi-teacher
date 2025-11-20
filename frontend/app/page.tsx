@@ -401,6 +401,24 @@ export default function Home() {
     audioManager.updateSettings(newSettings);
   };
 
+  const handleOpenLearn = async () => {
+    // Check if running in Electron
+    const isElectron = typeof window !== 'undefined' && 'electron' in window && (window as any).electron;
+    
+    if (isElectron) {
+      // In Electron, toggle learn window via IPC
+      const isOpen = await (window as any).electron.isLearnWindowOpen();
+      if (isOpen) {
+        await (window as any).electron.closeLearnWindow();
+      } else {
+        await (window as any).electron.openLearnWindow();
+      }
+    } else {
+      // In browser, open in new tab
+      window.open('/learn', '_blank');
+    }
+  };
+
   // Helper to add assistant message with sound
   const addAssistantMessage = (content: string) => {
     setMessages(prev => [...prev, { role: 'assistant', content }]);
@@ -575,6 +593,7 @@ export default function Home() {
             onOpenSettings={() => setIsConfigOpen(true)}
             allSoundsEnabled={soundSettings.uiEnabled || soundSettings.musicEnabled || soundSettings.ambientEnabled}
             onToggleAllSounds={handleToggleAllSounds}
+            onOpenLearn={handleOpenLearn}
           />
 
           {/* Main Content */}
