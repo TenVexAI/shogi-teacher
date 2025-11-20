@@ -13,14 +13,12 @@ export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllS
 
   useEffect(() => {
     // Check if running in Electron
-    const isElectron = typeof window !== 'undefined' && 'electron' in window && (window as any).electron;
-    
-    if (isElectron) {
+    if (typeof window !== 'undefined' && window.electron) {
       // Check initial state
-      (window as any).electron.isLearnWindowOpen().then(setIsLearnWindowOpen);
+      window.electron.isLearnWindowOpen().then(setIsLearnWindowOpen);
       
       // Listen for state changes
-      const cleanup = (window as any).electron.onLearnWindowStateChange((isOpen: boolean) => {
+      const cleanup = window.electron.onLearnWindowStateChange((isOpen: boolean) => {
         setIsLearnWindowOpen(isOpen);
       });
       
@@ -53,7 +51,7 @@ export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllS
         >
           <BookOpen className={`w-6 h-6 transition-colors ${
             isLearnWindowOpen 
-              ? 'sound-active group-hover:!text-red-500' 
+              ? 'sound-active group-hover:text-red-500!' 
               : 'text-text-secondary group-hover:text-accent-cyan'
           }`} />
         </button>

@@ -59,7 +59,7 @@ export default function ConfigModal({ isOpen, onClose, onSave, currentUseLLM = t
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50">
             <div className="bg-background-secondary border border-border rounded-lg shadow-xl p-6 w-full max-w-md">
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-2xl font-bold text-text-primary">Settings</h2>

@@ -79,7 +79,7 @@ export default function SoundSettingsModal({ isOpen, onClose, onSave, currentSet
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50">
             <div className="bg-background-secondary border border-border rounded-lg shadow-xl p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
                 <h2 className="text-2xl font-bold text-accent-purple mb-6 font-pixel">Advanced Sound Settings</h2>
                 

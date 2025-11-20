@@ -403,15 +403,13 @@ export default function Home() {
 
   const handleOpenLearn = async () => {
     // Check if running in Electron
-    const isElectron = typeof window !== 'undefined' && 'electron' in window && (window as any).electron;
-    
-    if (isElectron) {
+    if (typeof window !== 'undefined' && window.electron) {
       // In Electron, toggle learn window via IPC
-      const isOpen = await (window as any).electron.isLearnWindowOpen();
+      const isOpen = await window.electron.isLearnWindowOpen();
       if (isOpen) {
-        await (window as any).electron.closeLearnWindow();
+        await window.electron.closeLearnWindow();
       } else {
-        await (window as any).electron.openLearnWindow();
+        await window.electron.openLearnWindow();
       }
     } else {
       // In browser, open in new tab
@@ -563,7 +561,7 @@ export default function Home() {
 
         {/* Clock Start Confirmation Modal */}
         {showClockStartModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+          <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50">
             <div className="bg-background-secondary border border-border rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
               <h2 className="text-xl font-bold text-text-primary mb-4">Start the Clock?</h2>
               <p className="text-text-secondary mb-6">
