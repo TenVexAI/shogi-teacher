@@ -6,6 +6,7 @@ import ChatInterface from '@/components/ChatInterface';
 import ConfigModal from '@/components/ConfigModal';
 import SoundSettingsModal, { SoundSettings } from '@/components/SoundSettingsModal';
 import MoveHistory, { MoveRecord } from '@/components/MoveHistory';
+import Sidebar from '@/components/Sidebar';
 import { getGameState, makeMove, analyzePosition, explainPosition, updateConfig, getConfig } from '@/lib/api';
 import { GameState } from '@/types/game';
 import { audioManager } from '@/lib/audioManager';
@@ -502,8 +503,8 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-background-primary p-8">
-      <div className="max-w-7xl mx-auto">
+    <main className="min-h-screen bg-background-primary">
+      <div className="max-w-full h-screen">
         <ConfigModal
           isOpen={isConfigOpen}
           onClose={() => setIsConfigOpen(false)}
@@ -553,9 +554,14 @@ export default function Home() {
           </div>
         )}
 
-        <div className="flex gap-6 h-[max(700px,calc(100vh-4rem))]">
-          {/* Left Column: Move History with Clock */}
-          <div className="w-[300px] shrink-0 h-full">
+        <div className="flex h-screen">
+          {/* Sidebar */}
+          <Sidebar onOpenSettings={() => setIsConfigOpen(true)} />
+
+          {/* Main Content */}
+          <div className="flex gap-3 flex-1 p-4">
+            {/* Left Column: Move History with Clock */}
+            <div className="w-[300px] shrink-0 h-full">
             <MoveHistory 
               moves={moveHistory} 
               currentTurn={(gameState?.turn as 'b' | 'w') || 'b'}
@@ -569,7 +575,7 @@ export default function Home() {
           </div>
 
           {/* Center Column: Board */}
-          <div className="flex-1 flex flex-col items-center gap-4">
+          <div className="shrink-0 flex flex-col items-center gap-4">
             {gameState ? (
               <ShogiBoard 
                 gameState={gameState} 
@@ -585,15 +591,15 @@ export default function Home() {
             )}
           </div>
 
-          {/* Right Column: Chat Interface */}
-          <div className="w-[500px] shrink-0 h-full">
+          {/* Right Column: Chat Interface - Expands to fill remaining space */}
+          <div className="flex-1 min-w-[400px] h-full">
             <ChatInterface
               messages={messages}
               onSendMessage={handleSendMessage}
               isLoading={isLoading}
               onGetHint={handleGetHint}
-              onOpenSettings={() => setIsConfigOpen(true)}
             />
+          </div>
           </div>
         </div>
       </div>

@@ -1,0 +1,55 @@
+{
+  "appId": "com.tenvexai.shogi-teacher",
+  "productName": "Shogi Teacher",
+  "directories": {
+    "output": "dist"
+  },
+  "files": [
+    "out/**/*",
+    "electron/**/*",
+    "package.json"
+  ],
+  "extraResources": [
+    {
+      "from": "../backend/dist/shogi-teacher-backend.exe",
+      "to": "backend/shogi-teacher-backend.exe"
+    },
+    {
+      "from": "../backend/engine",
+      "to": "backend/engine",
+      "filter": ["**/*"]
+    }
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      },
+      {
+        "target": "portable",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "public/icon.png",
+    "signAndEditExecutable": false,
+    "signDlls": false
+  },
+  "mac": {
+    "target": ["dmg", "zip"],
+    "icon": "public/icon.png",
+    "category": "public.app-category.games"
+  },
+  "linux": {
+    "target": ["AppImage", "deb"],
+    "icon": "public/icon.png",
+    "category": "Game"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "Shogi Teacher"
+  }
+}

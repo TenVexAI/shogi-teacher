@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { Play, Pause } from 'lucide-react';
 
 export interface MoveRecord {
     moveNumber: number;
@@ -150,7 +151,7 @@ export default function MoveHistory({ moves, currentTurn, isClockRunning = false
                                         : 'bg-accent-purple hover:bg-[#8a6fd1] text-white'
                                 }`}
                             >
-                                {isClockRunning ? '⏸' : '▶'}
+                                {isClockRunning ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
                             </button>
                         </div>
                         

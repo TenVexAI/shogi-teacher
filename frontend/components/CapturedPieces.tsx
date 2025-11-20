@@ -12,7 +12,7 @@ const PIECE_SYMBOLS: { [key: string]: string } = {
 
 export default function CapturedPieces({ pieces, color, onPieceDrop }: CapturedPiecesProps) {
     const colorName = color === 'b' ? 'Black' : 'White';
-    const bgColor = color === 'b' ? 'bg-gray-800' : 'bg-gray-100';
+    const bgColor = color === 'b' ? 'bg-background-secondary' : 'bg-gray-100';
     const textColor = color === 'b' ? 'text-white' : 'text-gray-800';
     const alignClass = color === 'b' ? 'text-right justify-end' : 'text-left justify-start';
 
