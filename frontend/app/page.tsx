@@ -386,6 +386,21 @@ export default function Home() {
     audioManager.updateSettings(newSettings);
   };
 
+  const handleToggleAllSounds = () => {
+    // Check if any sound is currently enabled
+    const anySoundEnabled = soundSettings.uiEnabled || soundSettings.musicEnabled || soundSettings.ambientEnabled;
+    
+    // Toggle all sounds to the opposite state
+    const newSettings = {
+      ...soundSettings,
+      uiEnabled: !anySoundEnabled,
+      musicEnabled: !anySoundEnabled,
+      ambientEnabled: !anySoundEnabled
+    };
+    setSoundSettings(newSettings);
+    audioManager.updateSettings(newSettings);
+  };
+
   // Helper to add assistant message with sound
   const addAssistantMessage = (content: string) => {
     setMessages(prev => [...prev, { role: 'assistant', content }]);
@@ -556,7 +571,11 @@ export default function Home() {
 
         <div className="flex h-screen">
           {/* Sidebar */}
-          <Sidebar onOpenSettings={() => setIsConfigOpen(true)} />
+          <Sidebar 
+            onOpenSettings={() => setIsConfigOpen(true)}
+            allSoundsEnabled={soundSettings.uiEnabled || soundSettings.musicEnabled || soundSettings.ambientEnabled}
+            onToggleAllSounds={handleToggleAllSounds}
+          />
 
           {/* Main Content */}
           <div className="flex gap-3 flex-1 p-4">

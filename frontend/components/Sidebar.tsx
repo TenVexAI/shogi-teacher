@@ -1,11 +1,13 @@
 import React from 'react';
-import { Settings, Power } from 'lucide-react';
+import { Settings, Power, Volume2, VolumeX } from 'lucide-react';
 
 interface SidebarProps {
   onOpenSettings: () => void;
+  allSoundsEnabled: boolean;
+  onToggleAllSounds: () => void;
 }
 
-export default function Sidebar({ onOpenSettings }: SidebarProps) {
+export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllSounds }: SidebarProps) {
   const handleShutdown = () => {
     // Check if running in Electron
     const isElectron = typeof window !== 'undefined' && 'electron' in window;
@@ -26,8 +28,27 @@ export default function Sidebar({ onOpenSettings }: SidebarProps) {
       {/* Top section - can add more buttons here later */}
       <div className="flex-1"></div>
 
-      {/* Bottom section - Settings and Shutdown */}
+      {/* Bottom section - Sound, Settings and Shutdown */}
       <div className="flex flex-col gap-4">
+        {/* Sound Toggle Button */}
+        <button
+          onClick={onToggleAllSounds}
+          className="w-10 h-10 flex items-center justify-center group transition-colors relative"
+          title={allSoundsEnabled ? "Mute All Sounds" : "Enable All Sounds"}
+        >
+          {allSoundsEnabled ? (
+            <>
+              <Volume2 className="w-6 h-6 text-accent-cyan transition-opacity group-hover:opacity-0" />
+              <VolumeX className="w-6 h-6 text-red-500 transition-opacity opacity-0 group-hover:opacity-100 absolute" />
+            </>
+          ) : (
+            <>
+              <VolumeX className="w-6 h-6 text-text-secondary transition-opacity group-hover:opacity-0" />
+              <Volume2 className="w-6 h-6 text-accent-cyan transition-opacity opacity-0 group-hover:opacity-100 absolute" />
+            </>
+          )}
+        </button>
+
         {/* Settings Button */}
         <button
           onClick={onOpenSettings}
