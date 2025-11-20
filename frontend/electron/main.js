@@ -82,7 +82,7 @@ function createWindow() {
     width: 1600,
     height: 1000,
     minWidth: 1500,
-    minHeight: 910,
+    minHeight: 990,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
