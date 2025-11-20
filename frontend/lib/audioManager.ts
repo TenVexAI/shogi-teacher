@@ -19,10 +19,10 @@ const MUSIC_FILES = [
     '3. Harris Heller - The Illusive Man.wav',
     '4. Harris Heller - Not Enough Movement.wav',
     '5. Harris Heller - Minuet of the Forest.wav',
-    '6. Harris Heller - Gerudo Valley.wav',
-    '7. Harris Heller - Zora_s Domain.wav',
-    '8. Harris Heller - Kakariko Village.wav',
-    '9. Harris Heller - Kokiri Forest.wav',
+    '6. Harris Heller - Would You Kindly.wav',
+    '7. Harris Heller - Lavender Tower.wav',
+    '8. Harris Heller - Unfortunate Fate.wav',
+    '9. Harris Heller - Desync.wav',
     '10. Harris Heller - Mute City.wav',
     '11. Harris Heller - Guilty Spark.wav',
     '12. Harris Heller - Skyward.wav',
@@ -62,9 +62,9 @@ class AudioManager {
     private settings: SoundSettings;
 
     constructor() {
-        // Default settings
+        // Default settings - all sounds disabled by default
         this.settings = {
-            uiEnabled: true,
+            uiEnabled: false,
             musicEnabled: false,
             ambientEnabled: false,
             uiVolume: 50,
@@ -75,7 +75,20 @@ class AudioManager {
         if (typeof window !== 'undefined') {
             // Initialize music player
             this.musicAudio = new Audio();
-            this.musicAudio.addEventListener('ended', () => this.playNextMusic());
+            this.musicAudio.addEventListener('ended', () => {
+                // Only play next if music is still enabled
+                if (this.settings.musicEnabled) {
+                    this.playNextMusic();
+                }
+            });
+            this.musicAudio.addEventListener('error', (e) => {
+                console.error('Music playback error:', e);
+                // Try to recover by playing next song after a delay (only if enabled)
+                if (this.settings.musicEnabled) {
+                    setTimeout(() => this.playNextMusic(), 1000);
+                }
+            });
+            this.musicAudio.loop = false;
         }
     }
 
@@ -103,38 +116,33 @@ class AudioManager {
             this.updateAmbientVolumes();
         }
 
-        // Save to localStorage
+        // Save volume settings to localStorage (but not toggle states)
         if (typeof window !== 'undefined') {
-            localStorage.setItem('soundSettings', JSON.stringify(settings));
+            const volumeSettings = {
+                uiVolume: settings.uiVolume,
+                musicVolume: settings.musicVolume,
+                ambientVolumes: settings.ambientVolumes
+            };
+            localStorage.setItem('soundVolumes', JSON.stringify(volumeSettings));
         }
     }
 
     loadSettings(): SoundSettings {
+        // Load saved volume settings, but always start with toggles disabled
         if (typeof window !== 'undefined') {
-            const saved = localStorage.getItem('soundSettings');
+            const saved = localStorage.getItem('soundVolumes');
             if (saved) {
                 try {
-                    const settings = JSON.parse(saved);
-                    
-                    // Migrate old settings format to new format
-                    const migratedSettings: SoundSettings = {
-                        uiEnabled: settings.uiEnabled ?? true,
-                        musicEnabled: settings.musicEnabled ?? false,
-                        ambientEnabled: settings.ambientEnabled ?? false,
-                        uiVolume: settings.uiVolume ?? settings.sfxVolume ?? settings.pieceVolume ?? 50,
-                        musicVolume: settings.musicVolume ?? 10,
-                        ambientVolumes: settings.ambientVolumes ?? [10, 10, 10, 10, 10, 10, 10, 10, 10, 10]
-                    };
-                    
-                    this.settings = migratedSettings;
-                    // Save migrated settings
-                    localStorage.setItem('soundSettings', JSON.stringify(migratedSettings));
-                    return migratedSettings;
+                    const volumes = JSON.parse(saved);
+                    this.settings.uiVolume = volumes.uiVolume ?? 50;
+                    this.settings.musicVolume = volumes.musicVolume ?? 10;
+                    this.settings.ambientVolumes = volumes.ambientVolumes ?? [10, 10, 10, 10, 10, 10, 10, 10, 10, 10];
                 } catch (e) {
-                    console.error('Failed to parse sound settings:', e);
+                    console.error('Failed to parse volume settings:', e);
                 }
             }
         }
+        // Always return with toggles disabled
         return this.settings;
     }
 
@@ -289,10 +297,19 @@ class AudioManager {
         this.musicAudio.volume = 0; // Start at 0 for fade in
 
         try {
+            // Reset audio element state
+            this.musicAudio.load();
             await this.musicAudio.play();
             this.fadeInMusic();
+            console.log(`Now playing: ${musicFile}`);
         } catch (error) {
-            console.log('Music play failed:', error);
+            console.error('Music play failed:', error);
+            // Try again after a delay
+            setTimeout(() => {
+                if (this.settings.musicEnabled) {
+                    this.playNextMusic();
+                }
+            }, 2000);
         }
     }
 
@@ -342,12 +359,18 @@ class AudioManager {
     stopMusic() {
         if (!this.musicAudio) return;
 
-        this.fadeOutMusic(() => {
-            if (this.musicAudio) {
-                this.musicAudio.pause();
-                this.musicAudio.currentTime = 0;
-            }
-        });
+        // Clear any fade intervals
+        if (this.musicFadeInterval) {
+            clearInterval(this.musicFadeInterval);
+            this.musicFadeInterval = null;
+        }
+
+        // Stop immediately without fade
+        this.musicAudio.pause();
+        this.musicAudio.currentTime = 0;
+        this.musicAudio.volume = 0;
+        
+        console.log('Music stopped');
     }
 
     // ===== UI SOUNDS =====

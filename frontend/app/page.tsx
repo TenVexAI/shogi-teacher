@@ -22,12 +22,12 @@ export default function Home() {
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isSoundSettingsOpen, setIsSoundSettingsOpen] = useState(false);
   const [soundSettings, setSoundSettings] = useState<SoundSettings>({
-    uiEnabled: true,
+    uiEnabled: false,
     musicEnabled: false,
     ambientEnabled: false,
     uiVolume: 50,
-    musicVolume: 50,
-    ambientVolumes: [50, 50, 50, 50, 50, 50, 50, 50, 50, 50]
+    musicVolume: 10,
+    ambientVolumes: [10, 10, 10, 10, 10, 10, 10, 10, 10, 10]
   });
   const [isClockRunning, setIsClockRunning] = useState(false);
   const [useLLM, setUseLLM] = useState(true);
