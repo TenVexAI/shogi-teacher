@@ -9,9 +9,16 @@ interface ConfigModalProps {
     currentUseLLM?: boolean;
     currentApiKey?: string;
     currentShowBestMove?: boolean;
+    onOpenSounds?: () => void;
+    soundToggles?: {
+        uiEnabled: boolean;
+        musicEnabled: boolean;
+        ambientEnabled: boolean;
+    };
+    onSoundToggle?: (category: 'ui' | 'music' | 'ambient', enabled: boolean) => void;
 }
 
-export default function ConfigModal({ isOpen, onClose, onSave, currentUseLLM = true, currentApiKey = '', currentShowBestMove = false }: ConfigModalProps) {
+export default function ConfigModal({ isOpen, onClose, onSave, currentUseLLM = true, currentApiKey = '', currentShowBestMove = false, onOpenSounds, soundToggles, onSoundToggle }: ConfigModalProps) {
     const [apiKey, setApiKey] = useState('');
     const [useLLM, setUseLLM] = useState(currentUseLLM);
     const [showBestMove, setShowBestMove] = useState(currentShowBestMove);
@@ -128,6 +135,71 @@ export default function ConfigModal({ isOpen, onClose, onSave, currentUseLLM = t
                         <div className="mb-4 p-3 bg-green-900/30 border border-green-600 text-green-400 rounded">
                             Configuration saved successfully!
                         </div>
+                    )}
+
+                    {/* Sound Category Toggles */}
+                    {soundToggles && onSoundToggle && (
+                        <div className="mb-4 space-y-3 pb-4 border-b border-border">
+                            <h3 className="text-sm font-semibold text-text-primary">Sound Categories</h3>
+                            
+                            <label className="flex items-center justify-between cursor-pointer">
+                                <span className="text-sm text-text-primary">UI Sounds</span>
+                                <div className="relative inline-flex items-center">
+                                    <input
+                                        type="checkbox"
+                                        checked={soundToggles.uiEnabled}
+                                        onChange={(e) => onSoundToggle('ui', e.target.checked)}
+                                        className="sr-only peer"
+                                    />
+                                    <div className="w-11 h-6 bg-background-primary peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent-cyan rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent-cyan"></div>
+                                </div>
+                            </label>
+
+                            <label className="flex items-center justify-between cursor-pointer">
+                                <span className="text-sm text-text-primary">Music</span>
+                                <div className="relative inline-flex items-center">
+                                    <input
+                                        type="checkbox"
+                                        checked={soundToggles.musicEnabled}
+                                        onChange={(e) => onSoundToggle('music', e.target.checked)}
+                                        className="sr-only peer"
+                                    />
+                                    <div className="w-11 h-6 bg-background-primary peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent-cyan rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent-cyan"></div>
+                                </div>
+                            </label>
+
+                            <label className="flex items-center justify-between cursor-pointer">
+                                <span className="text-sm text-text-primary">Ambient Sounds</span>
+                                <div className="relative inline-flex items-center">
+                                    <input
+                                        type="checkbox"
+                                        checked={soundToggles.ambientEnabled}
+                                        onChange={(e) => onSoundToggle('ambient', e.target.checked)}
+                                        className="sr-only peer"
+                                    />
+                                    <div className="w-11 h-6 bg-background-primary peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent-cyan rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent-cyan"></div>
+                                </div>
+                            </label>
+                        </div>
+                    )}
+
+                    {/* Advanced Sound Settings Button */}
+                    {onOpenSounds && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                onClose();
+                                onOpenSounds();
+                            }}
+                            className="w-full mb-4 px-4 py-3 bg-linear-to-r from-accent-cyan to-accent-purple text-white rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2 font-semibold"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+                            </svg>
+                            Advanced Sound Settings
+                        </button>
                     )}
 
                     <div className="flex gap-3">

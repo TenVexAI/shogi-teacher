@@ -4,9 +4,11 @@ import { useState, useEffect, useRef } from 'react';
 import ShogiBoard from '@/components/ShogiBoard';
 import ChatInterface from '@/components/ChatInterface';
 import ConfigModal from '@/components/ConfigModal';
+import SoundSettingsModal, { SoundSettings } from '@/components/SoundSettingsModal';
 import MoveHistory, { MoveRecord } from '@/components/MoveHistory';
 import { getGameState, makeMove, analyzePosition, explainPosition, updateConfig, getConfig } from '@/lib/api';
 import { GameState } from '@/types/game';
+import { audioManager } from '@/lib/audioManager';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -18,6 +20,15 @@ export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [isSoundSettingsOpen, setIsSoundSettingsOpen] = useState(false);
+  const [soundSettings, setSoundSettings] = useState<SoundSettings>({
+    uiEnabled: true,
+    musicEnabled: false,
+    ambientEnabled: false,
+    uiVolume: 50,
+    musicVolume: 50,
+    ambientVolumes: [50, 50, 50, 50, 50, 50, 50, 50, 50, 50]
+  });
   const [isClockRunning, setIsClockRunning] = useState(false);
   const [useLLM, setUseLLM] = useState(true);
   const [currentApiKey, setCurrentApiKey] = useState<string>('');
@@ -38,6 +49,11 @@ export default function Home() {
     // Initialize game and load config
     loadInitialGame();
     loadConfig();
+    
+    // Load sound settings
+    const savedSettings = audioManager.loadSettings();
+    setSoundSettings(savedSettings);
+    audioManager.updateSettings(savedSettings);
   }, []);
 
   // Stop clock when game ends
@@ -150,10 +166,7 @@ export default function Home() {
       setGameState(newState);
 
       // Play sound effect based on which player moved
-      const soundFile = gameState.turn === 'b' ? '/sounds/shogi_sound_black.mp3' : '/sounds/shogi_sound_white.mp3';
-      const audio = new Audio(soundFile);
-      audio.volume = 0.5; // Set volume to 50%
-      audio.play().catch(err => console.log('Audio play failed:', err));
+      audioManager.playPieceSound(gameState.turn === 'b');
 
       // Add move to history using standard notation from backend
       const newMoveCount = moveCount + 1;
@@ -163,7 +176,8 @@ export default function Home() {
         player: gameState.turn as 'b' | 'w',
         move: newState.last_move_notation || move, // Use standard notation if available, fallback to USI
         timestamp: timeSinceStart,
-        timeSinceLastMove: timeSinceLastMove
+        timeSinceLastMove: timeSinceLastMove,
+        sfen: newState.sfen // Store board state after this move
       };
       setMoveHistory(prev => [...prev, moveRecord]);
 
@@ -217,32 +231,14 @@ export default function Home() {
           }
         }
 
-        setMessages(prev => [
-          ...prev,
-          {
-            role: 'assistant',
-            content: message
-          }
-        ]);
+        addAssistantMessage(message);
       } catch (analysisError) {
         console.error('Analysis failed:', analysisError);
-        setMessages(prev => [
-          ...prev,
-          {
-            role: 'assistant',
-            content: `Move played: ${move}\n\n⚠️ Engine analysis unavailable. Make sure YaneuraOu.exe is in backend/engine/\n\nYou can still play without analysis!`
-          }
-        ]);
+        addAssistantMessage(`Move played: ${move}\n\n⚠️ Engine analysis unavailable. Make sure YaneuraOu.exe is in backend/engine/\n\nYou can still play without analysis!`);
       }
     } catch (error) {
       console.error('Failed to make move:', error);
-      setMessages(prev => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: 'Error: Failed to process move. Please try again.'
-        }
-      ]);
+      addAssistantMessage('Error: Failed to process move. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -278,13 +274,7 @@ export default function Home() {
           { ...analysis, user_question: message }
         );
 
-        setMessages(prev => [
-          ...prev,
-          {
-            role: 'assistant',
-            content: explanation.explanation
-          }
-        ]);
+        addAssistantMessage(explanation.explanation);
       } else {
         // Show engine analysis only
         const currentColor = gameState.turn === 'b' ? 'Black' : 'White';
@@ -306,25 +296,13 @@ export default function Home() {
           }
         }
 
-        setMessages(prev => [
-          ...prev,
-          {
-            role: 'assistant',
-            content: response
-          }
-        ]);
+        addAssistantMessage(response);
       }
     } catch (error) {
       console.error('Failed to get response:', error);
-      setMessages(prev => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: useLLM 
-            ? '⚠️ AI teacher unavailable. Please configure:\n- YaneuraOu.exe in backend/engine/\n- Claude API key in settings\n\nYou can still play and practice moves!'
-            : '⚠️ Engine analysis unavailable. Make sure YaneuraOu.exe is in backend/engine/'
-        }
-      ]);
+      addAssistantMessage(useLLM 
+        ? '⚠️ AI teacher unavailable. Please configure:\n- YaneuraOu.exe in backend/engine/\n- Claude API key in settings\n\nYou can still play and practice moves!'
+        : '⚠️ Engine analysis unavailable. Make sure YaneuraOu.exe is in backend/engine/');
     } finally {
       setIsLoading(false);
     }
@@ -332,6 +310,7 @@ export default function Home() {
 
   const handleNewGame = () => {
     loadInitialGame();
+    audioManager.playUISound('new_game');
   };
 
   const handleGetHint = async () => {
@@ -371,21 +350,12 @@ export default function Home() {
         {
           role: 'user',
           content: 'Give me a hint for the best move'
-        },
-        {
-          role: 'assistant',
-          content: hintMessage
         }
       ]);
+      addAssistantMessage(hintMessage);
     } catch (error) {
       console.error('Failed to get hint:', error);
-      setMessages(prev => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: '⚠️ Could not get hint. Engine analysis unavailable.'
-        }
-      ]);
+      addAssistantMessage('⚠️ Could not get hint. Engine analysis unavailable.');
     } finally {
       setIsLoading(false);
     }
@@ -401,12 +371,35 @@ export default function Home() {
     setShowBestMove(showBestMoveSetting);
   };
 
+  const handleSaveSoundSettings = (settings: SoundSettings) => {
+    setSoundSettings(settings);
+    audioManager.updateSettings(settings);
+  };
+
+  const handleSoundToggle = (category: 'ui' | 'music' | 'ambient', enabled: boolean) => {
+    const newSettings = { ...soundSettings };
+    if (category === 'ui') newSettings.uiEnabled = enabled;
+    if (category === 'music') newSettings.musicEnabled = enabled;
+    if (category === 'ambient') newSettings.ambientEnabled = enabled;
+    setSoundSettings(newSettings);
+    audioManager.updateSettings(newSettings);
+  };
+
+  // Helper to add assistant message with sound
+  const addAssistantMessage = (content: string) => {
+    setMessages(prev => [...prev, { role: 'assistant', content }]);
+    audioManager.playUISound('message');
+  };
+
   const handleClockToggle = () => {
-    setIsClockRunning(!isClockRunning);
-    if (!isClockRunning && clockStartTimeRef.current === 0) {
+    const willStart = !isClockRunning;
+    setIsClockRunning(willStart);
+    if (willStart && clockStartTimeRef.current === 0) {
       clockStartTimeRef.current = Date.now();
       lastMoveTimeRef.current = Date.now();
     }
+    // Play appropriate sound
+    audioManager.playUISound(willStart ? 'start' : 'pause');
   };
 
   const handleBestMove = async () => {
@@ -426,13 +419,50 @@ export default function Home() {
       await handleMove(analysis.bestmove);
     } catch (error) {
       console.error('Failed to get best move:', error);
-      setMessages(prev => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: '⚠️ Could not get best move. Engine analysis unavailable.'
-        }
-      ]);
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: 'Failed to get best move. Please try again.'
+      }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRevertToMove = async (moveIndex: number) => {
+    try {
+      setIsLoading(true);
+      
+      // Get the SFEN from the selected move
+      const targetMove = moveHistory[moveIndex];
+      if (!targetMove) return;
+      
+      // Fetch the game state for that SFEN
+      const state = await getGameState(targetMove.sfen);
+      setGameState(state);
+      
+      // Truncate move history to only include moves up to and including the selected move
+      setMoveHistory(moveHistory.slice(0, moveIndex + 1));
+      setMoveCount(moveIndex + 1);
+      
+      // Update game time to the timestamp of the selected move
+      setGameTime(targetMove.timestamp);
+      accumulatedTimeRef.current = targetMove.timestamp;
+      
+      // Clear cached hints
+      setCachedHintAnalysis(null);
+      setCachedHintSfen(null);
+      setCachedHintTurn(null);
+      
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `Reverted to move ${targetMove.moveNumber} (${targetMove.move}). All subsequent moves have been removed.`
+      }]);
+    } catch (error) {
+      console.error('Failed to revert to move:', error);
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: 'Failed to revert to the selected move. Please try again.'
+      }]);
     } finally {
       setIsLoading(false);
     }
@@ -481,6 +511,20 @@ export default function Home() {
           currentUseLLM={useLLM}
           currentApiKey={currentApiKey}
           currentShowBestMove={showBestMove}
+          onOpenSounds={() => setIsSoundSettingsOpen(true)}
+          soundToggles={{
+            uiEnabled: soundSettings.uiEnabled,
+            musicEnabled: soundSettings.musicEnabled,
+            ambientEnabled: soundSettings.ambientEnabled
+          }}
+          onSoundToggle={handleSoundToggle}
+        />
+
+        <SoundSettingsModal
+          isOpen={isSoundSettingsOpen}
+          onClose={() => setIsSoundSettingsOpen(false)}
+          onSave={handleSaveSoundSettings}
+          currentSettings={soundSettings}
         />
 
         {/* Clock Start Confirmation Modal */}
@@ -511,7 +555,7 @@ export default function Home() {
 
         <div className="flex gap-6 h-[max(700px,calc(100vh-4rem))]">
           {/* Left Column: Move History with Clock */}
-          <div className="w-[300px] flex-shrink-0 h-full">
+          <div className="w-[300px] shrink-0 h-full">
             <MoveHistory 
               moves={moveHistory} 
               currentTurn={(gameState?.turn as 'b' | 'w') || 'b'}
@@ -520,6 +564,7 @@ export default function Home() {
               gameTime={gameTime}
               onNewGame={handleNewGame}
               isGameOver={gameState?.is_game_over || false}
+              onRevertToMove={handleRevertToMove}
             />
           </div>
 
@@ -541,7 +586,7 @@ export default function Home() {
           </div>
 
           {/* Right Column: Chat Interface */}
-          <div className="w-[500px] flex-shrink-0 h-full">
+          <div className="w-[500px] shrink-0 h-full">
             <ChatInterface
               messages={messages}
               onSendMessage={handleSendMessage}

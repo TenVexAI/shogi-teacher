@@ -39,10 +39,13 @@ export default function ChatInterface({ messages, onSendMessage, isLoading, onGe
     return (
         <div className="flex flex-col h-full bg-background-secondary rounded-lg shadow-lg border border-border">
             <div className="bg-linear-to-r from-accent-purple to-accent-cyan text-white p-4 rounded-t-lg">
-                <div className="flex items-start justify-between">
-                    <div>
-                        <h2 className="text-xl font-bold font-pixel drop-shadow-lg">Shogi Teacher</h2>
-                        <p className="text-sm opacity-90">Ask questions about the position or request analysis</p>
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <span className="text-4xl font-shogi drop-shadow-lg">先生</span>
+                        <div>
+                            <h2 className="text-xl font-bold font-pixel drop-shadow-lg mb-1">Shogi Teacher</h2>
+                            <p className="text-sm opacity-90">Ask questions about the position or request analysis</p>
+                        </div>
                     </div>
                     {onOpenSettings && (
                         <button

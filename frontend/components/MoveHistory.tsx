@@ -8,6 +8,7 @@ export interface MoveRecord {
     move: string;
     timestamp: number;
     timeSinceLastMove: number;
+    sfen: string; // Board state after this move
 }
 
 interface MoveHistoryProps {
@@ -21,11 +22,14 @@ interface MoveHistoryPropsExtended extends MoveHistoryProps {
     gameTime?: number;
     onNewGame?: () => void;
     isGameOver?: boolean;
+    onRevertToMove?: (moveIndex: number) => void;
 }
 
-export default function MoveHistory({ moves, currentTurn, isClockRunning = false, onClockToggle, gameTime = 0, onNewGame, isGameOver = false }: MoveHistoryPropsExtended) {
+export default function MoveHistory({ moves, currentTurn, isClockRunning = false, onClockToggle, gameTime = 0, onNewGame, isGameOver = false, onRevertToMove }: MoveHistoryPropsExtended) {
     const bottomRef = useRef<HTMLDivElement>(null);
     const [showNewGameModal, setShowNewGameModal] = useState(false);
+    const [showRevertModal, setShowRevertModal] = useState(false);
+    const [selectedMoveIndex, setSelectedMoveIndex] = useState<number | null>(null);
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -88,7 +92,11 @@ export default function MoveHistory({ moves, currentTurn, isClockRunning = false
                         {moves.map((move, index) => (
                             <div
                                 key={index}
-                                className="flex items-center justify-between py-1 hover:bg-background-primary rounded transition-colors"
+                                onClick={() => {
+                                    setSelectedMoveIndex(index);
+                                    setShowRevertModal(true);
+                                }}
+                                className="flex items-center justify-between py-1 hover:bg-background-primary rounded transition-colors cursor-pointer"
                             >
                                 {/* Left side: Move number, piece indicator, and move notation */}
                                 <div className="flex items-center gap-2">
@@ -179,6 +187,42 @@ export default function MoveHistory({ moves, currentTurn, isClockRunning = false
                                 className="px-4 py-2 rounded-lg font-semibold text-sm bg-orange-600 hover:bg-orange-700 text-white transition-colors"
                             >
                                 Start New Game
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Revert to Move Confirmation Modal */}
+            {showRevertModal && selectedMoveIndex !== null && (
+                <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+                    <div className="bg-background-secondary border border-border rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+                        <h2 className="text-xl font-bold text-text-primary mb-4">Revert to Move {moves[selectedMoveIndex]?.moveNumber}?</h2>
+                        <p className="text-text-secondary mb-6">
+                            Are you sure you want to go back to move {moves[selectedMoveIndex]?.moveNumber} ({moves[selectedMoveIndex]?.move})? 
+                            All moves after this point will be removed from the history.
+                        </p>
+                        <div className="flex gap-3 justify-end">
+                            <button
+                                onClick={() => {
+                                    setShowRevertModal(false);
+                                    setSelectedMoveIndex(null);
+                                }}
+                                className="px-4 py-2 rounded-lg font-semibold text-sm bg-background-primary border border-border hover:bg-background-secondary text-text-primary transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowRevertModal(false);
+                                    if (onRevertToMove && selectedMoveIndex !== null) {
+                                        onRevertToMove(selectedMoveIndex);
+                                    }
+                                    setSelectedMoveIndex(null);
+                                }}
+                                className="px-4 py-2 rounded-lg font-semibold text-sm bg-accent-cyan hover:bg-[#0fc9ad] text-white transition-colors"
+                            >
+                                Revert to Move
                             </button>
                         </div>
                     </div>
