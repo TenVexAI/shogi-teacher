@@ -335,7 +335,7 @@ Example: ☗7六歩 means "Black moves Pawn to 7-6"
 The Universal Shogi Interface (USI) format is used internationally:
 - Columns: 9-1 (left to right)
 - Rows: a-i (top to bottom)
-- Pieces: Uppercase for White, lowercase for Black
+- Pieces: Uppercase for Black, lowercase for White
 
 Example: 7g7f means "move from 7g to 7f"
 

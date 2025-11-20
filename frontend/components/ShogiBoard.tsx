@@ -20,11 +20,11 @@ interface ShogiBoardProps {
 }
 
 const PIECE_SYMBOLS: { [key: string]: string } = {
-    // Black pieces (lowercase in SFEN)
+    // White pieces (lowercase in SFEN)
     'p': '歩', 'l': '香', 'n': '桂', 's': '銀', 'g': '金', 'b': '角', 'r': '飛', 'k': '玉',
     '+p': 'と', '+l': '杏', '+n': '圭', '+s': '全', '+b': '馬', '+r': '龍',
-    // White pieces (uppercase in SFEN)
-    'P': '歩', 'L': '香', 'N': '桂', 'S': '銀', 'G': '金', 'B': '角', 'R': '飛', 'K': '玉',
+    // Black pieces (uppercase in SFEN)
+    'P': '歩', 'L': '香', 'N': '桂', 'S': '銀', 'G': '金', 'B': '角', 'R': '飛', 'K': '王',
     '+P': 'と', '+L': '杏', '+N': '圭', '+S': '全', '+B': '馬', '+R': '龍',
 };
 
