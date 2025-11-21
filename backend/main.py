@@ -2,11 +2,12 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
+from pathlib import Path
 import os
 import sys
 import shogi
 from dotenv import load_dotenv
-from engine import ShogiEngine
+from engine_manager import EngineManager
 from llm import ClaudeTeacher
 
 # Fix for Windows asyncio subprocess support
@@ -23,19 +24,51 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
 # Initialize components
-import pathlib
-ENGINE_PATH = os.getenv("USI_ENGINE_PATH", "./engine/YaneuraOu.exe")
-# Convert to absolute path
-if not os.path.isabs(ENGINE_PATH):
-    ENGINE_PATH = str(pathlib.Path(__file__).parent / ENGINE_PATH)
-print(f"Engine path: {ENGINE_PATH}")
-engine = ShogiEngine(ENGINE_PATH)
+print("\n=== Initializing Shogi Teaching Assistant ===")
+# Use absolute path for config file
+config_path = Path(__file__).parent / "engine_preferences.json"
+engine_manager = EngineManager(config_file=str(config_path))
+engine_manager.discover_engines()
+
+# Load and apply saved preferences
+preferences = engine_manager.load_preferences()
+engines_cfg = preferences.get("engines", {})
+black_cfg = engines_cfg.get("black", {})
+white_cfg = engines_cfg.get("white", {})
+analysis_cfg = engines_cfg.get("analysis", {})
+
+if black_cfg.get("engineId"):
+    engine_manager.set_engine(
+        "black", 
+        black_cfg["engineId"], 
+        black_cfg.get("strengthLevel", 10),
+        black_cfg.get("customOptions", {})
+    )
+
+if white_cfg.get("engineId"):
+    engine_manager.set_engine(
+        "white",
+        white_cfg["engineId"],
+        white_cfg.get("strengthLevel", 10),
+        white_cfg.get("customOptions", {})
+    )
+
+if analysis_cfg.get("engineId"):
+    engine_manager.set_engine(
+        "analysis",
+        analysis_cfg["engineId"],
+        analysis_cfg.get("strengthLevel", 10),
+        analysis_cfg.get("customOptions", {}),
+        analysis_cfg.get("enabled", False)
+    )
+
 teacher = ClaudeTeacher()
+print("✓ Initialization complete\n")
 
 class MoveRequest(BaseModel):
     sfen: str
@@ -104,13 +137,11 @@ def usi_to_standard_notation(board: shogi.Board, move: shogi.Move) -> str:
 
 @app.on_event("startup")
 async def startup_event():
-    # We can lazily start the engine, or start here.
-    # await engine.start()
     pass
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    await engine.stop()
+    engine_manager.shutdown()
 
 @app.get("/")
 async def root():
@@ -152,14 +183,24 @@ async def make_move(request: MoveRequest):
 @app.post("/analyze")
 async def analyze_position(request: AnalysisRequest):
     try:
-        print(f"Analyzing position: {request.sfen}")
-        analysis = await engine.analyze(request.sfen)
-        print(f"Analysis complete: {analysis}")
+        # Parse SFEN to extract position and moves
+        parts = request.sfen.split(" moves ")
+        position = parts[0]
+        moves = parts[1].split() if len(parts) > 1 else []
+        
+        # Use engine manager for analysis
+        analysis = engine_manager.analyze_position(
+            position=position,
+            moves=moves,
+            movetime=1000
+        )
+        
+        if not analysis:
+            raise HTTPException(status_code=500, detail="No engine available for analysis")
+        
         return analysis
-    except FileNotFoundError as e:
-        error_msg = f"Engine binary not found: {e}"
-        print(error_msg)
-        raise HTTPException(status_code=500, detail=error_msg)
+    except HTTPException:
+        raise
     except Exception as e:
         error_msg = f"Analysis error: {type(e).__name__}: {str(e)}"
         print(error_msg)
@@ -208,6 +249,186 @@ async def update_config(config: ConfigUpdate):
         return {"success": True, "message": "Configuration updated successfully"}
     else:
         raise HTTPException(status_code=500, detail="Failed to save configuration")
+
+# ===== Engine Management Endpoints =====
+
+@app.get("/engines")
+async def list_engines():
+    """Get list of all available engines."""
+    engines = []
+    for engine_id, config in engine_manager.available_engines.items():
+        # Skip tsume solvers from regular engine list
+        if config.usageNotes.get('notForPlay', False):
+            continue
+        
+        engines.append({
+            "id": config.id,
+            "name": config.name,
+            "author": config.author,
+            "version": config.version,
+            "description": config.description,
+            "strength": {
+                "estimated_elo": config.strength.get('estimated_elo'),
+                "level": config.strength.get('level'),
+                "minLevel": config.strength.get('minLevel', 10),
+                "maxLevel": config.strength.get('maxLevel', 10),
+            },
+            "strengthControl": {
+                "supported": config.strengthControl.get('supported', False),
+                "methods": config.strengthControl.get('methods', []),
+            },
+            "features": config.features,
+        })
+    
+    return {"engines": engines}
+
+@app.get("/engines/{engine_id}/options")
+async def get_engine_options(engine_id: str):
+    """Get available USI options for a specific engine."""
+    import asyncio
+    import functools
+    
+    if engine_id not in engine_manager.available_engines:
+        raise HTTPException(status_code=404, detail="Engine not found")
+    
+    try:
+        # Start engine temporarily if not running to get options
+        was_running = engine_id in engine_manager.running_engines
+        if not was_running:
+            loop = asyncio.get_event_loop()
+            success = await loop.run_in_executor(
+                None,
+                functools.partial(engine_manager._start_engine, engine_id)
+            )
+            if not success:
+                raise HTTPException(status_code=500, detail="Failed to start engine")
+        
+        process = engine_manager.running_engines.get(engine_id)
+        if not process:
+            raise HTTPException(status_code=500, detail="Engine process not available")
+        
+        # Get USI options from engine
+        options = []
+        for opt in process.usi_options:
+            options.append({
+                "name": opt.name,
+                "type": opt.type,
+                "default": opt.default,
+                "min": opt.min,
+                "max": opt.max,
+                "vars": opt.var,  # Note: USIOption uses 'var' not 'vars'
+            })
+        
+        # Stop engine if we started it temporarily
+        if not was_running:
+            engine_manager._stop_engine(engine_id)
+        
+        return {"options": options}
+    except Exception as e:
+        import traceback
+        print(f"Error getting engine options: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Error getting engine options: {str(e)}")
+
+@app.get("/engines/config")
+async def get_engine_config():
+    """Get current engine configuration."""
+    return {
+        "black": {
+            "engineId": engine_manager.active_engines.get("black"),
+            "strengthLevel": engine_manager.strength_levels.get("black", 10),
+            "customOptions": engine_manager.custom_options.get("black", {}),
+        },
+        "white": {
+            "engineId": engine_manager.active_engines.get("white"),
+            "strengthLevel": engine_manager.strength_levels.get("white", 10),
+            "customOptions": engine_manager.custom_options.get("white", {}),
+        },
+        "analysis": {
+            "engineId": engine_manager.active_engines.get("analysis"),
+            "strengthLevel": engine_manager.strength_levels.get("analysis", 10),
+            "enabled": engine_manager.analysis_enabled,
+            "customOptions": engine_manager.custom_options.get("analysis", {}),
+        }
+    }
+
+class EngineConfigUpdate(BaseModel):
+    side: str  # "black", "white", or "analysis"
+    engineId: Optional[str]  # None to disable
+    strengthLevel: int = 10  # 1-10
+    customOptions: Optional[Dict[str, str]] = None  # Custom USI options
+    enabled: Optional[bool] = None  # For analysis engine only
+
+@app.post("/engines/config")
+async def update_engine_config(config: EngineConfigUpdate):
+    """Update engine configuration (hot-swap)."""
+    import asyncio
+    import functools
+    
+    try:
+        # Run blocking engine operation in thread pool
+        loop = asyncio.get_event_loop()
+        success = await loop.run_in_executor(
+            None,
+            functools.partial(
+                engine_manager.set_engine,
+                config.side,
+                config.engineId,
+                config.strengthLevel,
+                config.customOptions,
+                config.enabled
+            )
+        )
+        
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to set engine")
+        
+        # Save preferences
+        preferences = {
+            "engines": {
+                "black": {
+                    "engineId": engine_manager.active_engines.get("black"),
+                    "strengthLevel": engine_manager.strength_levels.get("black", 10),
+                    "customOptions": engine_manager.custom_options.get("black", {}),
+                },
+                "white": {
+                    "engineId": engine_manager.active_engines.get("white"),
+                    "strengthLevel": engine_manager.strength_levels.get("white", 10),
+                    "customOptions": engine_manager.custom_options.get("white", {}),
+                },
+                "analysis": {
+                    "engineId": engine_manager.active_engines.get("analysis"),
+                    "strengthLevel": engine_manager.strength_levels.get("analysis", 10),
+                    "enabled": engine_manager.analysis_enabled,
+                    "customOptions": engine_manager.custom_options.get("analysis", {}),
+                }
+            }
+        }
+        engine_manager.save_preferences(preferences)
+        
+        return {
+            "success": True,
+            "message": f"Engine configuration updated for {config.side}",
+            "config": preferences
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except TimeoutError as e:
+        raise HTTPException(status_code=504, detail=f"Engine startup timed out: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating engine: {str(e)}")
+
+class PositionUpdate(BaseModel):
+    position: str  # SFEN
+    moves: List[str] = []  # Move history
+
+@app.post("/engines/position")
+async def update_engine_position(update: PositionUpdate):
+    """Update the current game position for engines."""
+    engine_manager.update_position(update.position, update.moves)
+    return {"success": True}
+
+# ===== End Engine Management =====
 
 def _build_game_state(board: shogi.Board, last_move_notation: Optional[str] = None) -> GameState:
     # Extract pieces in hand from board

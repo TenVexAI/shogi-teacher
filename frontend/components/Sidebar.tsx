@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Power, Volume2, VolumeX, BookOpen } from 'lucide-react';
+import { Settings, Power, Volume2, VolumeX, BookOpen, Cpu } from 'lucide-react';
 
 interface SidebarProps {
   onOpenSettings: () => void;
   allSoundsEnabled: boolean;
   onToggleAllSounds: () => void;
   onOpenLearn: () => void;
+  onOpenEngineManagement: () => void;
 }
 
-export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllSounds, onOpenLearn }: SidebarProps) {
+export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllSounds, onOpenLearn, onOpenEngineManagement }: SidebarProps) {
   const [isLearnWindowOpen, setIsLearnWindowOpen] = useState(false);
 
   useEffect(() => {
@@ -42,7 +43,7 @@ export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllS
 
   return (
     <div className="w-12 h-full bg-background-secondary flex flex-col items-center py-4 shrink-0 border-r border-border">
-      {/* Top section - Learn button */}
+      {/* Top section - Learn & Engine Management buttons */}
       <div className="flex flex-col gap-4">
         <button
           onClick={onOpenLearn}
@@ -54,6 +55,14 @@ export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllS
               ? 'sound-active group-hover:text-red-500!' 
               : 'text-text-secondary group-hover:text-accent-cyan'
           }`} />
+        </button>
+
+        <button
+          onClick={onOpenEngineManagement}
+          className="w-10 h-10 flex items-center justify-center group transition-colors"
+          title="Engine Management"
+        >
+          <Cpu className="w-6 h-6 text-text-secondary group-hover:text-accent-purple transition-colors" />
         </button>
       </div>
 

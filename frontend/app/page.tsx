@@ -5,6 +5,7 @@ import ShogiBoard from '@/components/ShogiBoard';
 import ChatInterface from '@/components/ChatInterface';
 import ConfigModal from '@/components/ConfigModal';
 import SoundSettingsModal, { SoundSettings } from '@/components/SoundSettingsModal';
+import EngineManagementModal from '@/components/EngineManagementModal';
 import MoveHistory, { MoveRecord } from '@/components/MoveHistory';
 import Sidebar from '@/components/Sidebar';
 import { getGameState, makeMove, analyzePosition, explainPosition, updateConfig, getConfig } from '@/lib/api';
@@ -22,6 +23,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isSoundSettingsOpen, setIsSoundSettingsOpen] = useState(false);
+  const [isEngineManagementOpen, setIsEngineManagementOpen] = useState(false);
   const [soundSettings, setSoundSettings] = useState<SoundSettings>({
     uiEnabled: false,
     musicEnabled: false,
@@ -45,11 +47,13 @@ export default function Home() {
   const clockStartTimeRef = useRef<number>(0);
   const lastMoveTimeRef = useRef<number>(0);
   const accumulatedTimeRef = useRef<number>(0);
+  const [engineConfig, setEngineConfig] = useState<{ black: { engineId: string | null; strengthLevel: number }; white: { engineId: string | null; strengthLevel: number } } | null>(null);
 
   useEffect(() => {
     // Initialize game and load config
     loadInitialGame();
     loadConfig();
+    loadEngineConfig();
     
     // Load sound settings
     const savedSettings = audioManager.loadSettings();
@@ -98,6 +102,18 @@ export default function Home() {
       console.error('Failed to load config:', error);
       // Don't block the app if config loading fails
       // User can still configure via the settings modal
+    }
+  };
+
+  const loadEngineConfig = async () => {
+    try {
+      const response = await fetch('http://127.0.0.1:8000/engines/config');
+      if (response.ok) {
+        const data = await response.json();
+        setEngineConfig(data); // Data is already in the correct format { black: {...}, white: {...} }
+      }
+    } catch (error) {
+      console.error('Failed to load engine config:', error);
     }
   };
 
@@ -417,6 +433,26 @@ export default function Home() {
     }
   };
 
+  const handleOpenEngineManagement = () => {
+    // Auto-pause clock when opening engine management
+    if (isClockRunning) {
+      setIsClockRunning(false);
+      // Save accumulated time
+      if (clockStartTimeRef.current) {
+        const elapsed = Date.now() - clockStartTimeRef.current;
+        accumulatedTimeRef.current += elapsed;
+      }
+    }
+    setIsEngineManagementOpen(true);
+  };
+
+  const handleCloseEngineManagement = () => {
+    setIsEngineManagementOpen(false);
+    // Reload engine config to update best move button availability
+    loadEngineConfig();
+    // Note: User must manually resume clock after closing modal
+  };
+
   // Helper to add assistant message with sound
   const addAssistantMessage = (content: string) => {
     setMessages(prev => [...prev, { role: 'assistant', content }]);
@@ -585,6 +621,12 @@ export default function Home() {
           </div>
         )}
 
+        {/* Engine Management Modal */}
+        <EngineManagementModal 
+          isOpen={isEngineManagementOpen}
+          onClose={handleCloseEngineManagement}
+        />
+
         <div className="flex h-screen">
           {/* Sidebar */}
           <Sidebar 
@@ -592,6 +634,7 @@ export default function Home() {
             allSoundsEnabled={soundSettings.uiEnabled || soundSettings.musicEnabled || soundSettings.ambientEnabled}
             onToggleAllSounds={handleToggleAllSounds}
             onOpenLearn={handleOpenLearn}
+            onOpenEngineManagement={handleOpenEngineManagement}
           />
 
           {/* Main Content */}
@@ -619,6 +662,7 @@ export default function Home() {
                 showBestMove={showBestMove}
                 onBestMove={handleBestMove}
                 isLoading={isLoading}
+                engineConfig={engineConfig || undefined}
               />
             ) : (
               <div className="flex items-center justify-center h-96">

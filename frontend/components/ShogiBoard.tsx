@@ -9,6 +9,17 @@ interface Position {
     col: number;
 }
 
+interface EngineConfig {
+    black: {
+        engineId: string | null;
+        strengthLevel: number;
+    };
+    white: {
+        engineId: string | null;
+        strengthLevel: number;
+    };
+}
+
 interface ShogiBoardProps {
     gameState: GameState;
     onMove: (move: string) => void;
@@ -17,6 +28,7 @@ interface ShogiBoardProps {
     isLoading?: boolean;
     showCheckNotification?: boolean;
     isCheck?: boolean;
+    engineConfig?: EngineConfig;
 }
 
 const PIECE_SYMBOLS: { [key: string]: string } = {
@@ -121,10 +133,15 @@ function mustPromote(piece: string, toRow: number, isBlack: boolean): boolean {
     return false;
 }
 
-export default function ShogiBoard({ gameState, onMove, showBestMove = false, onBestMove, isLoading = false, showCheckNotification = true }: ShogiBoardProps) {
+export default function ShogiBoard({ gameState, onMove, showBestMove = false, onBestMove, isLoading = false, showCheckNotification = true, engineConfig }: ShogiBoardProps) {
     const board = useMemo(() => parseSfen(gameState.sfen), [gameState.sfen]);
     const [selectedSquare, setSelectedSquare] = useState<Position | null>(null);
     const [selectedDropPiece, setSelectedDropPiece] = useState<string | null>(null);
+    
+    // Check if current player has an engine configured
+    const currentPlayerHasEngine = engineConfig 
+        ? (gameState.turn === 'b' ? engineConfig.black.engineId !== null : engineConfig.white.engineId !== null)
+        : true; // If no config provided, assume engine is available (backward compatibility)
     const [legalMoves, setLegalMoves] = useState<Position[]>([]);
     const [showPromotionDialog, setShowPromotionDialog] = useState(false);
     const [pendingMove, setPendingMove] = useState<{ from: Position; to: Position; piece: string } | null>(null);
@@ -360,7 +377,7 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
             {showBestMove && onBestMove && (
                 <button
                     onClick={onBestMove}
-                    disabled={isLoading || isGameOver}
+                    disabled={isLoading || isGameOver || !currentPlayerHasEngine}
                     className="flex items-center gap-3 px-6 py-3 rounded-lg font-bold transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed bg-accent-cyan text-background-primary"
                 >
                     <div 

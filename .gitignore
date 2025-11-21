@@ -47,3 +47,14 @@ config.json
 .coverage
 htmlcov/
 .pytest_cache/
+
+# Engines (binaries, eval files are huge - keep config.json only)
+backend/engines/*/
+!backend/engines/*/config.json
+backend/engines/**/*.exe
+backend/engines/**/*.bin
+backend/engines/**/*.nnue
+backend/engines/**/*.db
+backend/engines/**/eval/
+backend/test_*.py
+backend/engine_preferences.json
