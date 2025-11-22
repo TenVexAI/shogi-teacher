@@ -11,8 +11,6 @@
    - [HoneyWaffle WCSC28](#honeywaffle-wcsc28)
    - [Apery WCSC30](#apery-wcsc30)
    - [SeoTsume](#seotsume)
-3. [Recommended Settings Summary](#recommended-settings-summary)
-
 ---
 
 ## Universal USI Options
