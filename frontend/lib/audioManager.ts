@@ -55,8 +55,8 @@ class AudioManager {
     
     // Music player
     private musicAudio: HTMLAudioElement | null = null;
-    private currentMusicIndex = -1;
-    private lastPlayedMusic = -1;
+    private shuffledPlaylist: number[] = [];
+    private playlistIndex = 0;
     private musicFadeInterval: NodeJS.Timeout | null = null;
     
     private settings: SoundSettings;
@@ -73,6 +73,9 @@ class AudioManager {
         };
 
         if (typeof window !== 'undefined') {
+            // Initialize shuffled playlist on app launch
+            this.shufflePlaylist();
+            
             // Initialize music player
             this.musicAudio = new Audio();
             this.musicAudio.addEventListener('ended', () => {
@@ -90,6 +93,23 @@ class AudioManager {
             });
             this.musicAudio.loop = false;
         }
+    }
+
+    private shufflePlaylist() {
+        // Create array of indices [0, 1, 2, ..., 29]
+        this.shuffledPlaylist = Array.from({ length: MUSIC_FILES.length }, (_, i) => i);
+        
+        // Fisher-Yates shuffle algorithm
+        for (let i = this.shuffledPlaylist.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [this.shuffledPlaylist[i], this.shuffledPlaylist[j]] = 
+                [this.shuffledPlaylist[j], this.shuffledPlaylist[i]];
+        }
+        
+        // Reset to beginning of playlist
+        this.playlistIndex = 0;
+        
+        console.log('Music playlist shuffled:', this.shuffledPlaylist.map(i => MUSIC_FILES[i].split(' - ')[1]?.replace('.wav', '')));
     }
 
     updateSettings(settings: SoundSettings) {
@@ -283,16 +303,19 @@ class AudioManager {
     private async playNextMusic() {
         if (!this.musicAudio || !this.settings.musicEnabled) return;
 
-        // Pick random song (avoid repeating last song)
-        let nextIndex;
-        do {
-            nextIndex = Math.floor(Math.random() * MUSIC_FILES.length);
-        } while (nextIndex === this.lastPlayedMusic && MUSIC_FILES.length > 1);
+        // Get next song from shuffled playlist
+        const songIndex = this.shuffledPlaylist[this.playlistIndex];
+        const musicFile = MUSIC_FILES[songIndex];
 
-        this.lastPlayedMusic = nextIndex;
-        this.currentMusicIndex = nextIndex;
+        // Move to next position in playlist
+        this.playlistIndex++;
+        
+        // Loop back to beginning if we've played all songs
+        if (this.playlistIndex >= this.shuffledPlaylist.length) {
+            this.playlistIndex = 0;
+            console.log('🔁 Playlist complete, looping back to start');
+        }
 
-        const musicFile = MUSIC_FILES[nextIndex];
         this.musicAudio.src = `/sounds/music/${musicFile}`;
         this.musicAudio.volume = 0; // Start at 0 for fade in
 
@@ -301,7 +324,7 @@ class AudioManager {
             this.musicAudio.load();
             await this.musicAudio.play();
             this.fadeInMusic();
-            console.log(`Now playing: ${musicFile}`);
+            console.log(`🎵 Now playing [${this.playlistIndex}/${this.shuffledPlaylist.length}]: ${musicFile}`);
         } catch (error) {
             console.error('Music play failed:', error);
             // Try again after a delay
