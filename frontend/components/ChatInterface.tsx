@@ -7,6 +7,8 @@ import { Lightbulb } from 'lucide-react';
 interface Message {
     role: 'user' | 'assistant';
     content: string;
+    messageType?: 'system' | 'llm' | 'engine-black' | 'engine-white';
+    engineName?: string;
 }
 
 interface ChatInterfaceProps {
@@ -58,27 +60,54 @@ export default function ChatInterface({ messages, onSendMessage, isLoading, onGe
                     </div>
                 )}
 
-                {messages.map((message, index) => (
-                    <div
-                        key={index}
-                        className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                    >
+                {messages.map((message, index) => {
+                    // Determine background color based on message type
+                    let bgColor = 'bg-background-primary';
+                    let borderColor = 'border-border';
+                    let textColor = 'text-text-primary';
+                    
+                    if (message.role === 'user') {
+                        bgColor = 'bg-accent-purple';
+                        textColor = 'text-white';
+                    } else if (message.messageType === 'engine-black') {
+                        bgColor = 'bg-black';
+                        borderColor = 'border-gray-700';
+                        textColor = 'text-white';
+                    } else if (message.messageType === 'engine-white') {
+                        bgColor = 'bg-white';
+                        borderColor = 'border-gray-300';
+                        textColor = 'text-gray-900';
+                    } else if (message.messageType === 'llm' || message.messageType === 'system') {
+                        bgColor = 'bg-accent-purple';
+                        textColor = 'text-white';
+                    }
+                    
+                    return (
                         <div
-                            className={`${message.role === 'user' ? 'max-w-[80%]' : 'max-w-[95%]'} rounded-lg p-3 ${message.role === 'user'
-                                    ? 'bg-accent-purple text-white'
-                                    : 'bg-background-primary border border-border text-text-primary'
-                                }`}
+                            key={index}
+                            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                         >
-                            {message.role === 'assistant' ? (
-                                <div className="prose prose-sm prose-invert max-w-none">
-                                    <ReactMarkdown>{message.content}</ReactMarkdown>
-                                </div>
-                            ) : (
-                                <p className="whitespace-pre-wrap">{message.content}</p>
-                            )}
+                            <div
+                                className={`${message.role === 'user' ? 'max-w-[80%]' : 'max-w-[95%]'} rounded-lg p-3 border ${bgColor} ${borderColor} ${textColor}`}
+                            >
+                                {/* Show engine name if present */}
+                                {message.engineName && (
+                                    <div className="text-xs font-semibold mb-2 opacity-75">
+                                        {message.engineName}
+                                    </div>
+                                )}
+                                
+                                {message.role === 'assistant' ? (
+                                    <div className={`prose prose-sm max-w-none ${textColor === 'text-white' ? 'prose-invert' : ''}`}>
+                                        <ReactMarkdown>{message.content}</ReactMarkdown>
+                                    </div>
+                                ) : (
+                                    <p className="whitespace-pre-wrap">{message.content}</p>
+                                )}
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
 
                 {isLoading && (
                     <div className="flex justify-start">

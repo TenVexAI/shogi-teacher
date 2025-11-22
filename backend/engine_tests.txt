@@ -1,0 +1,1490 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    ENGINE CAPABILITY TEST SUITE                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+Timestamp: 2025-11-22 03:15:48
+Output file: engine_tests.txt
+================================================================================
+
+=== Discovering Engines ===
+✓ Loaded engine: Apery (apery)
+✓ Loaded engine: Fairy-Stockfish (fairy-stockfish)
+✓ Loaded engine: FukauraOu (fukauraou)
+✓ Loaded engine: HoneyWaffle (honeywaffle)
+✓ Loaded engine: SeoTsume (seotsume)
+✓ Loaded engine: YaneuraOu (yaneuraou)
+
+Discovered 6 engines
+Found 5 playable engines (out of 6 total)
+
+================================================================================
+=== ENGINE CAPABILITY SUMMARY ===
+================================================================================
+
+Dynamic detection of engine features
+
+Engine                    MultiPV    Max    Ponder     Skill      Hash     Threads 
+────────────────────────────────────────────────────────────────────────────────
+[DEBUG] Starting Apery...
+[DEBUG] Executable: C:\Users\broke\shogi-teacher\backend\engines\apery\apery_wcsc30.exe
+[DEBUG] Process started, PID: 136876
+[DEBUG] Sending 'usi' command...
+[DEBUG] Waiting for USI response...
+[DEBUG] Engine: id name Apery_WCSC30
+[DEBUG] Engine: id author HiraokaTakuya
+[DEBUG] Engine: option name Book_Enable type check default false
+[DEBUG] Received usiok after 16 lines
+[DEBUG] Applying 0 default options...
+[DEBUG] Waiting 1s after options...
+[DEBUG] Sending 'isready' command...
+[DEBUG] Waiting for 'readyok' (may take time to load eval/model files)...
+[DEBUG] Received readyok!
+✓ Engine started: Apery
+Apery                     ✅ Yes      10     ✅ Yes      ❌ No       ❌ No     ✅ Yes   
+✓ Engine stopped: Apery
+[DEBUG] Starting Fairy-Stockfish...
+[DEBUG] Executable: C:\Users\broke\shogi-teacher\backend\engines\fairy-stockfish\fairy-stockfish-largeboard_x86-64.exe
+[DEBUG] Process started, PID: 66348
+[DEBUG] Sending 'usi' command...
+[DEBUG] Waiting for USI response...
+[DEBUG] Engine: Fairy-Stockfish 14 LB by Fabian Fichter
+[DEBUG] Engine: id name Fairy-Stockfish 14 LB
+[DEBUG] Engine: id author Fabian Fichter
+[DEBUG] Received usiok after 30 lines
+[DEBUG] Applying 9 default options...
+[DEBUG] Setting: Hash = 256
+[DEBUG] Setting: Threads = 2
+[DEBUG] Setting: UCI_Variant = shogi
+[DEBUG] Setting: UCI_LimitStrength = false
+[DEBUG] Setting: UCI_Elo = 2800
+[DEBUG] Setting: Skill Level = 20
+[DEBUG] Setting: EvalFile = networks/shogi.nnue
+[DEBUG] Setting: BookFile = books/shogi.epd
+[DEBUG] Setting: BookDepth = 255
+[DEBUG] Waiting 1s after options...
+[DEBUG] Sending 'isready' command...
+[DEBUG] Waiting for 'readyok' (may take time to load eval/model files)...
+[DEBUG] Received readyok!
+✓ Engine started: Fairy-Stockfish
+Fairy-Stockfish           ✅ Yes      10     ✅ Yes      ✅ Yes      ✅ Yes    ✅ Yes   
+✓ Engine stopped: Fairy-Stockfish
+[DEBUG] Starting FukauraOu...
+[DEBUG] Executable: C:\Users\broke\shogi-teacher\backend\engines\fukauraou\YaneuraOu-Deep-TensorRT.exe
+[DEBUG] Process started, PID: 131600
+[DEBUG] Sending 'usi' command...
+[DEBUG] Waiting for USI response...
+[DEBUG] Engine: id name FukauraOu TRT-DL 9.01git 64AVX2BMI2
+[DEBUG] Engine: id author Tadao Yamaoka , yaneurao
+[DEBUG] Engine: option name NumaPolicy type string default auto
+[DEBUG] Received usiok after 56 lines
+[DEBUG] Applying 3 default options...
+[DEBUG] Setting: Hash = 2048
+[DEBUG] Setting: Threads = 4
+[DEBUG] Setting: USI_Ponder = false
+[DEBUG] Waiting 1s after options...
+[DEBUG] Sending 'isready' command...
+[DEBUG] Waiting for 'readyok' (may take time to load eval/model files)...
+[DEBUG] Received readyok!
+✓ Engine started: FukauraOu
+FukauraOu                 ✅ Yes      10     ✅ Yes      ❌ No       ❌ No     ❌ No    
+✓ Engine stopped: FukauraOu
+[DEBUG] Starting HoneyWaffle...
+[DEBUG] Executable: C:\Users\broke\shogi-teacher\backend\engines\honeywaffle\HoneyWaffle_WCSC28_AVX2.exe
+[DEBUG] Process started, PID: 140316
+[DEBUG] Sending 'usi' command...
+[DEBUG] Waiting for USI response...
+[DEBUG] Engine: id name YaneuraOu 2018 Otafuku KPPT 4.82 64AVX2
+[DEBUG] Engine: id author by yaneurao
+[DEBUG] Engine: option name Threads type spin default 4 min 1 max 512
+[DEBUG] Received usiok after 38 lines
+[DEBUG] Applying 6 default options...
+[DEBUG] Setting: Hash = 512
+[DEBUG] Setting: Threads = 2
+[DEBUG] Setting: USI_Ponder = false
+[DEBUG] Setting: EvalDir = eval
+[DEBUG] Setting: BookFile = standard_book.db
+[DEBUG] Setting: BookMoves = 16
+[DEBUG] Waiting 1s after options...
+[DEBUG] Sending 'isready' command...
+[DEBUG] Waiting for 'readyok' (may take time to load eval/model files)...
+[DEBUG] Received readyok!
+✓ Engine started: HoneyWaffle
+HoneyWaffle               ✅ Yes      10     ❌ No       ❌ No       ✅ Yes    ✅ Yes   
+✓ Engine stopped: HoneyWaffle
+SeoTsume                  N/A        N/A    N/A        N/A        N/A      N/A      (tsume)
+[DEBUG] Starting YaneuraOu...
+[DEBUG] Executable: C:\Users\broke\shogi-teacher\backend\engines\yaneuraou\YaneuraOu.exe
+[DEBUG] Process started, PID: 10008
+[DEBUG] Sending 'usi' command...
+[DEBUG] Waiting for USI response...
+[DEBUG] Engine: id name YaneuraOu NNUE V9.00Git 64AVX512 TOURNAMENT
+[DEBUG] Engine: id author yaneurao
+[DEBUG] Engine: option name Threads type spin default 4 min 1 max 1024
+[DEBUG] Received usiok after 42 lines
+[DEBUG] Applying 7 default options...
+[DEBUG] Setting: Hash = 1024
+[DEBUG] Setting: Threads = 4
+[DEBUG] Setting: USI_Ponder = false
+[DEBUG] Setting: NetworkDelay = 120
+[DEBUG] Setting: NetworkDelay2 = 1120
+[DEBUG] Setting: MinimumThinkingTime = 2000
+[DEBUG] Setting: EvalDir = eval
+[DEBUG] Waiting 1s after options...
+[DEBUG] Sending 'isready' command...
+[DEBUG] Waiting for 'readyok' (may take time to load eval/model files)...
+[DEBUG] Received readyok!
+✓ Engine started: YaneuraOu
+YaneuraOu                 ✅ Yes      10     ✅ Yes      ❌ No       ❌ No     ✅ Yes   
+✓ Engine stopped: YaneuraOu
+
+================================================================================
+
+📋 Feature Definitions:
+   MultiPV  : Can show multiple best moves (alternatives)
+   Max      : Maximum number of PVs supported
+   Ponder   : Can predict opponent's response
+   Skill    : Can adjust playing strength
+   Hash     : Configurable hash table size
+   Threads  : Can use multiple CPU threads
+
+💡 Usage Recommendations:
+   • MultiPV (show alternatives): Apery, Fairy-Stockfish, FukauraOu, HoneyWaffle, YaneuraOu
+   • Multi-threading: Apery, Fairy-Stockfish, HoneyWaffle, YaneuraOu
+
+================================================================================
+
+
+================================================================================
+=== PRIORITY 1: Centipawn Loss & Move Classification ===
+================================================================================
+
+Demonstrates how to classify moves as Brilliant/Excellent/Good/Inaccuracy/Mistake/Blunder
+This is the core algorithm for post-game analysis.
+
+Testing engine: Apery (apery)
+
+[DEBUG] Starting Apery...
+[DEBUG] Executable: C:\Users\broke\shogi-teacher\backend\engines\apery\apery_wcsc30.exe
+[DEBUG] Process started, PID: 140804
+[DEBUG] Sending 'usi' command...
+[DEBUG] Waiting for USI response...
+[DEBUG] Engine: id name Apery_WCSC30
+[DEBUG] Engine: id author HiraokaTakuya
+[DEBUG] Engine: option name Book_Enable type check default false
+[DEBUG] Received usiok after 16 lines
+[DEBUG] Applying 0 default options...
+[DEBUG] Waiting 1s after options...
+[DEBUG] Sending 'isready' command...
+[DEBUG] Waiting for 'readyok' (may take time to load eval/model files)...
+[DEBUG] Received readyok!
+✓ Engine started: Apery
+================================================================================
+
+📊 Move-by-Move Analysis:
+
+────────────────────────────────────────────────────────────────────────────────
+📍 Move 1: P-7f (typical opening)
+   Move played: 7g7f
+   DEBUG: Position before: lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LN...
+   DEBUG: Position after:  lnsgkgsnl/1r5b1/ppppppppp/9/9/2P6/PP1PPPPPP/1B5R1/...
+   Engine recommended: 7g7f (46cp)
+   DEBUG: eval_before = 46cp (our perspective)
+   DEBUG: eval_after = -47cp (opponent's perspective)
+   DEBUG: -eval_after = 47cp (flipped to our perspective)
+   DEBUG: cp_loss = 46 - (47) = -1cp
+   ✅ Played engine's top choice!
+   Centipawn loss: 1cp
+   🌟 Classification: Brilliant
+
+────────────────────────────────────────────────────────────────────────────────
+📍 Move 2: P-3d (opponent response)
+   Move played: 3c3d
+   DEBUG: Position before: lnsgkgsnl/1r5b1/ppppppppp/9/9/2P6/PP1PPPPPP/1B5R1/...
+   DEBUG: Position after:  lnsgkgsnl/1r5b1/pppppp1pp/6p2/9/2P6/PP1PPPPPP/1B5R...
+   Engine recommended: 8c8d (-36cp)
+   DEBUG: eval_before = -36cp (our perspective)
+   DEBUG: eval_after = 21cp (opponent's perspective)
+   DEBUG: -eval_after = -21cp (flipped to our perspective)
+   DEBUG: cp_loss = -36 - (-21) = -15cp
+   💡 Different from engine (wanted: 8c8d)
+   Centipawn loss: 15cp
+   🌟 Classification: Brilliant
+
+────────────────────────────────────────────────────────────────────────────────
+📍 Move 3: P-2f (second file pawn)
+   Move played: 2g2f
+   DEBUG: Position before: lnsgkgsnl/1r5b1/pppppp1pp/6p2/9/2P6/PP1PPPPPP/1B5R...
+   DEBUG: Position after:  lnsgkgsnl/1r5b1/pppppp1pp/6p2/9/2P4P1/PP1PPPP1P/1B...
+   Engine recommended: 2g2f (38cp)
+   DEBUG: eval_before = 38cp (our perspective)
+   DEBUG: eval_after = -27cp (opponent's perspective)
+   DEBUG: -eval_after = 27cp (flipped to our perspective)
+   DEBUG: cp_loss = 38 - (27) = 11cp
+   ✅ Played engine's top choice!
+   Centipawn loss: 11cp
+   💚 Classification: Good
+
+────────────────────────────────────────────────────────────────────────────────
+📍 Move 4: S-3b (silver development)
+   Move played: 4a3b
+   DEBUG: Position before: lnsgkgsnl/1r5b1/pppppp1pp/6p2/9/2P4P1/PP1PPPP1P/1B...
+   DEBUG: Position after:  lnsgk1snl/1r4gb1/pppppp1pp/6p2/9/2P4P1/PP1PPPP1P/1...
+   Engine recommended: 8c8d (-64cp)
+   DEBUG: eval_before = -64cp (our perspective)
+   DEBUG: eval_after = 76cp (opponent's perspective)
+   DEBUG: -eval_after = -76cp (flipped to our perspective)
+   DEBUG: cp_loss = -64 - (-76) = 12cp
+   💡 Different from engine (wanted: 8c8d)
+   Centipawn loss: 12cp
+   💚 Classification: Good
+
+================================================================================
+
+📚 Classification Guide:
+   🌟 Brilliant    : Better than engine (≤0cp loss)
+   ✅ Excellent   : Engine's choice (≤10cp loss)
+   💚 Good        : Minor difference (≤30cp loss)
+   💡 Inaccuracy  : Small mistake (≤100cp loss)
+   ⚠️  Mistake     : Significant error (≤300cp loss)
+   ❌ Blunder     : Major error (>300cp loss)
+
+================================================================================
+
+✓ Engine stopped: Apery
+
+================================================================================
+=== PRIORITY 2: Multi-PV Testing (Multiple Move Alternatives) ===
+================================================================================
+
+Tests engines that support showing multiple good moves
+
+⚠️  Note: This test requires EngineManager.analyze_position() to support
+    the 'engine_options' parameter for setting MultiPV dynamically.
+
+Test position: Complex midgame
+SFEN: +Bn1g2s1l/2skg2r1/ppppp1n1p/5bpp1/5p1P1/2P6/PP1PP1P1P/1SK2S1...
+
+================================================================================
+
+🔍 Engine: Apery
+[DEBUG] Starting Apery...
+[DEBUG] Executable: C:\Users\broke\shogi-teacher\backend\engines\apery\apery_wcsc30.exe
+[DEBUG] Process started, PID: 142512
+[DEBUG] Sending 'usi' command...
+[DEBUG] Waiting for USI response...
+[DEBUG] Engine: id name Apery_WCSC30
+[DEBUG] Engine: id author HiraokaTakuya
+[DEBUG] Engine: option name Book_Enable type check default false
+[DEBUG] Received usiok after 16 lines
+[DEBUG] Applying 0 default options...
+[DEBUG] Waiting 1s after options...
+[DEBUG] Sending 'isready' command...
+[DEBUG] Waiting for 'readyok' (may take time to load eval/model files)...
+[DEBUG] Received readyok!
+✓ Engine started: Apery
+   ✅ MultiPV supported (max: 10)
+
+   Testing MultiPV=1:
+      📊 Analyzing with MultiPV=1...
+      ✅ Received 1 variation(s)
+         PV #1: 2d2e 4i3h 2e2f 8i7g... (-23cp, depth=22)
+
+   Testing MultiPV=3:
+      📊 Analyzing with MultiPV=3...
+      ✅ Received 3 variation(s)
+         PV #1: 2d2e 4i3h 2e2f 8i7g... (-23cp, depth=20)
+         PV #2: 3a3b 2e2d 8i7g 2b2d... (-173cp, depth=20)
+         PV #3: 4e4f 2e2d 2b4b 2c2a+... (-327cp, depth=19)
+
+   Testing MultiPV=5:
+      📊 Analyzing with MultiPV=5...
+      ✅ Received 5 variation(s)
+         PV #1: 2d2e 8i7g 2e2f 4i3h... (43cp, depth=18)
+         PV #2: 3a3b 2e2d 8i7g 2b2d... (-87cp, depth=18)
+         PV #3: 4e4f 2e2d 4i3h 2b2d... (-104cp, depth=18)
+         PV #4: 4d8h+ 7h8h 2d2e 4h4g... (-703cp, depth=18)
+         PV #5: 2b2a 2e2d 3a3b 2g2e... (-860cp, depth=18)
+✓ Engine stopped: Apery
+
+🔍 Engine: Fairy-Stockfish
+[DEBUG] Starting Fairy-Stockfish...
+[DEBUG] Executable: C:\Users\broke\shogi-teacher\backend\engines\fairy-stockfish\fairy-stockfish-largeboard_x86-64.exe
+[DEBUG] Process started, PID: 139988
+[DEBUG] Sending 'usi' command...
+[DEBUG] Waiting for USI response...
+[DEBUG] Engine: Fairy-Stockfish 14 LB by Fabian Fichter
+[DEBUG] Engine: id name Fairy-Stockfish 14 LB
+[DEBUG] Engine: id author Fabian Fichter
+[DEBUG] Received usiok after 30 lines
+[DEBUG] Applying 9 default options...
+[DEBUG] Setting: Hash = 256
+[DEBUG] Setting: Threads = 2
+[DEBUG] Setting: UCI_Variant = shogi
+[DEBUG] Setting: UCI_LimitStrength = false
+[DEBUG] Setting: UCI_Elo = 2800
+[DEBUG] Setting: Skill Level = 20
+[DEBUG] Setting: EvalFile = networks/shogi.nnue
+[DEBUG] Setting: BookFile = books/shogi.epd
+[DEBUG] Setting: BookDepth = 255
+[DEBUG] Waiting 1s after options...
+[DEBUG] Sending 'isready' command...
+[DEBUG] Waiting for 'readyok' (may take time to load eval/model files)...
+[DEBUG] Received readyok!
+✓ Engine started: Fairy-Stockfish
+   ✅ MultiPV supported (max: 10)
+
+   Testing MultiPV=1:
+      📊 Analyzing with MultiPV=1...
+      ✅ Received 1 variation(s)
+         PV #1: 2d2e (14cp, depth=19)
+
+   Testing MultiPV=3:
+      📊 Analyzing with MultiPV=3...
+      ✅ Received 3 variation(s)
+         PV #1: 2d2e (46cp, depth=16)
+         PV #2: 3a3b 2e2d 6a7a 4i5i... (-127cp, depth=15)
+         PV #3: 4e4f 2e2d 2b4b 4i5h... (-220cp, depth=15)
+
+   Testing MultiPV=5:
+      📊 Analyzing with MultiPV=5...
+      ✅ Received 5 variation(s)
+         PV #1: 2d2e 4i3h 2e2f 6a7a... (63cp, depth=16)
+         PV #2: 3a3b 2e2d 6a7a 4i5i... (-135cp, depth=15)
+         PV #3: 4e4f 2e2d 2b4b 4i5h... (-284cp, depth=15)
+         PV #4: 4d8h+ 7h8h 2d2e 4h4g... (-323cp, depth=15)
+         PV #5: 4d8h 7h8h 2d2e 4h4g... (-325cp, depth=15)
+✓ Engine stopped: Fairy-Stockfish
+
+🔍 Engine: FukauraOu
+[DEBUG] Starting FukauraOu...
+[DEBUG] Executable: C:\Users\broke\shogi-teacher\backend\engines\fukauraou\YaneuraOu-Deep-TensorRT.exe
+[DEBUG] Process started, PID: 143984
+[DEBUG] Sending 'usi' command...
+[DEBUG] Waiting for USI response...
+[DEBUG] Engine: id name FukauraOu TRT-DL 9.01git 64AVX2BMI2
+[DEBUG] Engine: id author Tadao Yamaoka , yaneurao
+[DEBUG] Engine: option name NumaPolicy type string default auto
+[DEBUG] Received usiok after 56 lines
+[DEBUG] Applying 3 default options...
+[DEBUG] Setting: Hash = 2048
+[DEBUG] Setting: Threads = 4
+[DEBUG] Setting: USI_Ponder = false
+[DEBUG] Waiting 1s after options...
+[DEBUG] Sending 'isready' command...
+[DEBUG] Waiting for 'readyok' (may take time to load eval/model files)...
+[DEBUG] Received readyok!
+✓ Engine started: FukauraOu
+   ✅ MultiPV supported (max: 10)
+
+   Testing MultiPV=1:
+      📊 Analyzing with MultiPV=1...
+      ✅ Received 1 variation(s)
+         PV #1: 2d2e 2e2f 4i3h 4d8h+... (57cp, depth=42)
+
+   Testing MultiPV=3:
+      📊 Analyzing with MultiPV=3...
+      ✅ Received 3 variation(s)
+         PV #1: 2d2e 2e2f 4i3h 4d8h+... (58cp, depth=40)
+         PV #2: 3a3b 2e2d 4i3h 2b2d... (-173cp, depth=11)
+         PV #3: 4e4f 2e2d 2b4b 4i5h... (-486cp, depth=13)
+
+   Testing MultiPV=5:
+      📊 Analyzing with MultiPV=5...
+      ✅ Received 5 variation(s)
+         PV #1: 2d2e 2e2f 4i3h 6a7a... (54cp, depth=18)
+         PV #2: 3a3b 2e2d 4i3h 2b2d... (-178cp, depth=11)
+         PV #3: 4e4f 2e2d 2b4b 4i5h... (-524cp, depth=14)
+         PV #4: 3a4b 2e2d 2b3b 2c2a+... (-1398cp, depth=11)
+         PV #5: 1c1d 2e2d 2b4b 2c2a+... (-965cp, depth=9)
+✓ Engine stopped: FukauraOu
+
+🔍 Engine: HoneyWaffle
+[DEBUG] Starting HoneyWaffle...
+[DEBUG] Executable: C:\Users\broke\shogi-teacher\backend\engines\honeywaffle\HoneyWaffle_WCSC28_AVX2.exe
+[DEBUG] Process started, PID: 123424
+[DEBUG] Sending 'usi' command...
+[DEBUG] Waiting for USI response...
+[DEBUG] Engine: id name YaneuraOu 2018 Otafuku KPPT 4.82 64AVX2
+[DEBUG] Engine: id author by yaneurao
+[DEBUG] Engine: option name Threads type spin default 4 min 1 max 512
+[DEBUG] Received usiok after 38 lines
+[DEBUG] Applying 6 default options...
+[DEBUG] Setting: Hash = 512
+[DEBUG] Setting: Threads = 2
+[DEBUG] Setting: USI_Ponder = false
+[DEBUG] Setting: EvalDir = eval
+[DEBUG] Setting: BookFile = standard_book.db
+[DEBUG] Setting: BookMoves = 16
+[DEBUG] Waiting 1s after options...
+[DEBUG] Sending 'isready' command...
+[DEBUG] Waiting for 'readyok' (may take time to load eval/model files)...
+[DEBUG] Received readyok!
+✓ Engine started: HoneyWaffle
+   ✅ MultiPV supported (max: 10)
+
+   Testing MultiPV=1:
+      📊 Analyzing with MultiPV=1...
+      ⚠️  No MultiPV lines found in engine output
+      📝 Engine returned bestmove: 2d2e
+
+   Testing MultiPV=3:
+      📊 Analyzing with MultiPV=3...
+      ✅ Received 3 variation(s)
+         PV #1: 2d2e 4i3h 2e2f 4h5i... (132cp, depth=15)
+         PV #2: 3a3b 2e2d 6a7a 8h7g... (-252cp, depth=14)
+         PV #3: 5b4c 2e2d 4i3h 2b2d... (-302cp, depth=14)
+
+   Testing MultiPV=5:
+      📊 Analyzing with MultiPV=5...
+      ✅ Received 5 variation(s)
+         PV #1: 2d2e 4i3h 2e2f 4h5i... (64cp, depth=13)
+         PV #2: 3a3b 6a7a 2e2d 9g9f... (-170cp, depth=13)
+         PV #3: 3c2e 8h7g (-845cp, depth=13)
+         PV #4: 4d8h+ 7h8h (-827cp, depth=12)
+         PV #5: 2b2a 2e2d 3a3b 2f2e... (-858cp, depth=12)
+✓ Engine stopped: HoneyWaffle
+
+🔍 Engine: YaneuraOu
+[DEBUG] Starting YaneuraOu...
+[DEBUG] Executable: C:\Users\broke\shogi-teacher\backend\engines\yaneuraou\YaneuraOu.exe
+[DEBUG] Process started, PID: 141192
+[DEBUG] Sending 'usi' command...
+[DEBUG] Waiting for USI response...
+[DEBUG] Engine: id name YaneuraOu NNUE V9.00Git 64AVX512 TOURNAMENT
+[DEBUG] Engine: id author yaneurao
+[DEBUG] Engine: option name Threads type spin default 4 min 1 max 1024
+[DEBUG] Received usiok after 42 lines
+[DEBUG] Applying 7 default options...
+[DEBUG] Setting: Hash = 1024
+[DEBUG] Setting: Threads = 4
+[DEBUG] Setting: USI_Ponder = false
+[DEBUG] Setting: NetworkDelay = 120
+[DEBUG] Setting: NetworkDelay2 = 1120
+[DEBUG] Setting: MinimumThinkingTime = 2000
+[DEBUG] Setting: EvalDir = eval
+[DEBUG] Waiting 1s after options...
+[DEBUG] Sending 'isready' command...
+[DEBUG] Waiting for 'readyok' (may take time to load eval/model files)...
+[DEBUG] Received readyok!
+✓ Engine started: YaneuraOu
+   ✅ MultiPV supported (max: 10)
+
+   Testing MultiPV=1:
+      📊 Analyzing with MultiPV=1...
+      ✅ Received 1 variation(s)
+         PV #1: 2d2e 4i3h 2e2f 8i7g... (105cp, depth=21)
+
+   Testing MultiPV=3:
+      📊 Analyzing with MultiPV=3...
+      ✅ Received 3 variation(s)
+         PV #1: 2d2e 4i3h 2e2f 8i7g... (42cp, depth=19)
+         PV #2: 3a3b 2e2d 8i7g 4e4f... (-327cp, depth=19)
+         PV #3: 4e4f 2e2d (-530cp, depth=19)
+
+   Testing MultiPV=5:
+      📊 Analyzing with MultiPV=5...
+      ✅ Received 5 variation(s)
+         PV #1: 2d2e 4i3h 2e2f 8i7g... (18cp, depth=17)
+         PV #2: 3a3b 2e2d 8i7g 4e4f... (-331cp, depth=17)
+         PV #3: 4d8h+ 7h8h 2d2e 3a3b... (-604cp, depth=17)
+         PV #4: 4e4f 2e2d 2b4b 4i5h... (-842cp, depth=17)
+         PV #5: 2b2a 2e2d 3a3b 2f2e... (-974cp, depth=17)
+✓ Engine stopped: YaneuraOu
+
+================================================================================
+
+💡 Implementation Status:
+   ✅ Dynamic capability detection: IMPLEMENTED
+   ✅ MultiPV line parser: IMPLEMENTED (extract_multipv_lines)
+   ✅ Direct engine MultiPV testing: IMPLEMENTED (bypasses EngineManager)
+   ⚠️  EngineManager.analyze_position engine_options param: NOT YET IMPLEMENTED
+
+💡 Current Approach:
+   • Sends 'setoption name MultiPV value N' directly to engine process
+   • Collects all info lines via callback
+   • Parses multiple PV lines with extract_multipv_lines()
+
+💡 For Production (EngineManager Enhancement):
+   1. Add 'engine_options' parameter to analyze_position()
+   2. Before 'go' command, send: setoption name <opt> value <val>
+   3. Collect all 'info' lines (not just final one)
+   4. Return info_lines list in analysis dict
+
+💡 Usage:
+   • PV #1 is best move (highest score)
+   • PV #2-5 are good alternatives
+   • Score difference shows relative quality
+   • Perfect for teaching: 'Here are 3 other moves you could consider...'
+
+================================================================================
+
+
+================================================================================
+=== PRIORITY 3: Mate Detection & Display ===
+================================================================================
+
+Tests how engines report mate distances vs centipawn scores
+
+⚠️  Note: Tsume solvers (SeoTsume) may take a long time on complex positions
+    They are specialized for mate finding and may not respond quickly.
+
+Testing engine: Apery
+
+[DEBUG] Starting Apery...
+[DEBUG] Executable: C:\Users\broke\shogi-teacher\backend\engines\apery\apery_wcsc30.exe
+[DEBUG] Process started, PID: 68532
+[DEBUG] Sending 'usi' command...
+[DEBUG] Waiting for USI response...
+[DEBUG] Engine: id name Apery_WCSC30
+[DEBUG] Engine: id author HiraokaTakuya
+[DEBUG] Engine: option name Book_Enable type check default false
+[DEBUG] Received usiok after 16 lines
+[DEBUG] Applying 0 default options...
+[DEBUG] Waiting 1s after options...
+[DEBUG] Sending 'isready' command...
+[DEBUG] Waiting for 'readyok' (may take time to load eval/model files)...
+[DEBUG] Received readyok!
+✓ Engine started: Apery
+================================================================================
+
+📍 Mate in 1: Simple mate in one move
+   Expected: Mate in 1
+   Analysis time: 2000ms
+   Engine response:
+      bestmove: R*1a
+      score_cp: None
+      mate: 2
+   Display to user:
+      ✅ "Mate in 1 move"
+      DEBUG: Engine reported 2 plies = 1 full moves
+
+
+📍 Mate in 7: Complex tactical position
+   Expected: Mate in 7
+   Analysis time: 5000ms
+   Engine response:
+      bestmove: 8h5h
+      score_cp: 1022
+      mate: 7
+   Display to user:
+      ✅ "Mate in 4 moves"
+      DEBUG: Engine reported 7 plies = 4 full moves
+
+================================================================================
+
+📚 Mate Display Guide:
+   ⚠️  IMPORTANT: USI engines report mate in PLIES (half-moves), not full moves!
+   
+   Conversion: full_moves = (abs(plies) + 1) // 2
+   
+   Examples:
+   • Engine says mate:2  → Display: "Mate in 1 move"
+   • Engine says mate:7  → Display: "Mate in 4 moves"
+   • Engine says mate:-5 → Display: "Opponent has mate in 3 moves"
+   
+   mate > 0  : You have mate (use format_mate_distance())
+   mate < 0  : Opponent has mate (use format_mate_distance())
+   mate = None, score_cp present: No forced mate, show centipawn evaluation
+
+================================================================================
+
+✓ Engine stopped: Apery
+
+================================================================================
+=== PRIORITY 4: PV Line Display (Variation Explanation) ===
+================================================================================
+
+Tests how to parse and display variation lines for teaching
+
+Testing engine: Apery
+
+[DEBUG] Starting Apery...
+[DEBUG] Executable: C:\Users\broke\shogi-teacher\backend\engines\apery\apery_wcsc30.exe
+[DEBUG] Process started, PID: 120416
+[DEBUG] Sending 'usi' command...
+[DEBUG] Waiting for USI response...
+[DEBUG] Engine: id name Apery_WCSC30
+[DEBUG] Engine: id author HiraokaTakuya
+[DEBUG] Engine: option name Book_Enable type check default false
+[DEBUG] Received usiok after 16 lines
+[DEBUG] Applying 0 default options...
+[DEBUG] Waiting 1s after options...
+[DEBUG] Sending 'isready' command...
+[DEBUG] Waiting for 'readyok' (may take time to load eval/model files)...
+[DEBUG] Received readyok!
+✓ Engine started: Apery
+Position: Complex midgame
+SFEN: +Bn1g2s1l/2skg2r1/ppppp1n1p/5bpp1/5p1P1/2P6/PP1PP1P1P/1SK2S1...
+
+================================================================================
+
+📊 Engine Analysis:
+   Best move: 2d2e
+   Evaluation: 201cp
+   Depth: 24
+   PV length: 25 moves
+
+📝 Display Formats:
+
+   Compact (6 moves):
+   "Best line: 2d2e 4i3h 2e2f 8i7g 4e4f 1g1f..."
+
+   With move numbers:
+   "1. 2d2e 4i3h 2. 2e2f 8i7g 3. 4e4f 1g1f..."
+
+   Natural language:
+   "If you play 2d2e, the expected continuation is"
+   "4i3h → 2e2f → 8i7g → 4e4f → 1g1f"
+
+================================================================================
+
+💡 PV Display Tips:
+   • Limit to 5-6 moves for readability
+   • Use '...' to indicate more moves exist
+   • Convert to algebraic notation if available
+   • Show move numbers for clarity
+   • Consider showing evaluation at key points
+
+================================================================================
+
+✓ Engine stopped: Apery
+
+================================================================================
+=== PRIORITY 5: Depth/Time Sensitivity (Optimization Guidance) ===
+================================================================================
+
+Tests how analysis quality changes with time (quick hints vs deep analysis)
+
+Testing engine: Apery
+
+[DEBUG] Starting Apery...
+[DEBUG] Executable: C:\Users\broke\shogi-teacher\backend\engines\apery\apery_wcsc30.exe
+[DEBUG] Process started, PID: 139412
+[DEBUG] Sending 'usi' command...
+[DEBUG] Waiting for USI response...
+[DEBUG] Engine: id name Apery_WCSC30
+[DEBUG] Engine: id author HiraokaTakuya
+[DEBUG] Engine: option name Book_Enable type check default false
+[DEBUG] Received usiok after 16 lines
+[DEBUG] Applying 0 default options...
+[DEBUG] Waiting 1s after options...
+[DEBUG] Sending 'isready' command...
+[DEBUG] Waiting for 'readyok' (may take time to load eval/model files)...
+[DEBUG] Received readyok!
+✓ Engine started: Apery
+Position: Complex midgame
+SFEN: +Bn1g2s1l/2skg2r1/ppppp1n1p/5bpp1/5p1P1/2P6/PP1PP1P1P/1SK2S1...
+
+================================================================================
+
+📊 Analysis at Different Time Allocations:
+
+────────────────────────────────────────────────────────────────────────────────
+⏱️  Quick hint (100ms)
+   Best move: 1c1d
+   Evaluation: Nonecp
+   Depth: -1
+   Nodes: 2
+   PV length: 1 moves
+
+────────────────────────────────────────────────────────────────────────────────
+⏱️  Standard analysis (1000ms)
+   Best move: 2d2e
+   Evaluation: 245cp
+   Depth: 17
+   Nodes: 614,858
+   PV length: 13 moves
+
+────────────────────────────────────────────────────────────────────────────────
+⏱️  Deep analysis (5000ms)
+   Best move: 2d2e
+   Evaluation: 241cp
+   Depth: 24
+   Nodes: 4,410,742
+   PV length: 15 moves
+
+================================================================================
+
+📈 Comparison:
+   ⚠️  Best move CHANGED with deeper analysis!
+        100ms: 1c1d (Nonecp)
+       1000ms: 2d2e (245cp)
+       5000ms: 2d2e (241cp)
+   Evaluation range: 241cp to 245cp (±4cp)
+
+================================================================================
+
+💡 Time Allocation Recommendations:
+   • Quick hints (100-200ms): Fast feedback, may miss tactical nuances
+   • Standard (1000ms): Good balance for real-time analysis
+   • Deep (5000ms+): Best for post-game analysis and teaching
+   • If best move changes, position is complex - use longer time
+
+================================================================================
+
+✓ Engine stopped: Apery
+
+================================================================================
+=== PRIORITY 6: Ponder Move Testing (Opponent Prediction) ===
+================================================================================
+
+Tests what engines predict opponent will play after suggested move
+
+
+🔍 Engine: Apery
+[DEBUG] Starting Apery...
+[DEBUG] Executable: C:\Users\broke\shogi-teacher\backend\engines\apery\apery_wcsc30.exe
+[DEBUG] Process started, PID: 131976
+[DEBUG] Sending 'usi' command...
+[DEBUG] Waiting for USI response...
+[DEBUG] Engine: id name Apery_WCSC30
+[DEBUG] Engine: id author HiraokaTakuya
+[DEBUG] Engine: option name Book_Enable type check default false
+[DEBUG] Received usiok after 16 lines
+[DEBUG] Applying 0 default options...
+[DEBUG] Waiting 1s after options...
+[DEBUG] Sending 'isready' command...
+[DEBUG] Waiting for 'readyok' (may take time to load eval/model files)...
+[DEBUG] Received readyok!
+✓ Engine started: Apery
+   ✅ Ponder enabled (option: USI_Ponder)
+
+   📍 Opening: Starting position - should have strong book/common ponder
+      Best move: 2g2f (7cp)
+      Ponder:    3c3d
+      💡 Display: "If you play 2g2f, opponent likely plays 3c3d"
+
+   📍 Midgame: Complex midgame - ponder shows expected response
+      Best move: 2d2e (136cp)
+      Ponder:    4i3h
+      💡 Display: "If you play 2d2e, opponent likely plays 4i3h"
+✓ Engine stopped: Apery
+
+🔍 Engine: Fairy-Stockfish
+[DEBUG] Starting Fairy-Stockfish...
+[DEBUG] Executable: C:\Users\broke\shogi-teacher\backend\engines\fairy-stockfish\fairy-stockfish-largeboard_x86-64.exe
+[DEBUG] Process started, PID: 141608
+[DEBUG] Sending 'usi' command...
+[DEBUG] Waiting for USI response...
+[DEBUG] Engine: Fairy-Stockfish 14 LB by Fabian Fichter
+[DEBUG] Engine: id name Fairy-Stockfish 14 LB
+[DEBUG] Engine: id author Fabian Fichter
+[DEBUG] Received usiok after 30 lines
+[DEBUG] Applying 9 default options...
+[DEBUG] Setting: Hash = 256
+[DEBUG] Setting: Threads = 2
+[DEBUG] Setting: UCI_Variant = shogi
+[DEBUG] Setting: UCI_LimitStrength = false
+[DEBUG] Setting: UCI_Elo = 2800
+[DEBUG] Setting: Skill Level = 20
+[DEBUG] Setting: EvalFile = networks/shogi.nnue
+[DEBUG] Setting: BookFile = books/shogi.epd
+[DEBUG] Setting: BookDepth = 255
+[DEBUG] Waiting 1s after options...
+[DEBUG] Sending 'isready' command...
+[DEBUG] Waiting for 'readyok' (may take time to load eval/model files)...
+[DEBUG] Received readyok!
+✓ Engine started: Fairy-Stockfish
+   ✅ Ponder enabled (option: Ponder)
+
+   📍 Opening: Starting position - should have strong book/common ponder
+      Best move: 2g2f (31cp)
+      Ponder:    3c3d
+      💡 Display: "If you play 2g2f, opponent likely plays 3c3d"
+
+   📍 Midgame: Complex midgame - ponder shows expected response
+      Best move: 2d2e (-47cp)
+      Ponder:    8i7g
+      💡 Display: "If you play 2d2e, opponent likely plays 8i7g"
+✓ Engine stopped: Fairy-Stockfish
+
+🔍 Engine: FukauraOu
+[DEBUG] Starting FukauraOu...
+[DEBUG] Executable: C:\Users\broke\shogi-teacher\backend\engines\fukauraou\YaneuraOu-Deep-TensorRT.exe
+[DEBUG] Process started, PID: 143932
+[DEBUG] Sending 'usi' command...
+[DEBUG] Waiting for USI response...
+[DEBUG] Engine: id name FukauraOu TRT-DL 9.01git 64AVX2BMI2
+[DEBUG] Engine: id author Tadao Yamaoka , yaneurao
+[DEBUG] Engine: option name NumaPolicy type string default auto
+[DEBUG] Received usiok after 56 lines
+[DEBUG] Applying 3 default options...
+[DEBUG] Setting: Hash = 2048
+[DEBUG] Setting: Threads = 4
+[DEBUG] Setting: USI_Ponder = false
+[DEBUG] Waiting 1s after options...
+[DEBUG] Sending 'isready' command...
+[DEBUG] Waiting for 'readyok' (may take time to load eval/model files)...
+[DEBUG] Received readyok!
+✓ Engine started: FukauraOu
+   ✅ Ponder enabled (option: USI_Ponder)
+
+   📍 Opening: Starting position - should have strong book/common ponder
+      Best move: 9g9f (0cp)
+      Ponder:    3c3d
+      💡 Display: "If you play 9g9f, opponent likely plays 3c3d"
+
+   📍 Midgame: Complex midgame - ponder shows expected response
+      Best move: 2d2e (67cp)
+      Ponder:    L*8f
+      💡 Display: "If you play 2d2e, opponent likely plays L*8f"
+✓ Engine stopped: FukauraOu
+
+🔍 Engine: HoneyWaffle
+[DEBUG] Starting HoneyWaffle...
+[DEBUG] Executable: C:\Users\broke\shogi-teacher\backend\engines\honeywaffle\HoneyWaffle_WCSC28_AVX2.exe
+[DEBUG] Process started, PID: 130724
+[DEBUG] Sending 'usi' command...
+[DEBUG] Waiting for USI response...
+[DEBUG] Engine: id name YaneuraOu 2018 Otafuku KPPT 4.82 64AVX2
+[DEBUG] Engine: id author by yaneurao
+[DEBUG] Engine: option name Threads type spin default 4 min 1 max 512
+[DEBUG] Received usiok after 38 lines
+[DEBUG] Applying 6 default options...
+[DEBUG] Setting: Hash = 512
+[DEBUG] Setting: Threads = 2
+[DEBUG] Setting: USI_Ponder = false
+[DEBUG] Setting: EvalDir = eval
+[DEBUG] Setting: BookFile = standard_book.db
+[DEBUG] Setting: BookMoves = 16
+[DEBUG] Waiting 1s after options...
+[DEBUG] Sending 'isready' command...
+[DEBUG] Waiting for 'readyok' (may take time to load eval/model files)...
+[DEBUG] Received readyok!
+✓ Engine started: HoneyWaffle
+   ℹ️  Ponder not explicitly configured (may still return ponder moves)
+
+   📍 Opening: Starting position - should have strong book/common ponder
+      Best move: 2h7h (Nonecp)
+      Ponder:    8c8d
+      💡 Display: "If you play 2h7h, opponent likely plays 8c8d"
+
+   📍 Midgame: Complex midgame - ponder shows expected response
+      Best move: 2d2e (262cp)
+      Ponder:    4i3h
+      💡 Display: "If you play 2d2e, opponent likely plays 4i3h"
+✓ Engine stopped: HoneyWaffle
+
+🔍 Engine: YaneuraOu
+[DEBUG] Starting YaneuraOu...
+[DEBUG] Executable: C:\Users\broke\shogi-teacher\backend\engines\yaneuraou\YaneuraOu.exe
+[DEBUG] Process started, PID: 133296
+[DEBUG] Sending 'usi' command...
+[DEBUG] Waiting for USI response...
+[DEBUG] Engine: id name YaneuraOu NNUE V9.00Git 64AVX512 TOURNAMENT
+[DEBUG] Engine: id author yaneurao
+[DEBUG] Engine: option name Threads type spin default 4 min 1 max 1024
+[DEBUG] Received usiok after 42 lines
+[DEBUG] Applying 7 default options...
+[DEBUG] Setting: Hash = 1024
+[DEBUG] Setting: Threads = 4
+[DEBUG] Setting: USI_Ponder = false
+[DEBUG] Setting: NetworkDelay = 120
+[DEBUG] Setting: NetworkDelay2 = 1120
+[DEBUG] Setting: MinimumThinkingTime = 2000
+[DEBUG] Setting: EvalDir = eval
+[DEBUG] Waiting 1s after options...
+[DEBUG] Sending 'isready' command...
+[DEBUG] Waiting for 'readyok' (may take time to load eval/model files)...
+[DEBUG] Received readyok!
+✓ Engine started: YaneuraOu
+   ✅ Ponder enabled (option: USI_Ponder)
+
+   📍 Opening: Starting position - should have strong book/common ponder
+      Best move: 3i3h (0cp)
+      Ponder:    8c8d
+      💡 Display: "If you play 3i3h, opponent likely plays 8c8d"
+
+   📍 Midgame: Complex midgame - ponder shows expected response
+      Best move: 2d2e (177cp)
+      Ponder:    4i3h
+      💡 Display: "If you play 2d2e, opponent likely plays 4i3h"
+✓ Engine stopped: YaneuraOu
+
+================================================================================
+
+💡 Ponder Usage Tips:
+   • Ponder = engine's prediction of opponent's response
+   • Useful for showing continuation: "After 7g7f, expect 3c3d..."
+   • Combines with PV line for complete variation preview
+   • Not all engines provide ponder (especially in book positions)
+   • Display format: 'If you play [bestmove], opponent likely plays [ponder]'
+
+================================================================================
+
+
+=== Testing Engine Response Formats ===
+
+
+=== Discovering Engines ===
+✓ Loaded engine: Apery (apery)
+✓ Loaded engine: Fairy-Stockfish (fairy-stockfish)
+✓ Loaded engine: FukauraOu (fukauraou)
+✓ Loaded engine: HoneyWaffle (honeywaffle)
+✓ Loaded engine: SeoTsume (seotsume)
+✓ Loaded engine: YaneuraOu (yaneuraou)
+
+Discovered 6 engines
+Found 5 playable engines (out of 6 total)
+
+================================================================================
+🔍 Testing Engine: Apery (apery)
+   Path: C:\Users\broke\shogi-teacher\backend\engines\apery\apery_wcsc30.exe
+   Type: Standard
+================================================================================
+[DEBUG] Starting Apery...
+[DEBUG] Executable: C:\Users\broke\shogi-teacher\backend\engines\apery\apery_wcsc30.exe
+[DEBUG] Process started, PID: 140768
+[DEBUG] Sending 'usi' command...
+[DEBUG] Waiting for USI response...
+[DEBUG] Engine: id name Apery_WCSC30
+[DEBUG] Engine: id author HiraokaTakuya
+[DEBUG] Engine: option name Book_Enable type check default false
+[DEBUG] Received usiok after 16 lines
+[DEBUG] Applying 0 default options...
+[DEBUG] Waiting 1s after options...
+[DEBUG] Sending 'isready' command...
+[DEBUG] Waiting for 'readyok' (may take time to load eval/model files)...
+[DEBUG] Received readyok!
+✓ Engine started: Apery
+   ✅ Engine started successfully
+
+   📍 Test 1: Starting Position
+      Initial board position
+      SFEN: lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b ...
+      ✅ Analysis successful
+      📊 Response fields:
+         • bestmove: 2g2f
+         • ponder: 3c3d
+         • score_cp: 7
+         • mate: None
+         • depth: 20
+         • nodes: 487563
+         • nps: 973179
+         • pv: ['2g2f', '3c3d', '7g7f']... (20 moves)
+
+   📍 Test 2: Early/Mid Game
+      Complex middle game with promoted bishop
+      SFEN: +Bn1g2s1l/2skg2r1/ppppp1n1p/5bpp1/5p1P1/2P6/PP1PP1P1P/1SK2S1...
+      ✅ Analysis successful
+      📊 Response fields:
+         • bestmove: 2d2e
+         • ponder: 4i3h
+         • score_cp: 171
+         • mate: None
+         • depth: 16
+         • nodes: 404105
+         • nps: 806596
+         • pv: ['2d2e', '4i3h', '2e2f']... (11 moves)
+
+   📍 Test 3: Mid/Late Game
+      Late middle game with multiple promoted pieces
+      SFEN: +B1sg1gsnl/2+N2k1b1/pP2pp2p/2p3p2/9/2PpP4/P1+p2PP1P/7R1/LN1G...
+      ✅ Analysis successful
+      📊 Response fields:
+         • bestmove: 7a7b
+         • ponder: 8i7g
+         • score_cp: 225
+         • mate: None
+         • depth: 15
+         • nodes: 341845
+         • nps: 682325
+         • pv: ['7a7b', '8i7g', '6f6g+']... (14 moves)
+
+   📍 Test 4: Mate in 7
+      Tactical position with forced mate sequence
+      SFEN: ln1g3+Rl/2sk1s+P2/2ppppb1p/p1b3p2/8P/P4P3/2PPP1P2/1+r2GS3/LN...
+      ✅ Analysis successful
+      📊 Response fields:
+         • bestmove: 8h5h
+         • ponder: 4i5h
+         • score_cp: 602
+         • mate: 7
+         • depth: 40
+         • nodes: 426886
+         • nps: 852067
+         • pv: ['8h5h', '4i5h', 'S*6i']... (7 moves)
+
+✓ Engine stopped: Apery
+   ✅ Engine stopped
+
+
+================================================================================
+🔍 Testing Engine: Fairy-Stockfish (fairy-stockfish)
+   Path: C:\Users\broke\shogi-teacher\backend\engines\fairy-stockfish\fairy-stockfish-largeboard_x86-64.exe
+   Type: Standard
+================================================================================
+[DEBUG] Starting Fairy-Stockfish...
+[DEBUG] Executable: C:\Users\broke\shogi-teacher\backend\engines\fairy-stockfish\fairy-stockfish-largeboard_x86-64.exe
+[DEBUG] Process started, PID: 134168
+[DEBUG] Sending 'usi' command...
+[DEBUG] Waiting for USI response...
+[DEBUG] Engine: Fairy-Stockfish 14 LB by Fabian Fichter
+[DEBUG] Engine: id name Fairy-Stockfish 14 LB
+[DEBUG] Engine: id author Fabian Fichter
+[DEBUG] Received usiok after 30 lines
+[DEBUG] Applying 9 default options...
+[DEBUG] Setting: Hash = 256
+[DEBUG] Setting: Threads = 2
+[DEBUG] Setting: UCI_Variant = shogi
+[DEBUG] Setting: UCI_LimitStrength = false
+[DEBUG] Setting: UCI_Elo = 2800
+[DEBUG] Setting: Skill Level = 20
+[DEBUG] Setting: EvalFile = networks/shogi.nnue
+[DEBUG] Setting: BookFile = books/shogi.epd
+[DEBUG] Setting: BookDepth = 255
+[DEBUG] Waiting 1s after options...
+[DEBUG] Sending 'isready' command...
+[DEBUG] Waiting for 'readyok' (may take time to load eval/model files)...
+[DEBUG] Received readyok!
+✓ Engine started: Fairy-Stockfish
+   ✅ Engine started successfully
+
+   📍 Test 1: Starting Position
+      Initial board position
+      SFEN: lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b ...
+      ✅ Analysis successful
+      📊 Response fields:
+         • bestmove: 7g7f
+         • ponder: 3c3d
+         • score_cp: 62
+         • mate: None
+         • depth: 16
+         • nodes: 1049339
+         • nps: 1048290
+         • pv: ['7g7f', '3c3d', '6i7h']... (23 moves)
+
+   📍 Test 2: Early/Mid Game
+      Complex middle game with promoted bishop
+      SFEN: +Bn1g2s1l/2skg2r1/ppppp1n1p/5bpp1/5p1P1/2P6/PP1PP1P1P/1SK2S1...
+      ✅ Analysis successful
+      📊 Response fields:
+         • bestmove: 2d2e
+         • ponder: 4h5i
+         • score_cp: 62
+         • mate: None
+         • depth: 15
+         • nodes: 1043664
+         • nps: 1039505
+         • pv: ['2d2e'] (1 moves)
+
+   📍 Test 3: Mid/Late Game
+      Late middle game with multiple promoted pieces
+      SFEN: +B1sg1gsnl/2+N2k1b1/pP2pp2p/2p3p2/9/2PpP4/P1+p2PP1P/7R1/LN1G...
+      ✅ Analysis successful
+      📊 Response fields:
+         • bestmove: 7a7b
+         • ponder: 8i7g
+         • score_cp: 203
+         • mate: None
+         • depth: 15
+         • nodes: 973590
+         • nps: 969711
+         • pv: ['7a7b', '8i7g', '6f6g+']... (14 moves)
+
+   📍 Test 4: Mate in 7
+      Tactical position with forced mate sequence
+      SFEN: ln1g3+Rl/2sk1s+P2/2ppppb1p/p1b3p2/8P/P4P3/2PPP1P2/1+r2GS3/LN...
+      ✅ Analysis successful
+      📊 Response fields:
+         • bestmove: 8h5h
+         • ponder: 4i5h
+         • score_cp: 215
+         • mate: 7
+         • depth: 49
+         • nodes: 2401133
+         • nps: 2398734
+         • pv: ['8h5h', '4i5h', 'S*6i']... (7 moves)
+
+✓ Engine stopped: Fairy-Stockfish
+   ✅ Engine stopped
+
+
+================================================================================
+🔍 Testing Engine: FukauraOu (fukauraou)
+   Path: C:\Users\broke\shogi-teacher\backend\engines\fukauraou\YaneuraOu-Deep-TensorRT.exe
+   Type: Standard
+================================================================================
+[DEBUG] Starting FukauraOu...
+[DEBUG] Executable: C:\Users\broke\shogi-teacher\backend\engines\fukauraou\YaneuraOu-Deep-TensorRT.exe
+[DEBUG] Process started, PID: 142532
+[DEBUG] Sending 'usi' command...
+[DEBUG] Waiting for USI response...
+[DEBUG] Engine: id name FukauraOu TRT-DL 9.01git 64AVX2BMI2
+[DEBUG] Engine: id author Tadao Yamaoka , yaneurao
+[DEBUG] Engine: option name NumaPolicy type string default auto
+[DEBUG] Received usiok after 56 lines
+[DEBUG] Applying 3 default options...
+[DEBUG] Setting: Hash = 2048
+[DEBUG] Setting: Threads = 4
+[DEBUG] Setting: USI_Ponder = false
+[DEBUG] Waiting 1s after options...
+[DEBUG] Sending 'isready' command...
+[DEBUG] Waiting for 'readyok' (may take time to load eval/model files)...
+[DEBUG] Received readyok!
+✓ Engine started: FukauraOu
+   ✅ Engine started successfully
+
+   📍 Test 1: Starting Position
+      Initial board position
+      SFEN: lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b ...
+      ✅ Analysis successful
+      📊 Response fields:
+         • bestmove: 5g5f
+         • ponder: 3c3d
+         • score_cp: 0
+         • mate: None
+         • depth: 0
+         • nodes: 0
+         • nps: 0
+         • pv: ['5g5f', '3c3d'] (2 moves)
+
+   📍 Test 2: Early/Mid Game
+      Complex middle game with promoted bishop
+      SFEN: +Bn1g2s1l/2skg2r1/ppppp1n1p/5bpp1/5p1P1/2P6/PP1PP1P1P/1SK2S1...
+      ✅ Analysis successful
+      📊 Response fields:
+         • bestmove: 2d2e
+         • ponder: L*8f
+         • score_cp: 67
+         • mate: None
+         • depth: 40
+         • nodes: 43403
+         • nps: 38614
+         • pv: ['2d2e', 'L*8f', '2e2f']... (40 moves)
+
+   📍 Test 3: Mid/Late Game
+      Late middle game with multiple promoted pieces
+      SFEN: +B1sg1gsnl/2+N2k1b1/pP2pp2p/2p3p2/9/2PpP4/P1+p2PP1P/7R1/LN1G...
+      ✅ Analysis successful
+      📊 Response fields:
+         • bestmove: 7a7b
+         • ponder: 8i7g
+         • score_cp: -77
+         • mate: None
+         • depth: 25
+         • nodes: 39472
+         • nps: 31451
+         • pv: ['7a7b', '8i7g', '6f6g+']... (25 moves)
+
+   📍 Test 4: Mate in 7
+      Tactical position with forced mate sequence
+      SFEN: ln1g3+Rl/2sk1s+P2/2ppppb1p/p1b3p2/8P/P4P3/2PPP1P2/1+r2GS3/LN...
+      ✅ Analysis successful
+      📊 Response fields:
+         • bestmove: 8h5h
+         • ponder: None
+         • score_cp: 3856
+         • mate: 7
+         • depth: 1
+         • nodes: 83959
+         • nps: 4938764
+         • pv: ['8h5h'] (1 moves)
+
+✓ Engine stopped: FukauraOu
+   ✅ Engine stopped
+
+
+================================================================================
+🔍 Testing Engine: HoneyWaffle (honeywaffle)
+   Path: C:\Users\broke\shogi-teacher\backend\engines\honeywaffle\HoneyWaffle_WCSC28_AVX2.exe
+   Type: Standard
+================================================================================
+[DEBUG] Starting HoneyWaffle...
+[DEBUG] Executable: C:\Users\broke\shogi-teacher\backend\engines\honeywaffle\HoneyWaffle_WCSC28_AVX2.exe
+[DEBUG] Process started, PID: 139472
+[DEBUG] Sending 'usi' command...
+[DEBUG] Waiting for USI response...
+[DEBUG] Engine: id name YaneuraOu 2018 Otafuku KPPT 4.82 64AVX2
+[DEBUG] Engine: id author by yaneurao
+[DEBUG] Engine: option name Threads type spin default 4 min 1 max 512
+[DEBUG] Received usiok after 38 lines
+[DEBUG] Applying 6 default options...
+[DEBUG] Setting: Hash = 512
+[DEBUG] Setting: Threads = 2
+[DEBUG] Setting: USI_Ponder = false
+[DEBUG] Setting: EvalDir = eval
+[DEBUG] Setting: BookFile = standard_book.db
+[DEBUG] Setting: BookMoves = 16
+[DEBUG] Waiting 1s after options...
+[DEBUG] Sending 'isready' command...
+[DEBUG] Waiting for 'readyok' (may take time to load eval/model files)...
+[DEBUG] Received readyok!
+✓ Engine started: HoneyWaffle
+   ✅ Engine started successfully
+
+   📍 Test 1: Starting Position
+      Initial board position
+      SFEN: lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b ...
+      ✅ Analysis successful
+      📊 Response fields:
+         • bestmove: 2h7h
+         • ponder: 8c8d
+         • score_cp: None
+         • mate: None
+         • depth: None
+         • nodes: None
+         • nps: None
+         • pv: ['2h7h', '8c8d', '(100.00%)']... (10 moves)
+
+   📍 Test 2: Early/Mid Game
+      Complex middle game with promoted bishop
+      SFEN: +Bn1g2s1l/2skg2r1/ppppp1n1p/5bpp1/5p1P1/2P6/PP1PP1P1P/1SK2S1...
+      ✅ Analysis successful
+      📊 Response fields:
+         • bestmove: 2d2e
+         • ponder: 9g9f
+         • score_cp: 244
+         • mate: None
+         • depth: 14
+         • nodes: 309585
+         • nps: 2948428
+         • pv: ['2d2e'] (1 moves)
+
+   📍 Test 3: Mid/Late Game
+      Late middle game with multiple promoted pieces
+      SFEN: +B1sg1gsnl/2+N2k1b1/pP2pp2p/2p3p2/9/2PpP4/P1+p2PP1P/7R1/LN1G...
+      ✅ Analysis successful
+      📊 Response fields:
+         • bestmove: 7a7b
+         • ponder: L*2g
+         • score_cp: 474
+         • mate: None
+         • depth: 13
+         • nodes: 255984
+         • nps: 2485281
+         • pv: ['7a7b', 'L*2g', '2b4d']... (13 moves)
+
+   📍 Test 4: Mate in 7
+      Tactical position with forced mate sequence
+      SFEN: ln1g3+Rl/2sk1s+P2/2ppppb1p/p1b3p2/8P/P4P3/2PPP1P2/1+r2GS3/LN...
+      ✅ Analysis successful
+      📊 Response fields:
+         • bestmove: 8h5h
+         • ponder: 4i5h
+         • score_cp: 1850
+         • mate: None
+         • depth: 2
+         • nodes: 619
+         • nps: 619000
+         • pv: ['S*6i', '5h6h'] (2 moves)
+
+✓ Engine stopped: HoneyWaffle
+   ✅ Engine stopped
+
+
+================================================================================
+🔍 Engine: SeoTsume (seotsume)
+   Type: tsume_solver - ⏭️  SKIPPED in basic test
+   Note: Use --mate test to specifically test mate detection
+================================================================================
+
+
+================================================================================
+🔍 Testing Engine: YaneuraOu (yaneuraou)
+   Path: C:\Users\broke\shogi-teacher\backend\engines\yaneuraou\YaneuraOu.exe
+   Type: Standard
+================================================================================
+[DEBUG] Starting YaneuraOu...
+[DEBUG] Executable: C:\Users\broke\shogi-teacher\backend\engines\yaneuraou\YaneuraOu.exe
+[DEBUG] Process started, PID: 142696
+[DEBUG] Sending 'usi' command...
+[DEBUG] Waiting for USI response...
+[DEBUG] Engine: id name YaneuraOu NNUE V9.00Git 64AVX512 TOURNAMENT
+[DEBUG] Engine: id author yaneurao
+[DEBUG] Engine: option name Threads type spin default 4 min 1 max 1024
+[DEBUG] Received usiok after 42 lines
+[DEBUG] Applying 7 default options...
+[DEBUG] Setting: Hash = 1024
+[DEBUG] Setting: Threads = 4
+[DEBUG] Setting: USI_Ponder = false
+[DEBUG] Setting: NetworkDelay = 120
+[DEBUG] Setting: NetworkDelay2 = 1120
+[DEBUG] Setting: MinimumThinkingTime = 2000
+[DEBUG] Setting: EvalDir = eval
+[DEBUG] Waiting 1s after options...
+[DEBUG] Sending 'isready' command...
+[DEBUG] Waiting for 'readyok' (may take time to load eval/model files)...
+[DEBUG] Received readyok!
+✓ Engine started: YaneuraOu
+   ✅ Engine started successfully
+
+   📍 Test 1: Starting Position
+      Initial board position
+      SFEN: lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b ...
+      ✅ Analysis successful
+      📊 Response fields:
+         • bestmove: 1g1f
+         • ponder: 3c3d
+         • score_cp: 0
+         • mate: None
+         • depth: 0
+         • nodes: 0
+         • nps: 0
+         • pv: ['1g1f', '3c3d'] (2 moves)
+
+   📍 Test 2: Early/Mid Game
+      Complex middle game with promoted bishop
+      SFEN: +Bn1g2s1l/2skg2r1/ppppp1n1p/5bpp1/5p1P1/2P6/PP1PP1P1P/1SK2S1...
+      ✅ Analysis successful
+      📊 Response fields:
+         • bestmove: 2d2e
+         • ponder: 4i3h
+         • score_cp: 191
+         • mate: None
+         • depth: 18
+         • nodes: 3760260
+         • nps: 4934724
+         • pv: ['2d2e', '4i3h', '2e2f']... (25 moves)
+
+   📍 Test 3: Mid/Late Game
+      Late middle game with multiple promoted pieces
+      SFEN: +B1sg1gsnl/2+N2k1b1/pP2pp2p/2p3p2/9/2PpP4/P1+p2PP1P/7R1/LN1G...
+      ✅ Analysis successful
+      📊 Response fields:
+         • bestmove: 7a7b
+         • ponder: 8i7g
+         • score_cp: 370
+         • mate: None
+         • depth: 16
+         • nodes: 3794174
+         • nps: 4672628
+         • pv: ['7a7b', '8i7g', '6f6g+']... (21 moves)
+
+   📍 Test 4: Mate in 7
+      Tactical position with forced mate sequence
+      SFEN: ln1g3+Rl/2sk1s+P2/2ppppb1p/p1b3p2/8P/P4P3/2PPP1P2/1+r2GS3/LN...
+      ✅ Analysis successful
+      📊 Response fields:
+         • bestmove: 8h5h
+         • ponder: 4i5h
+         • score_cp: None
+         • mate: 7
+         • depth: 23
+         • nodes: 34119
+         • nps: 6823800
+         • pv: ['8h5h', '4i5h', 'S*6i']... (7 moves)
+
+✓ Engine stopped: YaneuraOu
+   ✅ Engine stopped
+
+================================================================================
+
+=== Position Analysis Tests Complete ===
+
+
+=== Testing Full Game Analysis ===
+
+
+=== Discovering Engines ===
+✓ Loaded engine: Apery (apery)
+✓ Loaded engine: Fairy-Stockfish (fairy-stockfish)
+✓ Loaded engine: FukauraOu (fukauraou)
+✓ Loaded engine: HoneyWaffle (honeywaffle)
+✓ Loaded engine: SeoTsume (seotsume)
+✓ Loaded engine: YaneuraOu (yaneuraou)
+
+Discovered 6 engines
+Found 5 playable engines (out of 6 total)
+Sample game: 10 moves
+Testing game analysis capability (analyzing each move)
+
+================================================================================
+
+🔍 Testing with: Apery (apery)
+   This demonstrates how game analysis would work with any engine.
+=================================================================================
+
+[DEBUG] Starting Apery...
+[DEBUG] Executable: C:\Users\broke\shogi-teacher\backend\engines\apery\apery_wcsc30.exe
+[DEBUG] Process started, PID: 125200
+[DEBUG] Sending 'usi' command...
+[DEBUG] Waiting for USI response...
+[DEBUG] Engine: id name Apery_WCSC30
+[DEBUG] Engine: id author HiraokaTakuya
+[DEBUG] Engine: option name Book_Enable type check default false
+[DEBUG] Received usiok after 16 lines
+[DEBUG] Applying 0 default options...
+[DEBUG] Waiting 1s after options...
+[DEBUG] Sending 'isready' command...
+[DEBUG] Waiting for 'readyok' (may take time to load eval/model files)...
+[DEBUG] Received readyok!
+✓ Engine started: Apery
+✅ Engine started
+
+📍 Move 1: P-7f
+   Position: lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LN...
+   Move played: 7g7f
+   Engine suggested: 2g2f (eval: 7cp)
+   Assessment: 💡 Different from engine (engine wanted: 2g2f)
+
+📍 Move 2: P-3d
+   Position: lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPP1P/1B5R1/LN...
+   Move played: 3c3d
+   Engine suggested: 4a3b (eval: -42cp)
+   Assessment: 💡 Different from engine (engine wanted: 4a3b)
+
+📍 Move 3: P-2f
+   Position: lnsgkgsnl/1r5b1/pppppp1pp/6p2/9/9/PPPPPPP1P/1B5R1/...
+   Move played: 2g2f
+   Engine suggested: 2h2c+ (eval: 1057cp)
+   Assessment: 💡 Different from engine (engine wanted: 2h2c+)
+
+📍 Move 4: S-3b
+   Position: lnsgkgsnl/1r5b1/pppppp1pp/6p2/9/9/PPPPPP1PP/1B5R1/...
+   Move played: 4a3b
+   Engine suggested: 3d3e (eval: 185cp)
+   Assessment: 💡 Different from engine (engine wanted: 3d3e)
+
+📍 Move 5: K-7h
+   Position: lnsgkg1nl/1r4sb1/pppppp1pp/6p2/9/9/PPPPPP1PP/1B5R1...
+   Move played: 6i7h
+   Engine suggested: 2h3h (eval: -33cp)
+   Assessment: 💡 Different from engine (engine wanted: 2h3h)
+
+📍 Move 6: B-3c
+   Position: lnsgkg1nl/1r4sb1/pppppp1pp/6p2/9/9/PPPPPP1PP/1B4SR...
+   Move played: 2b3c
+   Engine suggested: 8c8d (eval: 127cp)
+   Assessment: 💡 Different from engine (engine wanted: 8c8d)
+
+📍 Move 7: S-7g
+   Position: lnsgkg1nl/1r6b1/ppppppnpp/6p2/9/9/PPPPPP1PP/1B4SR1...
+   Move played: 8h7g
+   Engine suggested: 2g2f (eval: 8cp)
+   Assessment: 💡 Different from engine (engine wanted: 2g2f)
+
+📍 Move 8: K-4b
+   Position: lnsgkg1nl/1r6b1/ppppppnpp/6p2/9/9/PPPPPP1PP/1B5R1/...
+   Move played: 5a4b
+   Engine suggested: 2g2f (eval: -1cp)
+   Assessment: 💡 Different from engine (engine wanted: 2g2f)
+
+📍 Move 9: K-6h
+   Position: lnsg1g1nl/1r2k3b1/ppppppnpp/6p2/9/9/PPPPPP1PP/1B5R...
+   Move played: 5i6h
+   Engine suggested: 2g2f (eval: 73cp)
+   Assessment: 💡 Different from engine (engine wanted: 2g2f)
+
+📍 Move 10: S-4b
+   Position: lnsg1g1nl/1r2k3b1/ppppppnpp/6p2/9/9/PPPPPP1PP/1B5R...
+   Move played: 3a4b
+   Engine suggested: 2g2f (eval: 40cp)
+   Assessment: 💡 Different from engine (engine wanted: 2g2f)
+
+================================================================================
+
+📊 Game Analysis Summary:
+   Total moves analyzed: 10
+   Moves matching engine: 0/10 (0%)
+
+   Note: Full game analysis would require analyzing positions
+         after each move to calculate centipawn loss and classify
+         moves as Excellent/Good/Inaccuracy/Mistake/Blunder
+✓ Engine stopped: Apery
+
+✅ Engine stopped
+================================================================================
+
+=== Game Analysis Test Complete ===
+

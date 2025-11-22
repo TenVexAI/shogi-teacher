@@ -188,6 +188,15 @@ async def analyze_position(request: AnalysisRequest):
         position = parts[0]
         moves = parts[1].split() if len(parts) > 1 else []
         
+        # Determine whose turn it is
+        side_to_move = engine_manager._get_side_to_move(position, moves)
+        
+        # Get the engine ID being used
+        engine_id = engine_manager.active_engines.get(side_to_move)
+        engine_name = None
+        if engine_id and engine_id in engine_manager.available_engines:
+            engine_name = engine_manager.available_engines[engine_id].name
+        
         # Use engine manager for analysis
         analysis = engine_manager.analyze_position(
             position=position,
@@ -197,6 +206,10 @@ async def analyze_position(request: AnalysisRequest):
         
         if not analysis:
             raise HTTPException(status_code=500, detail="No engine available for analysis")
+        
+        # Add engine metadata
+        analysis["engine_name"] = engine_name
+        analysis["engine_side"] = side_to_move  # "black" or "white"
         
         return analysis
     except HTTPException:

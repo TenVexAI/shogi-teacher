@@ -1,7 +1,7 @@
 {
   "useLLM": false,
-  "showBestMove": false,
-  "showBoardOptionsPanel": false,
+  "showBestMove": true,
+  "showBoardOptionsPanel": true,
   "showMovementOverlay": false,
   "useWesternNotation": false,
   "useJapaneseCoords": false,

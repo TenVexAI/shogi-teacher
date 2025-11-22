@@ -97,50 +97,65 @@ export default function ConfigModal({ isOpen, onClose, onSave, currentUseLLM = t
                     </div>
 
                     <div className="mb-4">
-                        <label className="flex items-center cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={useLLM}
-                                onChange={(e) => setUseLLM(e.target.checked)}
-                                className="w-4 h-4 text-accent-purple bg-background-primary border-border rounded focus:ring-accent-purple focus:ring-2"
-                            />
-                            <span className="ml-2 text-sm text-text-primary">
-                                Enable LLM Analysis
-                            </span>
+                        <label className="flex items-center justify-between cursor-pointer">
+                            <div>
+                                <span className="text-sm text-text-primary">
+                                    Enable LLM Analysis
+                                </span>
+                                <p className="text-xs text-text-secondary mt-1">
+                                    When disabled, only engine analysis will be shown (no AI explanations)
+                                </p>
+                            </div>
+                            <div className="relative inline-flex items-center">
+                                <input
+                                    type="checkbox"
+                                    checked={useLLM}
+                                    onChange={(e) => setUseLLM(e.target.checked)}
+                                    className="sr-only peer"
+                                />
+                                <div className="w-11 h-6 bg-background-primary peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent-purple rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent-purple"></div>
+                            </div>
                         </label>
-                        <p className="text-xs text-text-secondary mt-1 ml-6">
-                            When disabled, only engine analysis will be shown (no AI explanations)
-                        </p>
                     </div>
 
                     <div className="mb-4">
-                        <label className="flex items-center cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={showBestMove}
-                                onChange={(e) => setShowBestMove(e.target.checked)}
-                                className="w-4 h-4 text-accent-purple bg-background-primary border-border rounded focus:ring-accent-purple focus:ring-2"
-                            />
-                            <span className="ml-2 text-sm text-text-primary">Show Best Move Button</span>
+                        <label className="flex items-center justify-between cursor-pointer">
+                            <div>
+                                <span className="text-sm text-text-primary">Show Best Move Button</span>
+                                <p className="text-xs text-text-secondary mt-1">
+                                    Display a button to automatically play the engine&apos;s recommended move
+                                </p>
+                            </div>
+                            <div className="relative inline-flex items-center">
+                                <input
+                                    type="checkbox"
+                                    checked={showBestMove}
+                                    onChange={(e) => setShowBestMove(e.target.checked)}
+                                    className="sr-only peer"
+                                />
+                                <div className="w-11 h-6 bg-background-primary peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent-purple rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent-purple"></div>
+                            </div>
                         </label>
-                        <p className="text-xs text-text-secondary mt-1 ml-6">
-                            Display a button to automatically play the engine&apos;s recommended move
-                        </p>
                     </div>
 
                     <div className="mb-4">
-                        <label className="flex items-center cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={showBoardOptions}
-                                onChange={(e) => setShowBoardOptions(e.target.checked)}
-                                className="w-4 h-4 text-accent-purple bg-background-primary border-border rounded focus:ring-accent-purple focus:ring-2"
-                            />
-                            <span className="ml-2 text-sm text-text-primary">Show Board Options Panel</span>
+                        <label className="flex items-center justify-between cursor-pointer">
+                            <div>
+                                <span className="text-sm text-text-primary">Show Board Options Panel</span>
+                                <p className="text-xs text-text-secondary mt-1">
+                                    Display customization options for the board display
+                                </p>
+                            </div>
+                            <div className="relative inline-flex items-center">
+                                <input
+                                    type="checkbox"
+                                    checked={showBoardOptions}
+                                    onChange={(e) => setShowBoardOptions(e.target.checked)}
+                                    className="sr-only peer"
+                                />
+                                <div className="w-11 h-6 bg-background-primary peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent-purple rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent-purple"></div>
+                            </div>
                         </label>
-                        <p className="text-xs text-text-secondary mt-1 ml-6">
-                            Display customization options for the board display
-                        </p>
                     </div>
 
                     {error && (
@@ -169,7 +184,7 @@ export default function ConfigModal({ isOpen, onClose, onSave, currentUseLLM = t
                                         onChange={(e) => onSoundToggle('ui', e.target.checked)}
                                         className="sr-only peer"
                                     />
-                                    <div className="w-11 h-6 bg-background-primary peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent-cyan rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent-cyan"></div>
+                                    <div className="w-11 h-6 bg-background-primary peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent-purple rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent-purple"></div>
                                 </div>
                             </label>
 
@@ -182,7 +197,7 @@ export default function ConfigModal({ isOpen, onClose, onSave, currentUseLLM = t
                                         onChange={(e) => onSoundToggle('music', e.target.checked)}
                                         className="sr-only peer"
                                     />
-                                    <div className="w-11 h-6 bg-background-primary peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent-cyan rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent-cyan"></div>
+                                    <div className="w-11 h-6 bg-background-primary peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent-purple rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent-purple"></div>
                                 </div>
                             </label>
 
@@ -195,7 +210,7 @@ export default function ConfigModal({ isOpen, onClose, onSave, currentUseLLM = t
                                         onChange={(e) => onSoundToggle('ambient', e.target.checked)}
                                         className="sr-only peer"
                                     />
-                                    <div className="w-11 h-6 bg-background-primary peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent-cyan rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent-cyan"></div>
+                                    <div className="w-11 h-6 bg-background-primary peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent-purple rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent-purple"></div>
                                 </div>
                             </label>
                         </div>

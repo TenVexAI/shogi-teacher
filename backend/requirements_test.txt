@@ -1,0 +1,8 @@
+# Requirements for test_engine_responses.py
+# Install with: pip install -r requirements_test.txt
+
+# Python Shogi library for position manipulation and verification
+python-shogi>=1.0.14
+
+# Note: The main backend has its own requirements.txt
+# This file is specifically for the engine testing script

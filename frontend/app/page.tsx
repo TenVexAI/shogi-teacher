@@ -16,6 +16,22 @@ import { loadUISettings, saveUISettings } from '@/lib/settings';
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  messageType?: 'system' | 'llm' | 'engine-black' | 'engine-white';
+  engineName?: string;
+}
+
+interface AnalysisResult {
+  bestmove: string;
+  ponder?: string;
+  score_cp?: number;
+  mate?: number | null;
+  depth?: number;
+  nodes?: number;
+  nps?: number;
+  pv?: string[];
+  info?: string;
+  engine_name?: string;
+  engine_side?: string;
 }
 
 export default function Home() {
@@ -44,7 +60,7 @@ export default function Home() {
   const [ambientSoundEnabled, setAmbientSoundEnabled] = useState(false);
   const [showClockStartModal, setShowClockStartModal] = useState(false);
   const [pendingMove, setPendingMove] = useState<string | null>(null);
-  const [cachedHintAnalysis, setCachedHintAnalysis] = useState<{ bestmove: string; score_cp: number; mate: number | null; info: string } | null>(null);
+  const [cachedHintAnalysis, setCachedHintAnalysis] = useState<AnalysisResult | null>(null);
   const [cachedHintSfen, setCachedHintSfen] = useState<string | null>(null);
   const [cachedHintTurn, setCachedHintTurn] = useState<string | null>(null);
   const [moveHistory, setMoveHistory] = useState<MoveRecord[]>([]);
@@ -163,7 +179,8 @@ export default function Home() {
       setMessages([
         {
           role: 'assistant',
-          content: 'Welcome to Shogi Teacher! I\'m here to help you learn and improve your shogi skills. Start the clock and make a move to begin, or ask me any questions about the game.'
+          content: 'Welcome to Shogi Teacher! I\'m here to help you learn and improve your shogi skills. Start the clock and make a move to begin, or ask me any questions about the game.',
+          messageType: 'system'
         }
       ]);
     } catch (error) {
@@ -171,13 +188,14 @@ export default function Home() {
       setMessages([
         {
           role: 'assistant',
-          content: 'Error: Could not connect to the backend. Please make sure the API server is running on http://localhost:8000'
+          content: 'Error: Could not connect to the backend. Please make sure the API server is running on http://localhost:8000',
+          messageType: 'system'
         }
       ]);
     }
   };
 
-  const executeMove = async (move: string) => {
+  const executeMove = async (move: string, providedAnalysis?: AnalysisResult) => {
     if (!gameState) return;
 
     try {
@@ -194,9 +212,11 @@ export default function Home() {
         clockStartTimeRef.current = currentTime;
       }
 
-      // Use cached hint analysis if available for this position AND same turn, otherwise analyze
+      // Use provided analysis first (from best move button), then cached, then fetch new
       let preMoveAnalysis = null;
-      if (cachedHintSfen === gameState.sfen && cachedHintTurn === gameState.turn && cachedHintAnalysis) {
+      if (providedAnalysis) {
+        preMoveAnalysis = providedAnalysis;
+      } else if (cachedHintSfen === gameState.sfen && cachedHintTurn === gameState.turn && cachedHintAnalysis) {
         preMoveAnalysis = cachedHintAnalysis;
         // Clear cache after use
         setCachedHintAnalysis(null);
@@ -235,6 +255,10 @@ export default function Home() {
         const postMoveAnalysis = await analyzePosition(newState.sfen);
         const playerColor = gameState.turn === 'b' ? 'Black' : 'White';
         const nextColor = newState.turn === 'b' ? 'Black' : 'White';
+        
+        // Determine message type and engine name based on which side played
+        const messageType = gameState.turn === 'b' ? 'engine-black' : 'engine-white';
+        const engineName = preMoveAnalysis?.engine_name || undefined;
 
         let message = `**${playerColor} played: ${move}**\n\n`;
 
@@ -255,6 +279,9 @@ export default function Home() {
               pre_move_score: preMoveAnalysis?.score_cp
             });
             message += `${explanation.explanation}\n\n`;
+            // If LLM is enabled, use LLM message type instead
+            addAssistantMessage(message, 'llm');
+            return; // Exit early since we handled LLM message
           } catch (llmError) {
             console.error('LLM explanation failed:', llmError);
             // Continue with engine-only analysis
@@ -280,10 +307,11 @@ export default function Home() {
           }
         }
 
-        addAssistantMessage(message);
+        // Use engine-specific message type and name (when LLM is disabled)
+        addAssistantMessage(message, messageType, engineName);
       } catch (analysisError) {
         console.error('Analysis failed:', analysisError);
-        addAssistantMessage(`Move played: ${move}\n\n⚠️ Engine analysis unavailable. Make sure YaneuraOu.exe is in backend/engine/\n\nYou can still play without analysis!`);
+        addAssistantMessage(`Move played: ${move}\n\n⚠️ Engine analysis unavailable. Make sure YaneuraOu.exe is in backend/engine/\n\nYou can still play without analysis!`, 'system');
       }
     } catch (error) {
       console.error('Failed to make move:', error);
@@ -515,8 +543,13 @@ export default function Home() {
   };
 
   // Helper to add assistant message with sound
-  const addAssistantMessage = (content: string) => {
-    setMessages(prev => [...prev, { role: 'assistant', content }]);
+  const addAssistantMessage = (content: string, messageType?: 'system' | 'llm' | 'engine-black' | 'engine-white', engineName?: string) => {
+    setMessages(prev => [...prev, { 
+      role: 'assistant', 
+      content,
+      messageType,
+      engineName
+    }]);
     audioManager.playUISound('message');
   };
 
@@ -539,18 +572,25 @@ export default function Home() {
       // Get the best move from engine
       const analysis = await analyzePosition(gameState.sfen);
       
-      // Cache it for the move execution
-      setCachedHintAnalysis(analysis);
-      setCachedHintSfen(gameState.sfen);
-      setCachedHintTurn(gameState.turn);
-      
-      // Execute the best move
-      await handleMove(analysis.bestmove);
+      // Execute the best move directly with the analysis (bypasses state timing issues)
+      if (!isClockRunning) {
+        // If clock not running, need to show modal first
+        setPendingMove(analysis.bestmove);
+        setShowClockStartModal(true);
+        // Cache it for when modal is confirmed
+        setCachedHintAnalysis(analysis);
+        setCachedHintSfen(gameState.sfen);
+        setCachedHintTurn(gameState.turn);
+      } else {
+        // Clock is running, execute immediately with provided analysis
+        await executeMove(analysis.bestmove, analysis);
+      }
     } catch (error) {
       console.error('Failed to get best move:', error);
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: 'Failed to get best move. Please try again.'
+        content: 'Failed to get best move. Please try again.',
+        messageType: 'system'
       }]);
     } finally {
       setIsLoading(false);
@@ -584,13 +624,15 @@ export default function Home() {
       
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: `Reverted to move ${targetMove.moveNumber} (${targetMove.move}). All subsequent moves have been removed.`
+        content: `Reverted to move ${targetMove.moveNumber} (${targetMove.move}). All subsequent moves have been removed.`,
+        messageType: 'system'
       }]);
     } catch (error) {
       console.error('Failed to revert to move:', error);
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: 'Failed to revert to the selected move. Please try again.'
+        content: 'Failed to revert to the selected move. Please try again.',
+        messageType: 'system'
       }]);
     } finally {
       setIsLoading(false);
@@ -607,7 +649,8 @@ export default function Home() {
       ...prev,
       {
         role: 'assistant',
-        content: 'Clock started!'
+        content: 'Clock started! Time tracking begins now.',
+        messageType: 'system'
       }
     ]);
     
