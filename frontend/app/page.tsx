@@ -36,6 +36,7 @@ export default function Home() {
   const [useLLM, setUseLLM] = useState(true);
   const [currentApiKey, setCurrentApiKey] = useState<string>('');
   const [showBestMove, setShowBestMove] = useState(false);
+  const [showBoardOptionsPanel, setShowBoardOptionsPanel] = useState(true);
   const [showClockStartModal, setShowClockStartModal] = useState(false);
   const [pendingMove, setPendingMove] = useState<string | null>(null);
   const [cachedHintAnalysis, setCachedHintAnalysis] = useState<{ bestmove: string; score_cp: number; mate: number | null; info: string } | null>(null);
@@ -378,7 +379,7 @@ export default function Home() {
     }
   };
 
-  const handleSaveConfig = async (apiKey: string, useLLMSetting: boolean, showBestMoveSetting: boolean) => {
+  const handleSaveConfig = async (apiKey: string, useLLMSetting: boolean, showBestMoveSetting: boolean, showBoardOptionsSetting: boolean) => {
     // Only update API key if a new one was provided
     if (apiKey && apiKey.trim()) {
       await updateConfig(apiKey);
@@ -386,6 +387,7 @@ export default function Home() {
     }
     setUseLLM(useLLMSetting);
     setShowBestMove(showBestMoveSetting);
+    setShowBoardOptionsPanel(showBoardOptionsSetting);
   };
 
   const handleSaveSoundSettings = (settings: SoundSettings) => {
@@ -570,7 +572,7 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-background-primary">
+    <main className="min-h-screen">
       <div className="max-w-full h-screen">
         <ConfigModal
           isOpen={isConfigOpen}
@@ -579,6 +581,7 @@ export default function Home() {
           currentUseLLM={useLLM}
           currentApiKey={currentApiKey}
           currentShowBestMove={showBestMove}
+          currentShowBoardOptions={showBoardOptionsPanel}
           onOpenSounds={() => setIsSoundSettingsOpen(true)}
           soundToggles={{
             uiEnabled: soundSettings.uiEnabled,
@@ -663,6 +666,7 @@ export default function Home() {
                 onBestMove={handleBestMove}
                 isLoading={isLoading}
                 engineConfig={engineConfig || undefined}
+                showBoardOptionsPanel={showBoardOptionsPanel}
               />
             ) : (
               <div className="flex items-center justify-center h-96">

@@ -5,10 +5,11 @@ import { useState, useEffect } from 'react';
 interface ConfigModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (apiKey: string, useLLM: boolean, showBestMove: boolean) => Promise<void>;
+    onSave: (apiKey: string, useLLM: boolean, showBestMove: boolean, showBoardOptions: boolean) => Promise<void>;
     currentUseLLM?: boolean;
     currentApiKey?: string;
     currentShowBestMove?: boolean;
+    currentShowBoardOptions?: boolean;
     onOpenSounds?: () => void;
     soundToggles?: {
         uiEnabled: boolean;
@@ -18,10 +19,11 @@ interface ConfigModalProps {
     onSoundToggle?: (category: 'ui' | 'music' | 'ambient', enabled: boolean) => void;
 }
 
-export default function ConfigModal({ isOpen, onClose, onSave, currentUseLLM = true, currentApiKey = '', currentShowBestMove = false, onOpenSounds, soundToggles, onSoundToggle }: ConfigModalProps) {
+export default function ConfigModal({ isOpen, onClose, onSave, currentUseLLM = true, currentApiKey = '', currentShowBestMove = false, currentShowBoardOptions = true, onOpenSounds, soundToggles, onSoundToggle }: ConfigModalProps) {
     const [apiKey, setApiKey] = useState('');
     const [useLLM, setUseLLM] = useState(currentUseLLM);
     const [showBestMove, setShowBestMove] = useState(currentShowBestMove);
+    const [showBoardOptions, setShowBoardOptions] = useState(currentShowBoardOptions);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
@@ -34,8 +36,9 @@ export default function ConfigModal({ isOpen, onClose, onSave, currentUseLLM = t
         } else {
             setUseLLM(currentUseLLM);
             setShowBestMove(currentShowBestMove);
+            setShowBoardOptions(currentShowBoardOptions);
         }
-    }, [isOpen, currentUseLLM, currentShowBestMove]);
+    }, [isOpen, currentUseLLM, currentShowBestMove, currentShowBoardOptions]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -44,7 +47,7 @@ export default function ConfigModal({ isOpen, onClose, onSave, currentUseLLM = t
         setIsSaving(true);
 
         try {
-            await onSave(apiKey, useLLM, showBestMove);
+            await onSave(apiKey, useLLM, showBestMove, showBoardOptions);
             setSuccess(true);
             setTimeout(() => {
                 onClose();
@@ -122,6 +125,21 @@ export default function ConfigModal({ isOpen, onClose, onSave, currentUseLLM = t
                         </label>
                         <p className="text-xs text-text-secondary mt-1 ml-6">
                             Display a button to automatically play the engine&apos;s recommended move
+                        </p>
+                    </div>
+
+                    <div className="mb-4">
+                        <label className="flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={showBoardOptions}
+                                onChange={(e) => setShowBoardOptions(e.target.checked)}
+                                className="w-4 h-4 text-accent-purple bg-background-primary border-border rounded focus:ring-accent-purple focus:ring-2"
+                            />
+                            <span className="ml-2 text-sm text-text-primary">Show Board Options Panel</span>
+                        </label>
+                        <p className="text-xs text-text-secondary mt-1 ml-6">
+                            Display customization options for the board display
                         </p>
                     </div>
 

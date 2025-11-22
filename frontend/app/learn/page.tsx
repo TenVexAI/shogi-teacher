@@ -71,7 +71,7 @@ export default function LearnPage() {
   };
 
   return (
-    <div className="h-screen bg-background-primary flex flex-col overflow-hidden">
+    <div className="h-screen flex flex-col overflow-hidden">
       {/* Header with Navigation - Fixed at top */}
       <div className="bg-background-secondary border-b border-border px-6 py-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">

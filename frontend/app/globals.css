@@ -26,9 +26,10 @@
 }
 
 body {
-  background-color: var(--bg-primary);
+  background: linear-gradient(to bottom right, #000000, #000000 40%, #2a1a3d);
   color: var(--text-primary);
   font-family: Arial, Helvetica, sans-serif;
+  min-height: 100vh;
 }
 
 /* Hide Next.js development indicator */
