@@ -1,0 +1,227 @@
+{
+  "engineId": "fukauraou",
+  "engineName": "Fukauraaou V9.01",
+  "settings": [
+    {
+      "name": "Hash",
+      "displayName": "Hash Table Size",
+      "description": "Memory allocated for transposition table (MB).",
+      "type": "slider",
+      "default": 8192,
+      "min": 2048,
+      "max": 8192,
+      "step": 1024,
+      "unit": "MB"
+    },
+    {
+      "name": "Threads",
+      "displayName": "CPU Threads",
+      "description": "Number of CPU threads to use.",
+      "type": "slider",
+      "default": 4,
+      "min": 1,
+      "max": 16,
+      "step": 1
+    },
+    {
+      "name": "UCT_Threads",
+      "displayName": "UCT Threads",
+      "description": "Threads per GPU for Monte Carlo Tree Search.",
+      "type": "slider",
+      "default": 2,
+      "min": 1,
+      "max": 4,
+      "step": 1
+    },
+    {
+      "name": "DNN_Batch_Size",
+      "displayName": "DNN Batch Size",
+      "description": "Neural network batch size (higher = better GPU utilization).",
+      "type": "slider",
+      "default": 128,
+      "min": 64,
+      "max": 1024,
+      "step": 64
+    },
+    {
+      "name": "MultiPV",
+      "displayName": "Multiple Lines",
+      "description": "Number of best lines to calculate.",
+      "type": "slider",
+      "default": 1,
+      "min": 1,
+      "max": 5,
+      "step": 1,
+      "analysisDefault": 3
+    },
+    {
+      "name": "USI_Ponder",
+      "displayName": "Ponder",
+      "description": "Think during opponent's turn.",
+      "type": "toggle",
+      "default": false
+    },
+    {
+      "name": "MinimumThinkingTime",
+      "displayName": "Minimum Think Time",
+      "description": "Minimum time to think per move (milliseconds).",
+      "type": "slider",
+      "default": 2000,
+      "min": 1000,
+      "max": 100000,
+      "step": 1000,
+      "unit": "ms"
+    },
+    {
+      "name": "SlowMover",
+      "displayName": "Slow Mover",
+      "description": "Time management strategy.",
+      "type": "slider",
+      "default": 100,
+      "min": 10,
+      "max": 1000,
+      "step": 1
+    },
+    {
+      "name": "NetworkDelay",
+      "displayName": "Network Delay",
+      "description": "GPU inference delay compensation (milliseconds).",
+      "type": "slider",
+      "default": 400,
+      "min": 0,
+      "max": 10000,
+      "step": 100,
+      "unit": "ms"
+    },
+    {
+      "name": "NetworkDelay2",
+      "displayName": "Network Delay 2",
+      "description": "Additional network delay (milliseconds).",
+      "type": "slider",
+      "default": 1400,
+      "min": 0,
+      "max": 10000,
+      "step": 100,
+      "unit": "ms"
+    },
+    {
+      "name": "USI_OwnBook",
+      "displayName": "Use Opening Book",
+      "description": "Enable opening book usage.",
+      "type": "toggle",
+      "default": true
+    },
+    {
+      "name": "BookFile",
+      "displayName": "Book File",
+      "description": "Opening book database file.",
+      "type": "select",
+      "default": "standard_book.db",
+      "options": [
+        "no_book",
+        "standard_book.db",
+        "user_book1.db",
+        "yaneura_book1.db",
+        "yaneura_book3.db"
+      ]
+    },
+    {
+      "name": "BookMoves",
+      "displayName": "Book Moves",
+      "description": "Number of moves to use book for.",
+      "type": "slider",
+      "default": 16,
+      "min": 0,
+      "max": 128,
+      "step": 1
+    },
+    {
+      "name": "BookDepthLimit",
+      "displayName": "Book Depth Limit",
+      "description": "Maximum ply depth to use book.",
+      "type": "slider",
+      "default": 16,
+      "min": 0,
+      "max": 128,
+      "step": 1
+    },
+    {
+      "name": "BookIgnoreRate",
+      "displayName": "Book Ignore Rate",
+      "description": "Percentage chance to ignore book move (0=always use).",
+      "type": "slider",
+      "default": 0,
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "%"
+    },
+    {
+      "name": "EvalDir",
+      "displayName": "Evaluation Directory",
+      "description": "Directory containing neural network files.",
+      "type": "text",
+      "default": "eval"
+    },
+    {
+      "name": "Eval_Coef",
+      "displayName": "Evaluation Coefficient",
+      "description": "Evaluation scaling coefficient.",
+      "type": "slider",
+      "default": 285,
+      "min": 1,
+      "max": 10000,
+      "step": 1
+    },
+    {
+      "name": "UCT_NodeLimit",
+      "displayName": "Node Limit",
+      "description": "Maximum MCTS search nodes (1 node ≈ 2KB RAM).",
+      "type": "slider",
+      "default": 10000000,
+      "min": 100000,
+      "max": 25000000,
+      "step": 100000
+    },
+    {
+      "name": "C_init",
+      "displayName": "C_init",
+      "description": "MCTS exploration parameter (initial).",
+      "type": "slider",
+      "default": 144,
+      "min": 0,
+      "max": 500,
+      "step": 1
+    },
+    {
+      "name": "C_base",
+      "displayName": "C_base",
+      "description": "MCTS exploration base parameter.",
+      "type": "slider",
+      "default": 28288,
+      "min": 10000,
+      "max": 100000,
+      "step": 1000
+    },
+    {
+      "name": "C_init_root",
+      "displayName": "C_init (Root)",
+      "description": "MCTS exploration parameter for root node.",
+      "type": "slider",
+      "default": 116,
+      "min": 0,
+      "max": 500,
+      "step": 1
+    },
+    {
+      "name": "C_base_root",
+      "displayName": "C_base (Root)",
+      "description": "MCTS base parameter for root node.",
+      "type": "slider",
+      "default": 25617,
+      "min": 10000,
+      "max": 100000,
+      "step": 1000
+    }
+  ]
+}

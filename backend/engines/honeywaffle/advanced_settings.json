@@ -1,0 +1,156 @@
+{
+  "engineId": "honeywaffle",
+  "engineName": "HoneyWaffle WCSC28",
+  "settings": [
+    {
+      "name": "Hash",
+      "displayName": "Hash Table Size",
+      "description": "Memory allocated for transposition table (MB).",
+      "type": "slider",
+      "default": 2048,
+      "min": 1024,
+      "max": 8192,
+      "step": 1024,
+      "unit": "MB"
+    },
+    {
+      "name": "Threads",
+      "displayName": "CPU Threads",
+      "description": "Number of CPU threads to use for search.",
+      "type": "slider",
+      "default": 4,
+      "min": 1,
+      "max": 16,
+      "step": 1
+    },
+    {
+      "name": "MultiPV",
+      "displayName": "Multiple Lines",
+      "description": "Number of best lines to calculate.",
+      "type": "slider",
+      "default": 1,
+      "min": 1,
+      "max": 5,
+      "step": 1
+    },
+    {
+      "name": "MinimumThinkingTime",
+      "displayName": "Minimum Think Time",
+      "description": "Minimum time to think per move (milliseconds).",
+      "type": "slider",
+      "default": 2000,
+      "min": 1000,
+      "max": 100000,
+      "step": 1000,
+      "unit": "ms"
+    },
+    {
+      "name": "SlowMover",
+      "displayName": "Slow Mover",
+      "description": "Time management strategy.",
+      "type": "slider",
+      "default": 100,
+      "min": 10,
+      "max": 1000,
+      "step": 1
+    },
+    {
+      "name": "NetworkDelay",
+      "displayName": "Network Delay",
+      "description": "Network lag compensation (milliseconds).",
+      "type": "slider",
+      "default": 200,
+      "min": 0,
+      "max": 10000,
+      "step": 100,
+      "unit": "ms"
+    },
+    {
+      "name": "NetworkDelay2",
+      "displayName": "Network Delay 2",
+      "description": "Additional network delay (milliseconds).",
+      "type": "slider",
+      "default": 1200,
+      "min": 0,
+      "max": 10000,
+      "step": 100,
+      "unit": "ms"
+    },
+    {
+      "name": "BookFile",
+      "displayName": "Book File",
+      "description": "Opening book database file.",
+      "type": "select",
+      "default": "standard_book.db",
+      "options": [
+        "no_book",
+        "standard_book.db"
+      ]
+    },
+    {
+      "name": "BookMoves",
+      "displayName": "Book Moves",
+      "description": "Number of moves to use book for.",
+      "type": "slider",
+      "default": 16,
+      "min": 0,
+      "max": 128,
+      "step": 1
+    },
+    {
+      "name": "BookDepthLimit",
+      "displayName": "Book Depth Limit",
+      "description": "Maximum ply depth to use book.",
+      "type": "slider",
+      "default": 16,
+      "min": 0,
+      "max": 128,
+      "step": 1
+    },
+    {
+      "name": "BookIgnoreRate",
+      "displayName": "Book Ignore Rate",
+      "description": "Percentage chance to ignore book move.",
+      "type": "slider",
+      "default": 0,
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "%"
+    },
+    {
+      "name": "EvalDir",
+      "displayName": "Evaluation Directory",
+      "description": "Directory containing evaluation files.",
+      "type": "text",
+      "default": "eval"
+    },
+    {
+      "name": "Contempt",
+      "displayName": "Contempt",
+      "description": "Draw avoidance (positive=avoid draws, negative=accept draws).",
+      "type": "slider",
+      "default": 2,
+      "min": -100,
+      "max": 100,
+      "step": 1
+    },
+    {
+      "name": "ContemptFromBlack",
+      "displayName": "Contempt From Black",
+      "description": "Apply contempt from black's perspective.",
+      "type": "toggle",
+      "default": false
+    },
+    {
+      "name": "MaxMovesToDraw",
+      "displayName": "Max Moves to Draw",
+      "description": "Maximum moves before automatic draw declaration (0=disabled).",
+      "type": "slider",
+      "default": 0,
+      "min": 0,
+      "max": 100,
+      "step": 1
+    }
+  ]
+}

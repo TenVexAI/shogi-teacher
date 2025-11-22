@@ -1,0 +1,98 @@
+{
+  "engineId": "apery",
+  "engineName": "Apery WCSC30",
+  "settings": [
+    {
+      "name": "USI_Hash",
+      "displayName": "Hash Table Size",
+      "description": "Memory allocated for transposition table (MB). Higher values improve search quality.",
+      "type": "slider",
+      "default": 1024,
+      "min": 256,
+      "max": 8192,
+      "step": 256,
+      "unit": "MB"
+    },
+    {
+      "name": "Eval_Hash",
+      "displayName": "Evaluation Cache",
+      "description": "Memory for evaluation cache (MB).",
+      "type": "slider",
+      "default": 256,
+      "min": 256,
+      "max": 2048,
+      "step": 256,
+      "unit": "MB"
+    },
+    {
+      "name": "Threads",
+      "displayName": "CPU Threads",
+      "description": "Number of CPU threads to use for search.",
+      "type": "slider",
+      "default": 1,
+      "min": 1,
+      "max": 16,
+      "step": 1
+    },
+    {
+      "name": "MultiPV",
+      "displayName": "Multiple Lines",
+      "description": "Number of best lines to calculate (1-5 recommended for teaching).",
+      "type": "slider",
+      "default": 1,
+      "min": 1,
+      "max": 5,
+      "step": 1
+    },
+    {
+      "name": "USI_Ponder",
+      "displayName": "Ponder",
+      "description": "Think during opponent's turn.",
+      "type": "toggle",
+      "default": false
+    },
+    {
+      "name": "Minimum_Thinking_Time",
+      "displayName": "Minimum Think Time",
+      "description": "Minimum time to think per move (milliseconds).",
+      "type": "slider",
+      "default": 20,
+      "min": 10,
+      "max": 5000,
+      "step": 10,
+      "unit": "ms"
+    },
+    {
+      "name": "Slow_Mover",
+      "displayName": "Slow Mover",
+      "description": "Time management strategy (higher = use more time per move).",
+      "type": "slider",
+      "default": 84,
+      "min": 10,
+      "max": 1000,
+      "step": 1
+    },
+    {
+      "name": "Byoyomi_Margin",
+      "displayName": "Byoyomi Margin",
+      "description": "Safety buffer for byoyomi time control (milliseconds).",
+      "type": "slider",
+      "default": 500,
+      "min": 0,
+      "max": 5000,
+      "step": 10,
+      "unit": "ms"
+    },
+    {
+      "name": "Time_Margin",
+      "displayName": "Time Margin",
+      "description": "General time safety buffer (milliseconds).",
+      "type": "slider",
+      "default": 500,
+      "min": 0,
+      "max": 5000,
+      "step": 10,
+      "unit": "ms"
+    }
+  ]
+}

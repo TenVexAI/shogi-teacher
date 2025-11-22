@@ -1,0 +1,107 @@
+{
+  "engineId": "fairy-stockfish",
+  "engineName": "Fairy-Stockfish (Large Board)",
+  "settings": [
+    {
+      "name": "UCI_LimitStrength",
+      "displayName": "Limit Strength",
+      "description": "Enable strength limiting to use UCI_Elo rating control.",
+      "type": "toggle",
+      "default": true
+    },
+    {
+      "name": "UCI_Elo",
+      "displayName": "Target Elo Rating",
+      "description": "Playing strength in Elo (500=beginner, 1200=club, 1800=strong, 2400+=professional).",
+      "type": "slider",
+      "default": 1200,
+      "min": 500,
+      "max": 2850,
+      "step": 50,
+      "dependsOn": {
+        "setting": "UCI_LimitStrength",
+        "value": true
+      }
+    },
+    {
+      "name": "Skill Level",
+      "displayName": "Skill Level",
+      "description": "Alternative strength control (-20=weakest, 20=strongest). Only used if UCI_LimitStrength is false.",
+      "type": "slider",
+      "default": 20,
+      "min": -20,
+      "max": 20,
+      "step": 1,
+      "dependsOn": {
+        "setting": "UCI_LimitStrength",
+        "value": false
+      }
+    },
+    {
+      "name": "Hash",
+      "displayName": "Hash Table Size",
+      "description": "Memory allocated for transposition table (MB).",
+      "type": "slider",
+      "default": 4096,
+      "min": 256,
+      "max": 8192,
+      "step": 256,
+      "unit": "MB"
+    },
+    {
+      "name": "Threads",
+      "displayName": "CPU Threads",
+      "description": "Number of CPU threads to use for search.",
+      "type": "slider",
+      "default": 1,
+      "min": 1,
+      "max": 16,
+      "step": 1
+    },
+    {
+      "name": "MultiPV",
+      "displayName": "Multiple Lines",
+      "description": "Number of best lines to calculate (1-5 recommended for teaching).",
+      "type": "slider",
+      "default": 1,
+      "min": 1,
+      "max": 5,
+      "step": 1
+    },
+    {
+      "name": "Ponder",
+      "displayName": "Ponder",
+      "description": "Think during opponent's turn.",
+      "type": "toggle",
+      "default": false
+    },
+    {
+      "name": "UCI_AnalyseMode",
+      "displayName": "Analysis Mode",
+      "description": "Enable pure analysis mode (disables some optimizations).",
+      "type": "toggle",
+      "default": false
+    },
+    {
+      "name": "Move Overhead",
+      "displayName": "Move Overhead",
+      "description": "Network lag compensation (milliseconds).",
+      "type": "slider",
+      "default": 10,
+      "min": 10,
+      "max": 5000,
+      "step": 10,
+      "unit": "ms"
+    },
+    {
+      "name": "Slow Mover",
+      "displayName": "Slow Mover",
+      "description": "Time management strategy (higher = use more time per move).",
+      "type": "slider",
+      "default": 100,
+      "min": 10,
+      "max": 1000,
+      "step": 1
+    }
+  ]
+}

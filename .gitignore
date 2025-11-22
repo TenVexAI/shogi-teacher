@@ -48,13 +48,26 @@ config.json
 htmlcov/
 .pytest_cache/
 
-# Engines (binaries, eval files are huge - keep config.json only)
-backend/engines/*/
-!backend/engines/*/config.json
+# Engines - Keep JSON configs, ignore binaries and eval files
+# Binaries
 backend/engines/**/*.exe
+backend/engines/**/*.dll
+backend/engines/**/*.so
+backend/engines/**/*.dylib
+
+# Evaluation files (huge - hundreds of MB to GB)
 backend/engines/**/*.bin
 backend/engines/**/*.nnue
-backend/engines/**/*.db
 backend/engines/**/eval/
+backend/engines/**/model/
+
+# Opening books (large)
+backend/engines/**/*.db
+
+# Test scripts
 backend/test_*.py
+
+# User preferences (personal settings)
 backend/engine_preferences.json
+
+# Note: config.json and advanced_settings.json are tracked for documentation
