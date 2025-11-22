@@ -54,18 +54,6 @@ interface EngineManagementModalProps {
   onClose: () => void;
 }
 
-const STRENGTH_LABELS = {
-  10: "Level 10: Superhuman (3000+ Elo)",
-  9: "Level 9: 7-Dan (2300+ Elo)",
-  8: "Level 8: 5-6 Dan (2100-2299 Elo)",
-  7: "Level 7: 3-4 Dan (1800-2099 Elo)",
-  6: "Level 6: 1-2 Dan (1600-1799 Elo)",
-  5: "Level 5: 3-1 Kyu (1300-1599 Elo)",
-  4: "Level 4: 6-4 Kyu (1150-1299 Elo)",
-  3: "Level 3: 9-7 Kyu (1000-1149 Elo)",
-  2: "Level 2: 12-10 Kyu (700-999 Elo)",
-  1: "Level 1: 15-13 Kyu (<700 Elo)",
-};
 
 export default function EngineManagementModal({ isOpen, onClose }: EngineManagementModalProps) {
   const [engines, setEngines] = useState<Engine[]>([]);
@@ -158,19 +146,31 @@ export default function EngineManagementModal({ isOpen, onClose }: EngineManagem
   };
 
   const handleStrengthChange = async (side: 'black' | 'white' | 'analysis', level: number) => {
+    // For fairy-stockfish, update customOptions with UCI_Elo or Skill Level
+    const selectedEngine = getSelectedEngine(side);
+    if (!selectedEngine || selectedEngine.id !== 'fairy-stockfish') return;
+
+    const isUciLimitStrength = config[side].customOptions['UCI_LimitStrength'] !== 'false';
+    const settingName = isUciLimitStrength ? 'UCI_Elo' : 'Skill Level';
+    
+    const updatedOptions = {
+      ...config[side].customOptions,
+      [settingName]: String(level)
+    };
+
     // Update local state immediately for responsive UI
     setConfig(prev => ({
       ...prev,
-      [side]: { ...prev[side], strengthLevel: level }
+      [side]: { ...prev[side], customOptions: updatedOptions }
     }));
 
-    // Debounce the API call
+    // API call to save
     setSaving(true);
     setError(null);
     
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 70000); // 70 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 70000);
       
       const response = await fetch('http://127.0.0.1:8000/engines/config', {
         method: 'POST',
@@ -178,8 +178,8 @@ export default function EngineManagementModal({ isOpen, onClose }: EngineManagem
         body: JSON.stringify({
           side,
           engineId: config[side].engineId,
-          strengthLevel: level,
-          customOptions: config[side].customOptions,
+          strengthLevel: config[side].strengthLevel,
+          customOptions: updatedOptions,
           enabled: side === 'analysis' ? config.analysis.enabled : undefined
         }),
         signal: controller.signal
@@ -315,9 +315,9 @@ export default function EngineManagementModal({ isOpen, onClose }: EngineManagem
                 {config.black.engineId && (
                   <EngineStrengthControl
                     engine={getSelectedEngine('black')}
-                    strengthLevel={config.black.strengthLevel}
                     onStrengthChange={(level) => handleStrengthChange('black', level)}
                     disabled={saving}
+                    customOptions={config.black.customOptions}
                   />
                 )}
 
@@ -364,9 +364,9 @@ export default function EngineManagementModal({ isOpen, onClose }: EngineManagem
                 {config.white.engineId && (
                   <EngineStrengthControl
                     engine={getSelectedEngine('white')}
-                    strengthLevel={config.white.strengthLevel}
                     onStrengthChange={(level) => handleStrengthChange('white', level)}
                     disabled={saving}
+                    customOptions={config.white.customOptions}
                   />
                 )}
 
@@ -425,9 +425,9 @@ export default function EngineManagementModal({ isOpen, onClose }: EngineManagem
                 {config.analysis.engineId && (
                   <EngineStrengthControl
                     engine={getSelectedEngine('analysis')}
-                    strengthLevel={config.analysis.strengthLevel}
                     onStrengthChange={(level) => handleStrengthChange('analysis', level)}
                     disabled={saving}
+                    customOptions={config.analysis.customOptions}
                   />
                 )}
 
@@ -484,56 +484,99 @@ export default function EngineManagementModal({ isOpen, onClose }: EngineManagem
 
 function EngineStrengthControl({
   engine,
-  strengthLevel,
   onStrengthChange,
-  disabled
+  disabled,
+  customOptions
 }: {
   engine: Engine | null;
-  strengthLevel: number;
   onStrengthChange: (level: number) => void;
   disabled: boolean;
+  customOptions: Record<string, string>;
 }) {
   if (!engine) return null;
 
-  const minLevel = engine.strength.minLevel;
-  const maxLevel = engine.strength.maxLevel;
-  const isAdjustable = engine.strengthControl.supported;
+  // Only show strength control for fairy-stockfish
+  if (engine.id !== 'fairy-stockfish') return null;
+
+  // Check if UCI_LimitStrength is enabled (default is true)
+  const isUciLimitStrength = customOptions['UCI_LimitStrength'] !== 'false';
+
+  // Determine which setting to control
+  const settingName = isUciLimitStrength ? 'UCI_Elo' : 'Skill Level';
+  const min = isUciLimitStrength ? 500 : -20;
+  const max = isUciLimitStrength ? 2850 : 20;
+  const step = isUciLimitStrength ? 50 : 1;
+  const defaultValue = isUciLimitStrength ? 1200 : 20;
+
+  // Get current value from customOptions or use default
+  const currentValue = customOptions[settingName] 
+    ? parseInt(customOptions[settingName]) 
+    : defaultValue;
+
+  const handleChange = (newValue: number) => {
+    // This will be handled through the advanced settings system
+    // We need to update customOptions, not strengthLevel
+    onStrengthChange(newValue);
+  };
+
+  const getLabel = (value: number) => {
+    if (isUciLimitStrength) {
+      // UCI_Elo labels
+      if (value < 800) return `${value} Elo (Beginner)`;
+      if (value < 1500) return `${value} Elo (Club Player)`;
+      if (value < 1800) return `${value} Elo (Intermediate)`;
+      if (value < 2200) return `${value} Elo (Strong Amateur)`;
+      if (value < 2400) return `${value} Elo (Professional)`;
+      return `${value} Elo (Superhuman)`;
+    } else {
+      // Skill Level labels
+      if (value < 0) return `${value} (Very Weak)`;
+      if (value < 5) return `${value} (Weak)`;
+      if (value < 10) return `${value} (Moderate)`;
+      if (value < 15) return `${value} (Strong)`;
+      return `${value} (Maximum)`;
+    }
+  };
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <label className="text-sm text-text-secondary">Strength Level</label>
-        <span className="text-sm font-mono text-text-primary">
-          {STRENGTH_LABELS[strengthLevel as keyof typeof STRENGTH_LABELS]}
+        <label className="text-sm text-text-secondary">
+          {settingName}
+          {!isUciLimitStrength && (
+            <span className="text-xs ml-2 text-accent-cyan">(UCI_LimitStrength disabled)</span>
+          )}
+        </label>
+        <span className="text-sm font-mono text-accent-purple font-semibold">
+          {getLabel(currentValue)}
         </span>
       </div>
 
       <input
         type="range"
-        min={minLevel}
-        max={maxLevel}
-        value={strengthLevel}
-        onChange={(e) => onStrengthChange(parseInt(e.target.value))}
-        disabled={disabled || !isAdjustable}
-        className="w-full h-2 bg-background-primary rounded-lg appearance-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+        min={min}
+        max={max}
+        step={step}
+        value={currentValue}
+        onChange={(e) => handleChange(parseInt(e.target.value))}
+        disabled={disabled}
+        className="w-full h-2 bg-background-primary rounded-lg appearance-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 accent-accent-purple"
         style={{
-          background: isAdjustable 
-            ? `linear-gradient(to right, #00d9ff ${(strengthLevel - minLevel) / (maxLevel - minLevel) * 100}%, #1a1d2e ${(strengthLevel - minLevel) / (maxLevel - minLevel) * 100}%)`
-            : '#1a1d2e'
+          background: `linear-gradient(to right, #a78bfa ${((currentValue - min) / (max - min)) * 100}%, #1a1d2e ${((currentValue - min) / (max - min)) * 100}%)`
         }}
       />
 
-      {!isAdjustable && (
-        <p className="text-xs text-text-secondary italic">
-          This engine does not support strength adjustment. Always plays at Level {maxLevel}.
-        </p>
-      )}
+      <div className="flex justify-between text-xs text-text-secondary">
+        <span>Min: {min}</span>
+        <span>Default: {defaultValue}</span>
+        <span>Max: {max}</span>
+      </div>
 
-      {isAdjustable && engine.strengthControl.methods.length > 0 && (
-        <p className="text-xs text-text-secondary">
-          Strength control: {engine.strengthControl.methods.join(', ')}
-        </p>
-      )}
+      <p className="text-xs text-text-secondary">
+        {isUciLimitStrength 
+          ? 'Adjust playing strength in Elo rating. Toggle UCI_LimitStrength in Advanced Settings to use Skill Level instead.'
+          : 'Using Skill Level control. Enable UCI_LimitStrength in Advanced Settings to use Elo rating.'}
+      </p>
     </div>
   );
 }

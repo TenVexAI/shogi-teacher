@@ -330,6 +330,31 @@ async def get_engine_options(engine_id: str):
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error getting engine options: {str(e)}")
 
+@app.get("/engines/{engine_id}/advanced-settings")
+async def get_engine_advanced_settings(engine_id: str):
+    """Get advanced settings configuration for a specific engine."""
+    import json
+    
+    if engine_id not in engine_manager.available_engines:
+        raise HTTPException(status_code=404, detail="Engine not found")
+    
+    # Path to advanced settings JSON file
+    engine_config = engine_manager.available_engines[engine_id]
+    engine_dir = Path(engine_config.executablePath).parent
+    settings_file = engine_dir / "advanced_settings.json"
+    
+    if not settings_file.exists():
+        # Return empty settings if file doesn't exist
+        return {"engineId": engine_id, "settings": []}
+    
+    try:
+        with open(settings_file, 'r', encoding='utf-8') as f:
+            settings = json.load(f)
+        return settings
+    except Exception as e:
+        print(f"Error loading advanced settings for {engine_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error loading advanced settings: {str(e)}")
+
 @app.get("/engines/config")
 async def get_engine_config():
     """Get current engine configuration."""

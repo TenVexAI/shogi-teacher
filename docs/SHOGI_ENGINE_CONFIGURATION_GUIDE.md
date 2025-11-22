@@ -1,16 +1,308 @@
 # Shogi Engine Configuration Guide
 
-- Run `python inspect_engine_options.py` to see all available options for each engine
+This guide explains how to configure advanced settings for Shogi engines in the teaching system.
 
-## Table of Contents
-1. [Universal USI Options](#universal-usi-options)
-2. [Engine-Specific Configurations](#engine-specific-configurations)
+## 🚀 Quick Start
+
+1. **View available options**: Run `python inspect_engine_options.py` in the `backend/` directory
+2. **Access in UI**: Click "Advanced Settings" button next to any engine in the Engine Management modal
+3. **Customize**: Modify settings in the UI or edit the `advanced_settings.json` file directly
+
+## 📋 Table of Contents
+1. [Advanced Settings System](#advanced-settings-system)
+2. [Creating Custom Configurations](#creating-custom-configurations)
+3. [Universal USI Options](#universal-usi-options)
+4. [Engine-Specific Configurations](#engine-specific-configurations)
    - [Fairy-Stockfish (Large Board)](#fairy-stockfish-large-board)
    - [Fukauraaou V9.01 (GPU-Accelerated)](#fukauraaou-v901-gpu-accelerated)
    - [YaneuraOu NNUE](#yaneuraou-nnue)
    - [HoneyWaffle WCSC28](#honeywaffle-wcsc28)
    - [Apery WCSC30](#apery-wcsc30)
    - [SeoTsume](#seotsume)
+---
+
+## Advanced Settings System
+
+### Overview
+
+The advanced settings system uses **JSON configuration files** to define which USI options are exposed in the UI and how they're presented. This gives you full control over:
+- Which settings users can modify
+- Allowed value ranges and increments
+- Default values
+- UI control types (slider, toggle, dropdown, text input)
+- Conditional settings (e.g., UCI_Elo only shows when UCI_LimitStrength is enabled)
+
+### File Location
+
+Each engine has an `advanced_settings.json` file in its directory:
+```
+backend/engines/
+├── fairy-stockfish/
+│   ├── advanced_settings.json     ← Configuration file
+│   ├── config.json                 ← Engine metadata
+│   └── fairy-stockfish.exe         ← Engine binary
+├── yaneuraou/
+│   ├── advanced_settings.json
+│   └── ...
+```
+
+### Why Use JSON Configs?
+
+**Problem**: Engines expose 50-100+ USI options, many with impractical ranges (e.g., Hash: 1-33,554,432 MB) or obscure parameters not useful for teaching.
+
+**Solution**: JSON configs let you:
+- ✅ **Curate** only the most useful settings (typically 10-20)
+- ✅ **Limit ranges** to practical values (e.g., Hash: 256-8192 MB instead of 1-32TB)
+- ✅ **Set sensible increments** (e.g., adjust hash in 256MB steps, not 1MB)
+- ✅ **Provide descriptions** explaining what each setting does
+- ✅ **Create dependencies** (e.g., hide Skill Level when using UCI_Elo)
+
+---
+
+## Creating Custom Configurations
+
+### Step 1: Discover Available Options
+
+Run the inspection script to see all options an engine supports:
+```bash
+cd backend
+python inspect_engine_options.py
+```
+
+This shows:
+- All USI options the engine reports
+- Their types (spin/check/combo/string/button)
+- Min/max ranges and default values
+- Built-in descriptions for common options
+
+### Step 2: Create advanced_settings.json
+
+Create a file at `backend/engines/{engine-id}/advanced_settings.json`:
+
+```json
+{
+  "engineId": "your-engine-id",
+  "engineName": "Your Engine Name",
+  "settings": [
+    {
+      "name": "Hash",
+      "displayName": "Hash Table Size",
+      "description": "Memory allocated for transposition table (MB).",
+      "type": "slider",
+      "default": 2048,
+      "min": 256,
+      "max": 8192,
+      "step": 256,
+      "unit": "MB"
+    }
+  ]
+}
+```
+
+### JSON Schema Reference
+
+#### Setting Object Fields
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | ✅ Yes | Exact USI option name (case-sensitive) |
+| `displayName` | string | ✅ Yes | Human-friendly label shown in UI |
+| `description` | string | ✅ Yes | Explanation of what the setting does |
+| `type` | string | ✅ Yes | UI control type: `"slider"`, `"toggle"`, `"select"`, `"text"` |
+| `default` | string/number/boolean | ✅ Yes | Default value for this setting |
+| `min` | number | Slider only | Minimum allowed value |
+| `max` | number | Slider only | Maximum allowed value |
+| `step` | number | Slider only | Increment size (default: 1) |
+| `unit` | string | Optional | Display unit (e.g., `"MB"`, `"ms"`, `"%"`) |
+| `options` | string[] | Select only | Array of allowed values for dropdown |
+| `dependsOn` | object | Optional | Conditional display (see below) |
+| `analysisDefault` | number | Optional | Different default when used as analysis engine |
+
+#### Control Types
+
+**Slider** - For numeric values with ranges:
+```json
+{
+  "name": "Threads",
+  "type": "slider",
+  "default": 4,
+  "min": 1,
+  "max": 16,
+  "step": 1
+}
+```
+
+**Toggle** - For boolean on/off settings:
+```json
+{
+  "name": "USI_Ponder",
+  "type": "toggle",
+  "default": false
+}
+```
+
+**Select** - For dropdown/combo options:
+```json
+{
+  "name": "BookFile",
+  "type": "select",
+  "default": "standard_book.db",
+  "options": ["no_book", "standard_book.db", "user_book1.db"]
+}
+```
+
+**Text** - For string/path inputs:
+```json
+{
+  "name": "EvalDir",
+  "type": "text",
+  "default": "eval"
+}
+```
+
+#### Conditional Settings (dependsOn)
+
+Hide/show settings based on other settings:
+```json
+{
+  "name": "UCI_Elo",
+  "type": "slider",
+  "default": 1200,
+  "min": 500,
+  "max": 2850,
+  "step": 50,
+  "dependsOn": {
+    "setting": "UCI_LimitStrength",
+    "value": true
+  }
+}
+```
+This makes `UCI_Elo` only appear when `UCI_LimitStrength` is enabled.
+
+#### Analysis Engine Defaults
+
+Some settings should have different defaults for the analysis engine:
+```json
+{
+  "name": "MultiPV",
+  "type": "slider",
+  "default": 1,
+  "min": 1,
+  "max": 5,
+  "step": 1,
+  "analysisDefault": 3
+}
+```
+When used as the analysis engine, `MultiPV` defaults to 3 instead of 1.
+
+### Step 3: Test Your Configuration
+
+1. Restart the backend server
+2. Open Engine Management modal in the frontend
+3. Select your engine
+4. Click "Advanced Settings"
+5. Verify all settings appear correctly with proper ranges
+
+### Step 4: Share or Commit
+
+**For version control**:
+- ✅ **Commit** the `advanced_settings.json` file
+- ❌ **Don't commit** engine binaries or eval files (already in `.gitignore`)
+
+**For sharing**:
+- Include the JSON file in your engine distribution
+- Users only need to drop the JSON alongside the engine executable
+
+---
+
+## Modifying Existing Engines
+
+To expose hidden features or adjust ranges:
+
+1. **Run inspection**: `python inspect_engine_options.py` to see all available options
+2. **Edit JSON**: Open `backend/engines/{engine-id}/advanced_settings.json`
+3. **Add new setting**:
+```json
+{
+  "name": "Contempt",
+  "displayName": "Contempt Factor",
+  "description": "Willingness to play for a win vs accepting draws.",
+  "type": "slider",
+  "default": 0,
+  "min": -100,
+  "max": 100,
+  "step": 1
+}
+```
+4. **Save and reload**: Changes take effect immediately (no server restart needed for UI)
+
+### Common Modifications
+
+**Tighten Hash Range** (prevent users from allocating 32TB):
+```json
+{
+  "name": "Hash",
+  "max": 8192  // Change from 33554432
+}
+```
+
+**Add Opening Book Options**:
+```json
+{
+  "name": "BookIgnoreRate",
+  "displayName": "Book Randomness",
+  "description": "Percentage chance to ignore book and calculate freely.",
+  "type": "slider",
+  "default": 0,
+  "min": 0,
+  "max": 100,
+  "step": 5,
+  "unit": "%"
+}
+```
+
+**Hide Expert Options**: Simply remove them from the JSON. They'll still use engine defaults but won't appear in UI.
+
+---
+
+## Fairy-Stockfish Strength Control
+
+**Special Behavior**: The main Engine Management modal shows a strength slider **only for Fairy-Stockfish**, not other engines.
+
+### How It Works
+
+The slider dynamically switches between two modes:
+
+**UCI_Elo Mode** (default):
+- Range: 500-2850 Elo
+- Increments: 50 Elo
+- Default: 1200 Elo (club player)
+- Active when: `UCI_LimitStrength = true`
+
+**Skill Level Mode** (alternative):
+- Range: -20 to 20
+- Increments: 1
+- Default: 20 (maximum)
+- Active when: `UCI_LimitStrength = false`
+
+### Switching Modes
+
+1. Open Advanced Settings for Fairy-Stockfish
+2. Find "Limit Strength" toggle
+3. **Enable** → Slider controls UCI_Elo (Elo rating)
+4. **Disable** → Slider controls Skill Level (-20 to 20)
+
+The main modal slider automatically updates to match!
+
+### Why Only Fairy-Stockfish?
+
+Other engines either:
+- Don't support adjustable strength (always play at maximum)
+- Use engine-specific strength methods not standardized
+- Are too strong for teaching at any strength level
+
+Fairy-Stockfish's UCI_Elo is calibrated and reliable for creating appropriate difficulty levels.
+
 ---
 
 ## Universal USI Options
@@ -132,7 +424,7 @@ Slow_Mover: 100               # Time management (100 = default)
 ```yaml
 # Memory (Should depend on how much RAM the user has available on their system)
 Hash: 8192                      # 2-8GB - 8GB maximum practical for single engine
-Threads: 1-4                    # GPU-accelerated needs fewer CPU threads
+Threads: 4                      # 1-4 recommended as GPU-accelerated needs fewer CPU threads
 
 # GPU Configuration
 Max_GPU: 1                      # Number of GPUs (most only have 1)
