@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { GameState } from '@/types/game';
 import CapturedPieces from './CapturedPieces';
 import { Languages, FlipVertical, Type, Zap, Compass } from 'lucide-react';
+import { loadUISettingsSync, updateUISetting } from '@/lib/settings';
 
 interface Position {
     row: number;
@@ -195,13 +196,45 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
     const [selectedSquare, setSelectedSquare] = useState<Position | null>(null);
     const [selectedDropPiece, setSelectedDropPiece] = useState<string | null>(null);
     
-    // Board display toggles
-    const [useJapaneseCoords, setUseJapaneseCoords] = useState(false);
-    const [boardFlipped, setBoardFlipped] = useState(false);
-    const [useWesternNotation, setUseWesternNotation] = useState(false);
-    const [highlightLastMove, setHighlightLastMove] = useState(false);
-    const [showMovementOverlay, setShowMovementOverlay] = useState(false);
+    // Board display toggles - load from settings (sync version for initial render)
+    const uiSettings = loadUISettingsSync();
+    const [useJapaneseCoords, setUseJapaneseCoords] = useState(uiSettings.useJapaneseCoords);
+    const [boardFlipped, setBoardFlipped] = useState(uiSettings.boardFlipped);
+    const [useWesternNotation, setUseWesternNotation] = useState(uiSettings.useWesternNotation);
+    const [highlightLastMove, setHighlightLastMove] = useState(uiSettings.highlightLastMove);
+    const [showMovementOverlay, setShowMovementOverlay] = useState(uiSettings.showMovementOverlay);
     const [lastMovePositions, setLastMovePositions] = useState<{ from: Position; to: Position } | null>(null);
+
+    // Wrapper functions to save settings when changed
+    const toggleJapaneseCoords = () => {
+        const newValue = !useJapaneseCoords;
+        setUseJapaneseCoords(newValue);
+        updateUISetting('useJapaneseCoords', newValue);
+    };
+
+    const toggleBoardFlipped = () => {
+        const newValue = !boardFlipped;
+        setBoardFlipped(newValue);
+        updateUISetting('boardFlipped', newValue);
+    };
+
+    const toggleWesternNotation = () => {
+        const newValue = !useWesternNotation;
+        setUseWesternNotation(newValue);
+        updateUISetting('useWesternNotation', newValue);
+    };
+
+    const toggleHighlightLastMove = () => {
+        const newValue = !highlightLastMove;
+        setHighlightLastMove(newValue);
+        updateUISetting('highlightLastMove', newValue);
+    };
+
+    const toggleShowMovementOverlay = () => {
+        const newValue = !showMovementOverlay;
+        setShowMovementOverlay(newValue);
+        updateUISetting('showMovementOverlay', newValue);
+    };
 
     // Check if current player has an engine configured
     const currentPlayerHasEngine = engineConfig 
@@ -597,7 +630,7 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
                     <div className="bg-background-secondary border border-border rounded-lg px-1 py-1 flex items-center gap-2">
                         {/* Japanese Coordinates Toggle */}
                         <button
-                            onClick={() => setUseJapaneseCoords(!useJapaneseCoords)}
+                            onClick={toggleJapaneseCoords}
                             className="w-10 h-10 flex items-center justify-center group transition-colors relative"
                             title="Toggle Japanese coordinates"
                         >
@@ -616,7 +649,7 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
 
                         {/* Flip Board Toggle */}
                         <button
-                            onClick={() => setBoardFlipped(!boardFlipped)}
+                            onClick={toggleBoardFlipped}
                             className="w-10 h-10 flex items-center justify-center group transition-colors relative"
                             title="Flip board orientation"
                         >
@@ -635,7 +668,7 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
 
                         {/* Western Notation Toggle */}
                         <button
-                            onClick={() => setUseWesternNotation(!useWesternNotation)}
+                            onClick={toggleWesternNotation}
                             className="w-10 h-10 flex items-center justify-center group transition-colors relative"
                             title="Toggle Western piece notation"
                         >
@@ -654,7 +687,7 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
 
                         {/* Highlight Last Move Toggle */}
                         <button
-                            onClick={() => setHighlightLastMove(!highlightLastMove)}
+                            onClick={toggleHighlightLastMove}
                             className="w-10 h-10 flex items-center justify-center group transition-colors relative"
                             title="Highlight last move"
                         >
@@ -673,7 +706,7 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
 
                         {/* Movement Overlay Toggle */}
                         <button
-                            onClick={() => setShowMovementOverlay(!showMovementOverlay)}
+                            onClick={toggleShowMovementOverlay}
                             className="w-10 h-10 flex items-center justify-center group transition-colors relative"
                             title="Show movement overlay"
                         >

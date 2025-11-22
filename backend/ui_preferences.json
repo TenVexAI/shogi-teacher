@@ -1,0 +1,12 @@
+{
+  "useLLM": false,
+  "showBestMove": false,
+  "showBoardOptionsPanel": false,
+  "showMovementOverlay": false,
+  "useWesternNotation": false,
+  "useJapaneseCoords": false,
+  "allSoundsEnabled": true,
+  "uiSoundEnabled": true,
+  "ambientSoundEnabled": true,
+  "musicSoundEnabled": true
+}

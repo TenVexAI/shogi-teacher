@@ -11,6 +11,7 @@ import Sidebar from '@/components/Sidebar';
 import { getGameState, makeMove, analyzePosition, explainPosition, updateConfig, getConfig } from '@/lib/api';
 import { GameState } from '@/types/game';
 import { audioManager } from '@/lib/audioManager';
+import { loadUISettings, saveUISettings } from '@/lib/settings';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -37,6 +38,10 @@ export default function Home() {
   const [currentApiKey, setCurrentApiKey] = useState<string>('');
   const [showBestMove, setShowBestMove] = useState(false);
   const [showBoardOptionsPanel, setShowBoardOptionsPanel] = useState(true);
+  const [allSoundsMuted, setAllSoundsMuted] = useState(false);
+  const [uiSoundEnabled, setUiSoundEnabled] = useState(false);
+  const [musicSoundEnabled, setMusicSoundEnabled] = useState(false);
+  const [ambientSoundEnabled, setAmbientSoundEnabled] = useState(false);
   const [showClockStartModal, setShowClockStartModal] = useState(false);
   const [pendingMove, setPendingMove] = useState<string | null>(null);
   const [cachedHintAnalysis, setCachedHintAnalysis] = useState<{ bestmove: string; score_cp: number; mate: number | null; info: string } | null>(null);
@@ -56,10 +61,36 @@ export default function Home() {
     loadConfig();
     loadEngineConfig();
     
-    // Load sound settings
-    const savedSettings = audioManager.loadSettings();
-    setSoundSettings(savedSettings);
-    audioManager.updateSettings(savedSettings);
+    // Load UI settings asynchronously
+    loadUISettings().then(uiSettings => {
+      setUseLLM(uiSettings.useLLM);
+      setShowBestMove(uiSettings.showBestMove);
+      setShowBoardOptionsPanel(uiSettings.showBoardOptionsPanel);
+      setAllSoundsMuted(uiSettings.allSoundsMuted);
+      setUiSoundEnabled(uiSettings.uiSoundEnabled);
+      setMusicSoundEnabled(uiSettings.musicSoundEnabled);
+      setAmbientSoundEnabled(uiSettings.ambientSoundEnabled);
+      
+      // Apply sound settings from UI preferences
+      // Actual playing state = enabled && !muted
+      const newSettings = {
+        uiEnabled: uiSettings.uiSoundEnabled && !uiSettings.allSoundsMuted,
+        musicEnabled: uiSettings.musicSoundEnabled && !uiSettings.allSoundsMuted,
+        ambientEnabled: uiSettings.ambientSoundEnabled && !uiSettings.allSoundsMuted,
+        uiVolume: 50,
+        musicVolume: 10,
+        ambientVolumes: [10, 10, 10, 10, 10, 10, 10, 10, 10, 10]
+      };
+      
+      // Load volume settings from audioManager
+      const savedSettings = audioManager.loadSettings();
+      newSettings.uiVolume = savedSettings.uiVolume;
+      newSettings.musicVolume = savedSettings.musicVolume;
+      newSettings.ambientVolumes = savedSettings.ambientVolumes;
+      
+      setSoundSettings(newSettings);
+      audioManager.updateSettings(newSettings);
+    });
   }, []);
 
   // Stop clock when game ends
@@ -388,6 +419,13 @@ export default function Home() {
     setUseLLM(useLLMSetting);
     setShowBestMove(showBestMoveSetting);
     setShowBoardOptionsPanel(showBoardOptionsSetting);
+    
+    // Save UI settings to backend file
+    await saveUISettings({
+      useLLM: useLLMSetting,
+      showBestMove: showBestMoveSetting,
+      showBoardOptionsPanel: showBoardOptionsSetting,
+    });
   };
 
   const handleSaveSoundSettings = (settings: SoundSettings) => {
@@ -395,25 +433,46 @@ export default function Home() {
     audioManager.updateSettings(settings);
   };
 
-  const handleSoundToggle = (category: 'ui' | 'music' | 'ambient', enabled: boolean) => {
+  const handleSoundToggle = async (category: 'ui' | 'music' | 'ambient', enabled: boolean) => {
+    // Update local state
+    if (category === 'ui') setUiSoundEnabled(enabled);
+    if (category === 'music') setMusicSoundEnabled(enabled);
+    if (category === 'ambient') setAmbientSoundEnabled(enabled);
+    
+    // Save to UI preferences
+    const prefUpdate: Partial<{ uiSoundEnabled: boolean; musicSoundEnabled: boolean; ambientSoundEnabled: boolean }> = {};
+    if (category === 'ui') prefUpdate.uiSoundEnabled = enabled;
+    if (category === 'music') prefUpdate.musicSoundEnabled = enabled;
+    if (category === 'ambient') prefUpdate.ambientSoundEnabled = enabled;
+    await saveUISettings(prefUpdate);
+    
+    // Update actual playing state (must check master mute)
+    const uiSettings = await loadUISettings();
     const newSettings = { ...soundSettings };
-    if (category === 'ui') newSettings.uiEnabled = enabled;
-    if (category === 'music') newSettings.musicEnabled = enabled;
-    if (category === 'ambient') newSettings.ambientEnabled = enabled;
+    if (category === 'ui') newSettings.uiEnabled = enabled && !uiSettings.allSoundsMuted;
+    if (category === 'music') newSettings.musicEnabled = enabled && !uiSettings.allSoundsMuted;
+    if (category === 'ambient') newSettings.ambientEnabled = enabled && !uiSettings.allSoundsMuted;
     setSoundSettings(newSettings);
     audioManager.updateSettings(newSettings);
   };
 
-  const handleToggleAllSounds = () => {
-    // Check if any sound is currently enabled
-    const anySoundEnabled = soundSettings.uiEnabled || soundSettings.musicEnabled || soundSettings.ambientEnabled;
+  const handleToggleAllSounds = async () => {
+    // Toggle master mute state
+    const newMutedState = !allSoundsMuted;
+    setAllSoundsMuted(newMutedState);
     
-    // Toggle all sounds to the opposite state
+    // Save master mute state to UI preferences
+    await saveUISettings({ allSoundsMuted: newMutedState });
+    
+    // Get current UI preferences for individual sound settings
+    const uiSettings = await loadUISettings();
+    
+    // Update actual playing state based on enabled settings and new mute state
     const newSettings = {
       ...soundSettings,
-      uiEnabled: !anySoundEnabled,
-      musicEnabled: !anySoundEnabled,
-      ambientEnabled: !anySoundEnabled
+      uiEnabled: uiSettings.uiSoundEnabled && !newMutedState,
+      musicEnabled: uiSettings.musicSoundEnabled && !newMutedState,
+      ambientEnabled: uiSettings.ambientSoundEnabled && !newMutedState
     };
     setSoundSettings(newSettings);
     audioManager.updateSettings(newSettings);
@@ -584,9 +643,9 @@ export default function Home() {
           currentShowBoardOptions={showBoardOptionsPanel}
           onOpenSounds={() => setIsSoundSettingsOpen(true)}
           soundToggles={{
-            uiEnabled: soundSettings.uiEnabled,
-            musicEnabled: soundSettings.musicEnabled,
-            ambientEnabled: soundSettings.ambientEnabled
+            uiEnabled: uiSoundEnabled,
+            musicEnabled: musicSoundEnabled,
+            ambientEnabled: ambientSoundEnabled
           }}
           onSoundToggle={handleSoundToggle}
         />
@@ -634,7 +693,7 @@ export default function Home() {
           {/* Sidebar */}
           <Sidebar 
             onOpenSettings={() => setIsConfigOpen(true)}
-            allSoundsEnabled={soundSettings.uiEnabled || soundSettings.musicEnabled || soundSettings.ambientEnabled}
+            allSoundsEnabled={!allSoundsMuted}
             onToggleAllSounds={handleToggleAllSounds}
             onOpenLearn={handleOpenLearn}
             onOpenEngineManagement={handleOpenEngineManagement}

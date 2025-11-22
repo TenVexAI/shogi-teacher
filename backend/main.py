@@ -250,6 +250,78 @@ async def update_config(config: ConfigUpdate):
     else:
         raise HTTPException(status_code=500, detail="Failed to save configuration")
 
+# ===== UI Preferences Endpoints =====
+
+UI_PREFERENCES_FILE = Path(__file__).parent / "ui_preferences.json"
+
+@app.get("/ui-preferences")
+async def get_ui_preferences():
+    """Get UI preferences from file."""
+    import json
+    
+    if UI_PREFERENCES_FILE.exists():
+        try:
+            with open(UI_PREFERENCES_FILE, 'r') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            pass
+    
+    # Return defaults if file doesn't exist or is invalid
+    return {
+        "useLLM": True,
+        "showBestMove": False,
+        "showBoardOptionsPanel": True,
+        "useJapaneseCoords": False,
+        "boardFlipped": False,
+        "useWesternNotation": False,
+        "highlightLastMove": False,
+        "showMovementOverlay": False,
+        "allSoundsMuted": False,
+        "uiSoundEnabled": False,
+        "musicSoundEnabled": False,
+        "ambientSoundEnabled": False
+    }
+
+class UIPreferencesUpdate(BaseModel):
+    useLLM: Optional[bool] = None
+    showBestMove: Optional[bool] = None
+    showBoardOptionsPanel: Optional[bool] = None
+    useJapaneseCoords: Optional[bool] = None
+    boardFlipped: Optional[bool] = None
+    useWesternNotation: Optional[bool] = None
+    highlightLastMove: Optional[bool] = None
+    showMovementOverlay: Optional[bool] = None
+    allSoundsMuted: Optional[bool] = None
+    uiSoundEnabled: Optional[bool] = None
+    musicSoundEnabled: Optional[bool] = None
+    ambientSoundEnabled: Optional[bool] = None
+
+@app.post("/ui-preferences")
+async def update_ui_preferences(preferences: UIPreferencesUpdate):
+    """Update UI preferences to file."""
+    import json
+    
+    # Load existing preferences
+    current_prefs = {}
+    if UI_PREFERENCES_FILE.exists():
+        try:
+            with open(UI_PREFERENCES_FILE, 'r') as f:
+                current_prefs = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            pass
+    
+    # Update with new values (only non-None fields)
+    update_dict = preferences.dict(exclude_none=True)
+    current_prefs.update(update_dict)
+    
+    # Save to file
+    try:
+        with open(UI_PREFERENCES_FILE, 'w') as f:
+            json.dump(current_prefs, f, indent=2)
+        return {"success": True, "preferences": current_prefs}
+    except IOError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save preferences: {str(e)}")
+
 # ===== Engine Management Endpoints =====
 
 @app.get("/engines")
