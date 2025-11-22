@@ -355,6 +355,24 @@ async def get_engine_advanced_settings(engine_id: str):
         print(f"Error loading advanced settings for {engine_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Error loading advanced settings: {str(e)}")
 
+@app.get("/system/cuda-status")
+async def get_cuda_status():
+    """Check CUDA/GPU availability for GPU-accelerated engines like Fukauraou."""
+    try:
+        from check_cuda import get_cuda_status
+        status = get_cuda_status()
+        return status
+    except Exception as e:
+        print(f"Error checking CUDA status: {e}")
+        return {
+            "hasGPU": False,
+            "gpuNames": [],
+            "hasCUDA": False,
+            "cudaVersion": None,
+            "ready": False,
+            "warnings": ["Unable to check CUDA status. Error: " + str(e)]
+        }
+
 @app.get("/engines/config")
 async def get_engine_config():
     """Get current engine configuration."""

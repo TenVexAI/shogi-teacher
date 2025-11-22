@@ -55,6 +55,15 @@ interface EngineManagementModalProps {
 }
 
 
+interface CudaStatus {
+  hasGPU: boolean;
+  gpuNames: string[];
+  hasCUDA: boolean;
+  cudaVersion: string | null;
+  ready: boolean;
+  warnings: string[];
+}
+
 export default function EngineManagementModal({ isOpen, onClose }: EngineManagementModalProps) {
   const [engines, setEngines] = useState<Engine[]>([]);
   const [config, setConfig] = useState<EngineConfig>({
@@ -67,11 +76,13 @@ export default function EngineManagementModal({ isOpen, onClose }: EngineManagem
   const [error, setError] = useState<string | null>(null);
   const [advancedSettingsOpen, setAdvancedSettingsOpen] = useState(false);
   const [advancedSettingsRole, setAdvancedSettingsRole] = useState<'black' | 'white' | 'analysis'>('black');
+  const [cudaStatus, setCudaStatus] = useState<CudaStatus | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       fetchEngines();
       fetchConfig();
+      fetchCudaStatus();
     }
   }, [isOpen]);
 
@@ -94,6 +105,16 @@ export default function EngineManagementModal({ isOpen, onClose }: EngineManagem
     } catch (error) {
       console.error('Failed to fetch config:', error);
       setLoading(false);
+    }
+  };
+
+  const fetchCudaStatus = async () => {
+    try {
+      const response = await fetch('http://127.0.0.1:8000/system/cuda-status');
+      const data = await response.json();
+      setCudaStatus(data);
+    } catch (error) {
+      console.error('Failed to fetch CUDA status:', error);
     }
   };
 
@@ -322,7 +343,7 @@ export default function EngineManagementModal({ isOpen, onClose }: EngineManagem
                 )}
 
                 {config.black.engineId && (
-                  <EngineInfo engine={getSelectedEngine('black')} />
+                  <EngineInfo engine={getSelectedEngine('black')} cudaStatus={cudaStatus} />
                 )}
 
                 {config.black.engineId && (
@@ -371,7 +392,7 @@ export default function EngineManagementModal({ isOpen, onClose }: EngineManagem
                 )}
 
                 {config.white.engineId && (
-                  <EngineInfo engine={getSelectedEngine('white')} />
+                  <EngineInfo engine={getSelectedEngine('white')} cudaStatus={cudaStatus} />
                 )}
 
                 {config.white.engineId && (
@@ -393,16 +414,19 @@ export default function EngineManagementModal({ isOpen, onClose }: EngineManagem
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xl font-semibold text-text-primary">Analysis Engine</h3>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={config.analysis.enabled}
-                      onChange={(e) => handleEngineChange('analysis', config.analysis.engineId, e.target.checked)}
-                      disabled={saving || !config.analysis.engineId}
-                      className="w-4 h-4 text-accent-purple bg-background-primary border-border rounded focus:ring-2 focus:ring-accent-purple"
-                    />
+                  <div className="flex items-center gap-3">
                     <span className="text-sm text-text-secondary">Enable Live Analysis</span>
-                  </label>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={config.analysis.enabled}
+                        onChange={(e) => handleEngineChange('analysis', config.analysis.engineId, e.target.checked)}
+                        disabled={saving || !config.analysis.engineId}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-background-primary peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent-purple rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent-purple peer-disabled:opacity-50 peer-disabled:cursor-not-allowed"></div>
+                    </label>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -432,7 +456,7 @@ export default function EngineManagementModal({ isOpen, onClose }: EngineManagem
                 )}
 
                 {config.analysis.engineId && (
-                  <EngineInfo engine={getSelectedEngine('analysis')} />
+                  <EngineInfo engine={getSelectedEngine('analysis')} cudaStatus={cudaStatus} />
                 )}
 
                 {config.analysis.engineId && (
@@ -581,8 +605,11 @@ function EngineStrengthControl({
   );
 }
 
-function EngineInfo({ engine }: { engine: Engine | null }) {
+function EngineInfo({ engine, cudaStatus }: { engine: Engine | null; cudaStatus: CudaStatus | null }) {
   if (!engine) return null;
+
+  const isFukauraou = engine.id === 'fukauraou';
+  const showCudaWarnings = isFukauraou && cudaStatus && !cudaStatus.ready;
 
   return (
     <div className="bg-background-primary border border-border rounded-lg p-4 space-y-2">
@@ -601,6 +628,38 @@ function EngineInfo({ engine }: { engine: Engine | null }) {
           )}
           {engine.features.openingBook && (
             <p className="text-accent-cyan text-xs">✓ Opening Book</p>
+          )}
+          
+          {/* CUDA Status for Fukauraou */}
+          {isFukauraou && cudaStatus && (
+            <div className="mt-2 pt-2 border-t border-border space-y-1">
+              <p className="text-xs font-semibold text-text-primary">GPU Requirements:</p>
+              {cudaStatus.hasGPU ? (
+                <p className="text-xs text-accent-cyan">
+                  ✓ GPU: {cudaStatus.gpuNames.join(', ')}
+                </p>
+              ) : (
+                <p className="text-xs text-red-400">✗ No NVIDIA GPU detected</p>
+              )}
+              {cudaStatus.hasCUDA ? (
+                <p className="text-xs text-accent-cyan">
+                  ✓ CUDA: {cudaStatus.cudaVersion}
+                </p>
+              ) : (
+                <p className="text-xs text-red-400">✗ CUDA not installed</p>
+              )}
+              <p className="text-xs text-text-secondary italic">Note: TensorRT DLLs are bundled with the model</p>
+            </div>
+          )}
+          
+          {/* Warning box for Fukauraou if not ready */}
+          {showCudaWarnings && cudaStatus.warnings.length > 0 && (
+            <div className="mt-2 p-2 bg-red-900/20 border border-red-500/30 rounded text-xs text-red-400 space-y-1">
+              <p className="font-semibold">⚠ Requirements Not Met:</p>
+              {cudaStatus.warnings.map((warning, idx) => (
+                <p key={idx}>• {warning}</p>
+              ))}
+            </div>
           )}
         </div>
       </div>
