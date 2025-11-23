@@ -4,3 +4,9 @@ uvicorn
 python-shogi
 anthropic
 python-dotenv
+
+# Database
+sqlalchemy>=2.0.0
+
+# File processing
+pypdf2  # For PDF reference file extraction

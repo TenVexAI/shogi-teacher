@@ -1,5 +1,5 @@
 {
-  "useLLM": false,
+  "useLLM": true,
   "showBestMove": true,
   "showBoardOptionsPanel": true,
   "showMovementOverlay": false,
@@ -8,5 +8,8 @@
   "allSoundsEnabled": true,
   "uiSoundEnabled": true,
   "ambientSoundEnabled": true,
-  "musicSoundEnabled": true
+  "musicSoundEnabled": true,
+  "highlightLastMove": false,
+  "boardFlipped": false,
+  "allSoundsMuted": false
 }

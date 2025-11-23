@@ -484,6 +484,136 @@ class EngineManager:
             print(f"Error analyzing position: {e}")
             return None
     
+    def request_hint(self, side: str, position: str, moves: List[str] = None, 
+                     movetime: int = 1000) -> Optional[Dict]:
+        """
+        Get hint from the engine assigned to this side.
+        
+        Args:
+            side: "black" or "white"
+            position: SFEN position
+            moves: Move history
+            movetime: Analysis time in ms
+        
+        Returns:
+            Enhanced analysis dict with algebraic notation, MultiPV, ponder
+        """
+        if moves is None:
+            moves = []
+        
+        engine_id = self.active_engines.get(side)
+        if not engine_id:
+            return None
+        
+        # Start engine if not running
+        if engine_id not in self.running_engines:
+            if not self._start_engine(engine_id):
+                return None
+        
+        process = self.running_engines[engine_id]
+        
+        try:
+            # Analyze position
+            analysis = self._analyze_with_callback(process, position, moves, movetime)
+            if not analysis:
+                return None
+            
+            # Add engine metadata
+            config = self.available_engines[engine_id]
+            analysis['engine_id'] = engine_id
+            analysis['engine_name'] = config.name
+            
+            return analysis
+            
+        except Exception as e:
+            print(f"Error getting hint: {e}")
+            return None
+    
+    def request_post_move_analysis(self, position: str, moves: List[str] = None,
+                                   movetime: int = 3000) -> Optional[Dict]:
+        """
+        Get analysis from Engine 3 (analyst) after a move is made.
+        
+        Only runs if analyst is enabled.
+        Returns None if disabled or no analyst assigned.
+        """
+        if moves is None:
+            moves = []
+        
+        if not self.analysis_enabled:
+            return None
+        
+        engine_id = self.active_engines.get("analysis")
+        if not engine_id:
+            return None
+        
+        # Start engine if not running
+        if engine_id not in self.running_engines:
+            if not self._start_engine(engine_id):
+                return None
+        
+        process = self.running_engines[engine_id]
+        
+        try:
+            # Analyze position
+            analysis = self._analyze_with_callback(process, position, moves, movetime)
+            if not analysis:
+                return None
+            
+            # Add engine metadata
+            config = self.available_engines[engine_id]
+            analysis['engine_id'] = engine_id
+            analysis['engine_name'] = config.name
+            
+            return analysis
+            
+        except Exception as e:
+            print(f"Error in post-move analysis: {e}")
+            return None
+    
+    def _analyze_with_callback(self, process, position: str, moves: List[str], 
+                               movetime: int) -> Optional[Dict]:
+        """
+        Analyze position and collect all info lines (for MultiPV).
+        """
+        try:
+            # Set position
+            process.set_position(position, moves)
+            
+            # Collect all info lines
+            info_lines = []
+            def collect_info(line):
+                if line.startswith('info'):
+                    info_lines.append(line)
+            
+            # Run analysis
+            bestmove, ponder, final_info = process.go(
+                movetime=movetime,
+                callback=collect_info
+            )
+            
+            result = {
+                "bestmove": bestmove,
+                "ponder": ponder,
+                "score_cp": final_info.get("score_cp"),
+                "mate": final_info.get("mate"),
+                "depth": final_info.get("depth", 0),
+                "nodes": final_info.get("nodes", 0),
+                "nps": final_info.get("nps", 0),
+                "pv": final_info.get("pv", []),
+                "info_lines": info_lines  # For MultiPV parsing
+            }
+            
+            # Restore game state
+            if hasattr(self, 'current_position') and hasattr(self, 'move_history'):
+                process.set_position(self.current_position, self.move_history)
+            
+            return result
+            
+        except Exception as e:
+            print(f"Error in analysis: {e}")
+            return None
+    
     def shutdown(self) -> None:
         """Shutdown all engines."""
         print("\n=== Shutting down engines ===")

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
@@ -9,6 +9,15 @@ import shogi
 from dotenv import load_dotenv
 from engine_manager import EngineManager
 from llm import ClaudeTeacher
+from database import init_db, get_db
+from session_manager import SessionManager
+from models import (
+    GameSession, GameSessionCreate, GameSessionUpdate,
+    MoveRequest, MoveResponse, MoveRecord,
+    HintRequest, HintResponse, MoveAnalysis,
+    AnalyzeRequest, AnalyzeResponse,
+    LLMQuery, LLMResponse
+)
 
 # Fix for Windows asyncio subprocess support
 if sys.platform == 'win32':
@@ -30,6 +39,13 @@ app.add_middleware(
 
 # Initialize components
 print("\n=== Initializing Shogi Teaching Assistant ===")
+
+# Initialize database
+init_db()
+
+# Initialize session manager
+session_manager = SessionManager()
+
 # Use absolute path for config file
 config_path = Path(__file__).parent / "engine_preferences.json"
 engine_manager = EngineManager(config_file=str(config_path))
@@ -70,10 +86,7 @@ if analysis_cfg.get("engineId"):
 teacher = ClaudeTeacher()
 print("✓ Initialization complete\n")
 
-class MoveRequest(BaseModel):
-    sfen: str
-    move: str # USI format e.g. "7g7f"
-
+# Legacy models for backwards compatibility
 class GameState(BaseModel):
     sfen: str
     turn: str # "b" or "w"
@@ -89,8 +102,8 @@ class AnalysisRequest(BaseModel):
 
 def usi_to_standard_notation(board: shogi.Board, move: shogi.Move) -> str:
     """
-    Convert USI move to standard shogi notation.
-    Examples: P-7f, S-6h, Bx3c+, P*5e, +Px4d
+    Convert USI move to standard shogi notation with disambiguation.
+    Examples: P-7f, S-6h, Bx3c+, P*5e, +Px4d, G6a-5b (disambiguated)
     """
     # Map piece types to standard notation
     piece_map = {
@@ -110,11 +123,14 @@ def usi_to_standard_notation(board: shogi.Board, move: shogi.Move) -> str:
         shogi.PROM_ROOK: '+R',
     }
     
+    def square_to_notation(square: int) -> str:
+        """Convert square index to shogi notation (e.g., 80 -> 1a, 0 -> 9i)"""
+        file = 9 - (square % 9)  # Files go from 9 to 1 (right to left)
+        rank = chr(ord('a') + (square // 9))  # Ranks go from a to i (top to bottom)
+        return f"{file}{rank}"
+    
     to_square = move.to_square
-    # Convert square index to shogi notation (e.g., 80 -> 1a, 0 -> 9i)
-    file = 9 - (to_square % 9)  # Files go from 9 to 1 (right to left)
-    rank = chr(ord('a') + (to_square // 9))  # Ranks go from a to i (top to bottom)
-    dest = f"{file}{rank}"
+    dest = square_to_notation(to_square)
     
     # Check if it's a drop move
     if move.drop_piece_type:
@@ -133,7 +149,25 @@ def usi_to_standard_notation(board: shogi.Board, move: shogi.Move) -> str:
     # Check if it's a promotion
     promotion = '+' if move.promotion else ''
     
-    return f"{piece}{separator}{dest}{promotion}"
+    # Check for disambiguation: are there other pieces of the same type that can reach this square?
+    needs_disambiguation = False
+    for legal_move in board.legal_moves:
+        # Skip the current move
+        if legal_move == move:
+            continue
+        # Check if another piece of the same type can reach the same destination
+        if (legal_move.to_square == to_square and 
+            not legal_move.drop_piece_type and
+            board.piece_type_at(legal_move.from_square) == piece_type):
+            needs_disambiguation = True
+            break
+    
+    # Add source square if disambiguation is needed
+    if needs_disambiguation:
+        source = square_to_notation(from_square)
+        return f"{piece}{source}{separator}{dest}{promotion}"
+    else:
+        return f"{piece}{separator}{dest}{promotion}"
 
 @app.on_event("startup")
 async def startup_event():
@@ -225,6 +259,81 @@ async def analyze_position(request: AnalysisRequest):
 async def explain_position(sfen: str, analysis: Dict[str, Any]):
     explanation = await teacher.explain(sfen, analysis)
     return {"explanation": explanation}
+
+class ConversationHistoryRequest(BaseModel):
+    user_question: Optional[str] = None
+    conversation_history: Optional[List[Dict[str, str]]] = None
+
+@app.post("/session/{session_id}/explain")
+async def explain_position_with_context(session_id: str, request: ConversationHistoryRequest):
+    """
+    Get LLM explanation with full game context and conversation history.
+    
+    Args:
+        session_id: Session ID
+        request: Request body containing user_question and conversation_history
+    
+    Returns:
+        LLM explanation with game context
+    """
+    try:
+        # Get session with full context
+        session = session_manager.get_session(session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        # Build game context
+        game_context = teacher.build_game_context(session, include_moves=10)
+        
+        # Get current position analysis from appropriate engine
+        board = shogi.Board(session.current_sfen)
+        side = "black" if board.turn == shogi.BLACK else "white"
+        
+        # Parse SFEN for engine
+        parts = session.current_sfen.split(" moves ")
+        position = parts[0]
+        moves = parts[1].split() if len(parts) > 1 else []
+        
+        # Get analysis from current side's engine
+        analysis_raw = engine_manager.request_hint(
+            side=side,
+            position=position,
+            moves=moves,
+            movetime=1000
+        )
+        
+        if not analysis_raw:
+            raise HTTPException(status_code=500, detail="Failed to get position analysis")
+        
+        # Build analysis dict for LLM
+        analysis = {
+            'bestmove': analysis_raw['bestmove'],
+            'score_cp': analysis_raw.get('score_cp'),
+            'mate': analysis_raw.get('mate'),
+            'pv': ' '.join(analysis_raw.get('pv', [])[:5])
+        }
+        
+        # If user has a specific question, append it to context
+        if request.user_question:
+            game_context += f"\n\n**User Question:** {request.user_question}"
+        
+        # Get LLM explanation with full context and conversation history
+        explanation = await teacher.explain(
+            sfen=session.current_sfen,
+            analysis=analysis,
+            context=game_context,
+            conversation_history=request.conversation_history or []
+        )
+        
+        return {"explanation": explanation, "context": game_context}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error in explain with context: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/config")
 async def get_config():
@@ -586,4 +695,411 @@ def _build_game_state(board: shogi.Board, last_move_notation: Optional[str] = No
         pieces_in_hand=pieces_in_hand,
         last_move_notation=last_move_notation
     )
+
+
+# ===== NEW: Game Session Endpoints =====
+
+@app.post("/session/create", response_model=GameSession)
+async def create_game_session(request: GameSessionCreate):
+    """Create a new game session"""
+    try:
+        session = session_manager.create_session(request)
+        return session
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create session: {str(e)}")
+
+
+@app.get("/session/{session_id}", response_model=GameSession)
+async def get_game_session(session_id: str):
+    """Get a game session by ID"""
+    session = session_manager.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session
+
+
+@app.get("/session/list", response_model=List[GameSession])
+async def list_game_sessions(active_only: bool = True, limit: int = 50):
+    """List game sessions"""
+    return session_manager.list_sessions(active_only=active_only, limit=limit)
+
+
+@app.put("/session/{session_id}", response_model=GameSession)
+async def update_game_session(session_id: str, update: GameSessionUpdate):
+    """Update session settings"""
+    updated = session_manager.update_session(
+        session_id,
+        **update.dict(exclude_unset=True)
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return updated
+
+
+@app.delete("/session/{session_id}/moves/{move_number}")
+async def delete_moves_after(session_id: str, move_number: int):
+    """Delete all moves after the specified move number (for reverting)"""
+    try:
+        from database import SessionLocal, MoveRecordDB, GameSessionDB, engine
+        db = SessionLocal()
+        try:
+            # Delete all moves after move_number
+            deleted_count = db.query(MoveRecordDB).filter(
+                MoveRecordDB.session_id == session_id,
+                MoveRecordDB.move_number > move_number
+            ).delete(synchronize_session='fetch')  # Explicitly sync session
+            
+            # Also expire the session object to force reload of relationships
+            session_obj = db.query(GameSessionDB).filter(
+                GameSessionDB.session_id == session_id
+            ).first()
+            if session_obj:
+                db.expire(session_obj)
+            
+            db.commit()
+            
+            # Force all other sessions to see this change by flushing the engine
+            engine.dispose()
+            
+            return {"success": True, "deleted_after": move_number, "deleted_count": deleted_count}
+        finally:
+            db.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete moves: {str(e)}")
+
+
+# ===== NEW: Enhanced Hint Endpoint =====
+
+@app.post("/hint", response_model=HintResponse)
+async def get_hint(request: HintRequest):
+    """Get side-specific hint from assigned engine"""
+    try:
+        # Get session
+        session = session_manager.get_session(request.session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        # Determine side
+        if request.side:
+            side = request.side
+        else:
+            # Auto-detect from current position
+            board = shogi.Board(session.current_sfen)
+            side = "black" if board.turn == shogi.BLACK else "white"
+        
+        # Get engine for this side
+        engine_id = getattr(session, f"{side}_engine")
+        if not engine_id:
+            raise HTTPException(status_code=400, detail=f"No engine assigned to {side}")
+        
+        # Parse SFEN
+        parts = session.current_sfen.split(" moves ")
+        position = parts[0]
+        moves = parts[1].split() if len(parts) > 1 else []
+        
+        # Request hint from engine
+        analysis_raw = engine_manager.request_hint(
+            side=side,
+            position=position,
+            moves=moves,
+            movetime=1000
+        )
+        
+        if not analysis_raw:
+            raise HTTPException(status_code=500, detail="Failed to get hint from engine")
+        
+        # Convert to algebraic notation
+        board = shogi.Board(session.current_sfen)
+        bestmove_algebraic = usi_to_standard_notation(
+            board,
+            shogi.Move.from_usi(analysis_raw['bestmove'])
+        )
+        
+        # Build PV in algebraic
+        pv_algebraic = []
+        temp_board = shogi.Board(session.current_sfen)
+        for usi_move in analysis_raw.get('pv', [])[:5]:
+            try:
+                move = shogi.Move.from_usi(usi_move)
+                pv_algebraic.append(usi_to_standard_notation(temp_board, move))
+                temp_board.push(move)
+            except:
+                break
+        
+        # Process alternatives from MultiPV
+        alternatives = []
+        info_lines = analysis_raw.get('info_lines', [])
+        
+        # Parse and group info lines by multipv number
+        from engine_manager.usi_protocol import USIProtocol
+        parsed_lines = {}
+        for line in info_lines:
+            if not isinstance(line, str):
+                continue
+            parsed = USIProtocol.parse_info(line)
+            if not parsed or 'pv' not in parsed or not parsed['pv']:
+                continue
+            multipv = parsed.get('multipv', 1)
+            # Keep only the latest (deepest) info for each multipv
+            if multipv not in parsed_lines or parsed.get('depth', 0) > parsed_lines[multipv].get('depth', 0):
+                parsed_lines[multipv] = parsed
+        
+        # Sort by multipv number and skip #1 (that's the best move)
+        for multipv_num in sorted(parsed_lines.keys())[1:4]:  # Show alternatives 2-4
+            try:
+                parsed = parsed_lines[multipv_num]
+                pv = parsed['pv']
+                if not pv:
+                    continue
+                
+                # First move in PV is the alternative move
+                alt_move = shogi.Move.from_usi(pv[0])
+                alt_algebraic = usi_to_standard_notation(board, alt_move)
+                
+                # Build PV for alternative
+                alt_pv_algebraic = []
+                temp_board = shogi.Board(session.current_sfen)
+                for usi_move in pv[:3]:
+                    try:
+                        move = shogi.Move.from_usi(usi_move)
+                        alt_pv_algebraic.append(usi_to_standard_notation(temp_board, move))
+                        temp_board.push(move)
+                    except:
+                        break
+                
+                alternatives.append({
+                    'move_usi': pv[0],
+                    'move_algebraic': alt_algebraic,
+                    'score_cp': parsed.get('score_cp'),
+                    'mate': parsed.get('mate'),
+                    'pv_algebraic': alt_pv_algebraic
+                })
+            except Exception as e:
+                print(f"Error processing alternative {multipv_num}: {e}")
+                continue
+        
+        # Build analysis object
+        analysis = MoveAnalysis(
+            engine_id=analysis_raw['engine_id'],
+            engine_name=analysis_raw['engine_name'],
+            bestmove=analysis_raw['bestmove'],
+            bestmove_algebraic=bestmove_algebraic,
+            score_cp=analysis_raw.get('score_cp'),
+            mate=analysis_raw.get('mate'),
+            depth=analysis_raw.get('depth', 0),
+            nodes=analysis_raw.get('nodes', 0),
+            nps=analysis_raw.get('nps', 0),
+            pv=analysis_raw.get('pv', []),
+            pv_algebraic=pv_algebraic,
+            alternatives=alternatives
+        )
+        
+        # Check if expandable (has alternatives)
+        expandable = len(alternatives) > 0
+        
+        return HintResponse(
+            analysis=analysis,
+            side=side,
+            expandable=expandable
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error getting hint: {str(e)}")
+
+
+# ===== NEW: Post-Move Analysis Endpoint =====
+
+@app.post("/analyze-move", response_model=AnalyzeResponse)
+async def analyze_move(request: AnalyzeRequest, background_tasks: BackgroundTasks):
+    """Trigger Engine 3 post-move analysis"""
+    try:
+        # Get session
+        session = session_manager.get_session(request.session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        # Check if analyst is enabled
+        if not session.analyst_enabled:
+            return AnalyzeResponse(
+                status="disabled",
+                message="Analyst engine is not enabled for this session"
+            )
+        
+        if not session.analyst_engine:
+            return AnalyzeResponse(
+                status="disabled",
+                message="No analyst engine configured"
+            )
+        
+        # Parse SFEN
+        parts = session.current_sfen.split(" moves ")
+        position = parts[0]
+        moves = parts[1].split() if len(parts) > 1 else []
+        
+        if request.background:
+            # Start analysis in background
+            async def run_analysis():
+                analysis_raw = engine_manager.request_post_move_analysis(
+                    position=position,
+                    moves=moves,
+                    movetime=session.analyst_movetime
+                )
+                if analysis_raw and len(session.moves) > 0:
+                    # Store analysis for last move
+                    session_manager.add_post_move_analysis(
+                        session.session_id,
+                        len(session.moves),
+                        analysis_raw
+                    )
+            
+            background_tasks.add_task(run_analysis)
+            
+            return AnalyzeResponse(
+                status="started",
+                message="Analysis started in background"
+            )
+        else:
+            # Block until complete
+            analysis_raw = engine_manager.request_post_move_analysis(
+                position=position,
+                moves=moves,
+                movetime=session.analyst_movetime
+            )
+            
+            if not analysis_raw:
+                return AnalyzeResponse(
+                    status="error",
+                    message="Analysis failed"
+                )
+            
+            # Convert to MoveAnalysis
+            board = shogi.Board(session.current_sfen)
+            bestmove_algebraic = usi_to_standard_notation(
+                board,
+                shogi.Move.from_usi(analysis_raw['bestmove'])
+            )
+            
+            analysis = MoveAnalysis(
+                engine_id=analysis_raw['engine_id'],
+                engine_name=analysis_raw['engine_name'],
+                bestmove=analysis_raw['bestmove'],
+                bestmove_algebraic=bestmove_algebraic,
+                score_cp=analysis_raw.get('score_cp'),
+                mate=analysis_raw.get('mate'),
+                depth=analysis_raw.get('depth', 0),
+                nodes=analysis_raw.get('nodes', 0),
+                nps=analysis_raw.get('nps', 0),
+                pv=analysis_raw.get('pv', []),
+                pv_algebraic=[]
+            )
+            
+            return AnalyzeResponse(
+                status="complete",
+                analysis=analysis
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error analyzing move: {str(e)}")
+
+
+# ===== NEW: Enhanced Move Recording =====
+
+@app.post("/session/{session_id}/move", response_model=MoveResponse)
+async def record_move(session_id: str, move_req: MoveRequest, background_tasks: BackgroundTasks):
+    """Record a move in the session"""
+    try:
+        # Get session directly from database with explicit refresh
+        from database import SessionLocal, GameSessionDB
+        db = SessionLocal()
+        try:
+            # Query with explicit refresh to avoid stale data
+            db_session = db.query(GameSessionDB).filter(
+                GameSessionDB.session_id == session_id
+            ).first()
+            
+            if not db_session:
+                raise HTTPException(status_code=404, detail="Session not found")
+            
+            # Refresh to get latest data (in case of recent updates)
+            db.refresh(db_session)
+            current_sfen = db_session.current_sfen
+            analyst_enabled = db_session.analyst_enabled
+            analyst_movetime = db_session.analyst_movetime
+        finally:
+            db.close()
+        
+        # Parse current position using the refreshed SFEN
+        board = shogi.Board(current_sfen)
+        move = shogi.Move.from_usi(move_req.move_usi)
+        
+        if move not in board.legal_moves:
+            raise HTTPException(status_code=400, detail="Illegal move")
+        
+        # Get algebraic notation BEFORE pushing
+        move_algebraic = usi_to_standard_notation(board, move)
+        position_before = board.sfen()
+        
+        # Determine player
+        player = "black" if board.turn == shogi.BLACK else "white"
+        
+        # Apply move
+        board.push(move)
+        position_after = board.sfen()
+        
+        # Record move in database
+        move_record = session_manager.add_move(
+            session_id=session_id,
+            move_usi=move_req.move_usi,
+            move_algebraic=move_algebraic,
+            position_before=position_before,
+            position_after=position_after,
+            player=player,
+            time_spent=move_req.time_spent
+        )
+        
+        # Trigger post-move analysis if enabled
+        analysis_started = False
+        if analyst_enabled:
+            async def run_post_analysis():
+                parts = position_after.split(" moves ")
+                pos = parts[0]
+                mvs = parts[1].split() if len(parts) > 1 else []
+                
+                analysis_raw = engine_manager.request_post_move_analysis(
+                    position=pos,
+                    moves=mvs,
+                    movetime=analyst_movetime
+                )
+                
+                if analysis_raw:
+                    session_manager.add_post_move_analysis(
+                        session_id,
+                        move_record.move_number,
+                        analysis_raw
+                    )
+            
+            background_tasks.add_task(run_post_analysis)
+            analysis_started = True
+        
+        return MoveResponse(
+            success=True,
+            move_record=move_record,
+            new_sfen=position_after,
+            analysis_started=analysis_started
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error recording move: {str(e)}")
 

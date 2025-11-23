@@ -274,6 +274,9 @@ class USIProtocol:
             elif key == "hashfull" and i + 1 < len(parts):
                 info["hashfull"] = int(parts[i + 1])
                 i += 2
+            elif key == "multipv" and i + 1 < len(parts):
+                info["multipv"] = int(parts[i + 1])
+                i += 2
             elif key == "pv":
                 # PV is all remaining moves
                 info["pv"] = parts[i + 1:]

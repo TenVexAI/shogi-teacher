@@ -8,33 +8,44 @@ import SoundSettingsModal, { SoundSettings } from '@/components/SoundSettingsMod
 import EngineManagementModal from '@/components/EngineManagementModal';
 import MoveHistory, { MoveRecord } from '@/components/MoveHistory';
 import Sidebar from '@/components/Sidebar';
-import { getGameState, makeMove, analyzePosition, explainPosition, updateConfig, getConfig } from '@/lib/api';
+import { 
+  getGameState, analyzePosition, explainPosition, updateConfig, getConfig,
+  createSession, getSession, getHint, recordMove, 
+  GameSession, HintResponse, MoveRecordBackend
+} from '@/lib/api';
 import { GameState } from '@/types/game';
 import { audioManager } from '@/lib/audioManager';
 import { loadUISettings, saveUISettings } from '@/lib/settings';
+
+interface Alternative {
+  move_usi: string;
+  move_algebraic: string;
+  score_cp: number | null;
+  mate: number | null;
+  pv_algebraic: string[];
+}
+
+interface HintData {
+  bestmove: string;
+  bestmove_algebraic: string;
+  score_cp: number | null;
+  mate: number | null;
+  pv_algebraic: string[];
+  alternatives?: Alternative[];
+}
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
   messageType?: 'system' | 'llm' | 'engine-black' | 'engine-white';
   engineName?: string;
-}
-
-interface AnalysisResult {
-  bestmove: string;
-  ponder?: string;
-  score_cp?: number;
-  mate?: number | null;
-  depth?: number;
-  nodes?: number;
-  nps?: number;
-  pv?: string[];
-  info?: string;
-  engine_name?: string;
-  engine_side?: string;
+  hintData?: HintData;
 }
 
 export default function Home() {
+  // NEW: Session state
+  const [currentSession, setCurrentSession] = useState<GameSession | null>(null);
+  
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -60,11 +71,7 @@ export default function Home() {
   const [ambientSoundEnabled, setAmbientSoundEnabled] = useState(false);
   const [showClockStartModal, setShowClockStartModal] = useState(false);
   const [pendingMove, setPendingMove] = useState<string | null>(null);
-  const [cachedHintAnalysis, setCachedHintAnalysis] = useState<AnalysisResult | null>(null);
-  const [cachedHintSfen, setCachedHintSfen] = useState<string | null>(null);
-  const [cachedHintTurn, setCachedHintTurn] = useState<string | null>(null);
   const [moveHistory, setMoveHistory] = useState<MoveRecord[]>([]);
-  const [moveCount, setMoveCount] = useState(0);
   const [gameTime, setGameTime] = useState(0);
   const clockStartTimeRef = useRef<number>(0);
   const lastMoveTimeRef = useRef<number>(0);
@@ -167,10 +174,14 @@ export default function Home() {
 
   const loadInitialGame = async () => {
     try {
-      const state = await getGameState();
+      // Create a new session
+      const session = await createSession('human', 'human');
+      setCurrentSession(session);
+      
+      // Load game state from session SFEN
+      const state = await getGameState(session.current_sfen);
       setGameState(state);
       setMoveHistory([]);
-      setMoveCount(0);
       setIsClockRunning(false);
       setGameTime(0);
       clockStartTimeRef.current = 0;
@@ -179,7 +190,7 @@ export default function Home() {
       setMessages([
         {
           role: 'assistant',
-          content: 'Welcome to Shogi Teacher! I\'m here to help you learn and improve your shogi skills. Start the clock and make a move to begin, or ask me any questions about the game.',
+          content: `Welcome to Shogi Teacher! I'm here to help you learn and improve your shogi skills.\n\n**Game Mode**: ${session.mode}\n\nStart the clock and make a move to begin, or ask me any questions about the game.`,
           messageType: 'system'
         }
       ]);
@@ -195,16 +206,16 @@ export default function Home() {
     }
   };
 
-  const executeMove = async (move: string, providedAnalysis?: AnalysisResult) => {
-    if (!gameState) return;
+  const executeMove = async (move: string) => {
+    if (!gameState || !currentSession) return;
 
     try {
       setIsLoading(true);
 
       // Record move timing
       const currentTime = Date.now();
-      const timeSinceStart = clockStartTimeRef.current > 0 ? currentTime - clockStartTimeRef.current : 0;
-      const timeSinceLastMove = lastMoveTimeRef.current > 0 ? currentTime - lastMoveTimeRef.current : timeSinceStart;
+      const timeSinceLastMove = lastMoveTimeRef.current > 0 ? currentTime - lastMoveTimeRef.current : 0;
+      const timeSpent = timeSinceLastMove / 1000; // Convert to seconds
       lastMoveTimeRef.current = currentTime;
 
       // Initialize clock start time if this is the first move
@@ -212,110 +223,61 @@ export default function Home() {
         clockStartTimeRef.current = currentTime;
       }
 
-      // Use provided analysis first (from best move button), then cached, then fetch new
-      let preMoveAnalysis = null;
-      if (providedAnalysis) {
-        preMoveAnalysis = providedAnalysis;
-      } else if (cachedHintSfen === gameState.sfen && cachedHintTurn === gameState.turn && cachedHintAnalysis) {
-        preMoveAnalysis = cachedHintAnalysis;
-        // Clear cache after use
-        setCachedHintAnalysis(null);
-        setCachedHintSfen(null);
-        setCachedHintTurn(null);
-      } else {
-        try {
-          preMoveAnalysis = await analyzePosition(gameState.sfen);
-        } catch (e) {
-          console.error('Pre-move analysis failed:', e);
-        }
-      }
-
-      // Make the move
-      const newState = await makeMove(gameState.sfen, move);
+      // Record the move via session API
+      const result = await recordMove(currentSession.session_id, move, timeSpent);
+      
+      // Update game state from new SFEN
+      const newState = await getGameState(result.new_sfen);
       setGameState(newState);
 
       // Play sound effect based on which player moved
       audioManager.playPieceSound(gameState.turn === 'b');
 
-      // Add move to history using standard notation from backend
-      const newMoveCount = moveCount + 1;
-      setMoveCount(newMoveCount);
-      const moveRecord: MoveRecord = {
-        moveNumber: newMoveCount,
-        player: gameState.turn as 'b' | 'w',
-        move: newState.last_move_notation || move, // Use standard notation if available, fallback to USI
-        timestamp: timeSinceStart,
-        timeSinceLastMove: timeSinceLastMove,
-        sfen: newState.sfen // Store board state after this move
-      };
-      setMoveHistory(prev => [...prev, moveRecord]);
+      // Refresh session to get updated move history
+      const updatedSession = await getSession(currentSession.session_id);
+      setCurrentSession(updatedSession);
+      
+      // Update move history from backend
+      setMoveHistory(updatedSession.moves.map((m: MoveRecordBackend) => ({
+        moveNumber: m.move_number,
+        player: (m.player === 'black' ? 'b' : 'w') as 'b' | 'w',
+        move: m.move_algebraic,
+        timestamp: 0, // Not tracking cumulative time yet
+        timeSinceLastMove: m.time_spent * 1000, // Convert back to ms
+        sfen: m.position_after
+      })));
 
-      // Try to get analysis and explanation for the new position
-      try {
-        const postMoveAnalysis = await analyzePosition(newState.sfen);
-        const playerColor = gameState.turn === 'b' ? 'Black' : 'White';
-        const nextColor = newState.turn === 'b' ? 'Black' : 'White';
-        
-        // Determine message type and engine name based on which side played
-        const messageType = gameState.turn === 'b' ? 'engine-black' : 'engine-white';
-        const engineName = preMoveAnalysis?.engine_name || undefined;
-
-        let message = `**${playerColor} played: ${move}**\n\n`;
-
-        // Compare player's move with engine suggestion
-        if (preMoveAnalysis && preMoveAnalysis.bestmove !== move) {
-          message += `💡 Engine suggested: ${preMoveAnalysis.bestmove}\n\n`;
-        } else if (preMoveAnalysis && preMoveAnalysis.bestmove === move) {
-          message += `✓ Excellent! You played the engine's top choice!\n\n`;
+      // Show move confirmation
+      const playerColor = gameState.turn === 'b' ? 'Black' : 'White';
+      const lastMove = result.move_record;
+      
+      let message = `**${playerColor} played: ${lastMove.move_algebraic}**\n\n`;
+      
+      // Show move quality if available
+      if (lastMove.classification) {
+        const emoji = lastMove.classification === 'Excellent' ? '✅' :
+                     lastMove.classification === 'Good' ? '👍' :
+                     lastMove.classification === 'Inaccuracy' ? '⚠️' :
+                     lastMove.classification === 'Mistake' ? '❌' : '💥';
+        message += `${emoji} ${lastMove.classification}`;
+        if (lastMove.cp_loss) {
+          message += ` (-${lastMove.cp_loss}cp)`;
         }
-
-        // Add LLM explanation if enabled
-        if (useLLM) {
-          try {
-            const explanation = await explainPosition(newState.sfen, {
-              ...postMoveAnalysis,
-              player_move: move,
-              engine_suggestion: preMoveAnalysis?.bestmove,
-              pre_move_score: preMoveAnalysis?.score_cp
-            });
-            message += `${explanation.explanation}\n\n`;
-            // If LLM is enabled, use LLM message type instead
-            addAssistantMessage(message, 'llm');
-            return; // Exit early since we handled LLM message
-          } catch (llmError) {
-            console.error('LLM explanation failed:', llmError);
-            // Continue with engine-only analysis
-          }
-        }
-
-        message += `**Now it's ${nextColor}'s turn**\n`;
-        message += `Best move for ${nextColor}: ${postMoveAnalysis.bestmove}\n`;
-        message += `Position evaluation: ${postMoveAnalysis.mate ? `Mate in ${postMoveAnalysis.mate}` : `${postMoveAnalysis.score_cp} centipawns`}\n`;
-
-        // Add principal variation if available
-        if (postMoveAnalysis.info) {
-          const pvMatch = postMoveAnalysis.info.match(/pv (.+)$/);
-          if (pvMatch) {
-            // Extract only the actual moves (USI format: digit+letter+digit+letter, e.g., "7g7f")
-            const allTokens = pvMatch[1].split(' ');
-            const moves = allTokens.filter((token: string) =>
-              token.length >= 4 && token.length <= 5 && /^\d[a-i]\d[a-i]\+?$/.test(token)
-            );
-            if (moves.length > 0) {
-              message += `\nExpected continuation: ${moves.join(' ')}`;
-            }
-          }
-        }
-
-        // Use engine-specific message type and name (when LLM is disabled)
-        addAssistantMessage(message, messageType, engineName);
-      } catch (analysisError) {
-        console.error('Analysis failed:', analysisError);
-        addAssistantMessage(`Move played: ${move}\n\n⚠️ Engine analysis unavailable. Make sure YaneuraOu.exe is in backend/engine/\n\nYou can still play without analysis!`, 'system');
+        message += '\n\n';
       }
+      
+      // Show analysis notification if enabled
+      if (result.analysis_started) {
+        message += '📊 *Engine 3 is analyzing this position...*\n\n';
+      }
+      
+      message += `**Now it's ${newState.turn === 'b' ? 'Black' : 'White'}'s turn**`;
+
+      addAssistantMessage(message, 'system');
     } catch (error) {
       console.error('Failed to make move:', error);
-      addAssistantMessage('Error: Failed to process move. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      addAssistantMessage(`❌ Error: ${errorMessage}\n\nSession ID: ${currentSession?.session_id}\nMove: ${move}`, 'system');
     } finally {
       setIsLoading(false);
     }
@@ -335,25 +297,31 @@ export default function Home() {
   };
 
   const handleSendMessage = async (message: string) => {
-    if (!gameState) return;
+    if (!gameState || !currentSession) return;
 
     setMessages(prev => [...prev, { role: 'user', content: message }]);
     setIsLoading(true);
 
     try {
-      // Get analysis for current position
-      const analysis = await analyzePosition(gameState.sfen);
-
       if (useLLM) {
-        // Get LLM explanation with user's question as context
-        const explanation = await explainPosition(
-          gameState.sfen,
-          { ...analysis, user_question: message }
+        // Build conversation history from messages (only LLM conversations)
+        const conversationHistory = messages
+          .filter(m => m.messageType === 'llm' || (m.role === 'user' && messages.some(am => am.messageType === 'llm')))
+          .map(m => ({
+            role: m.role,
+            content: m.content
+          }));
+        
+        // Get LLM explanation with full game context, conversation history, and user's question
+        const result = await explainPosition(
+          currentSession.session_id, 
+          message,
+          conversationHistory
         );
-
-        addAssistantMessage(explanation.explanation);
+        addAssistantMessage(result.explanation, 'llm');
       } else {
         // Show engine analysis only
+        const analysis = await analyzePosition(gameState.sfen);
         const currentColor = gameState.turn === 'b' ? 'Black' : 'White';
         let response = `**Current Position Analysis**\n\n`;
         response += `Turn: ${currentColor}\n`;
@@ -391,48 +359,48 @@ export default function Home() {
   };
 
   const handleGetHint = async () => {
-    if (!gameState) return;
+    if (!gameState || !currentSession) return;
 
     setIsLoading(true);
     try {
-      const analysis = await analyzePosition(gameState.sfen);
+      // Get hint from session-based API
+      const hintResponse: HintResponse = await getHint(currentSession.session_id);
+      const { analysis, side } = hintResponse;
       
-      // Cache this analysis for use when the move is made
-      setCachedHintAnalysis(analysis);
-      setCachedHintSfen(gameState.sfen);
-      setCachedHintTurn(gameState.turn);
-      
-      const playerColor = gameState.turn === 'b' ? 'Black' : 'White';
+      // Determine message type based on side
+      const messageType = side === 'black' ? 'engine-black' : 'engine-white';
+      const playerColor = side === 'black' ? 'Black' : 'White';
 
-      let hintMessage = `💡 **Hint for ${playerColor}:**\n\nEngine suggests: **${analysis.bestmove}**\n\nEvaluation: ${analysis.mate ? `Mate in ${analysis.mate}` : `${analysis.score_cp} centipawns`}\n`;
-
-      // Add principal variation
-      if (analysis.info) {
-        const pvMatch = analysis.info.match(/pv (.+)$/);
-        if (pvMatch) {
-          const allTokens = pvMatch[1].split(' ');
-          const moves = allTokens.filter((token: string) =>
-            token.length >= 4 && token.length <= 5 && /^\d[a-i]\d[a-i]\+?$/.test(token)
-          ).slice(0, 5);
-          if (moves.length > 0) {
-            hintMessage += `\nExpected line: ${moves.join(' ')}\n`;
-          }
-        }
-      }
-
-      hintMessage += `\nTry to figure out why this move is strong!`;
-
+      // Add user question
       setMessages(prev => [
         ...prev,
         {
           role: 'user',
-          content: 'Give me a hint for the best move'
+          content: `Give me a hint for ${playerColor}`
         }
       ]);
-      addAssistantMessage(hintMessage);
+      
+      // Add hint as engine-specific message with structured data
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: '', // Content will be rendered from hintData
+          messageType: messageType,
+          engineName: analysis.engine_name,
+          hintData: {
+            bestmove: analysis.bestmove,
+            bestmove_algebraic: analysis.bestmove_algebraic,
+            score_cp: analysis.score_cp,
+            mate: analysis.mate,
+            pv_algebraic: analysis.pv_algebraic,
+            alternatives: analysis.alternatives
+          }
+        }
+      ]);
     } catch (error) {
       console.error('Failed to get hint:', error);
-      addAssistantMessage('⚠️ Could not get hint. Engine analysis unavailable.');
+      addAssistantMessage('⚠️ Could not get hint. Make sure an engine is assigned to the current player.', 'system');
     } finally {
       setIsLoading(false);
     }
@@ -569,21 +537,23 @@ export default function Home() {
 
     try {
       setIsLoading(true);
-      // Get the best move from engine
-      const analysis = await analyzePosition(gameState.sfen);
       
-      // Execute the best move directly with the analysis (bypasses state timing issues)
+      // Get hint from session (which gives us the best move)
+      if (!currentSession) {
+        throw new Error('No active session');
+      }
+      
+      const hintResponse = await getHint(currentSession.session_id);
+      const bestMove = hintResponse.analysis.bestmove;
+      
+      // Execute the best move
       if (!isClockRunning) {
         // If clock not running, need to show modal first
-        setPendingMove(analysis.bestmove);
+        setPendingMove(bestMove);
         setShowClockStartModal(true);
-        // Cache it for when modal is confirmed
-        setCachedHintAnalysis(analysis);
-        setCachedHintSfen(gameState.sfen);
-        setCachedHintTurn(gameState.turn);
       } else {
-        // Clock is running, execute immediately with provided analysis
-        await executeMove(analysis.bestmove, analysis);
+        // Clock is running, execute immediately
+        await executeMove(bestMove);
       }
     } catch (error) {
       console.error('Failed to get best move:', error);
@@ -601,30 +571,56 @@ export default function Home() {
     try {
       setIsLoading(true);
       
-      // Get the SFEN from the selected move
+      // Get the target move info BEFORE any operations
       const targetMove = moveHistory[moveIndex];
-      if (!targetMove) return;
+      if (!targetMove || !currentSession) return;
       
-      // Fetch the game state for that SFEN
-      const state = await getGameState(targetMove.sfen);
+      const targetMoveNumber = targetMove.moveNumber;
+      const targetMoveName = targetMove.move;
+      const oldMoveCount = moveHistory.length;
+      
+      // Step 1: Delete moves after the target move from database
+      await fetch(`http://localhost:8000/session/${currentSession.session_id}/moves/${targetMoveNumber}`, {
+        method: 'DELETE'
+      });
+      
+      // Step 2: Refresh session to get clean data
+      const updatedSession = await getSession(currentSession.session_id);
+      setCurrentSession(updatedSession);
+      
+      // Step 3: Get the SFEN from the REFRESHED session's last move
+      const lastMove = updatedSession.moves[updatedSession.moves.length - 1];
+      const targetSfen = lastMove ? lastMove.position_after : 'lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1';
+      
+      // Step 4: Update session's current_sfen to match
+      const updateResponse = await fetch(`http://localhost:8000/session/${currentSession.session_id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ current_sfen: targetSfen })
+      });
+      
+      // Wait for the response to ensure the update is committed
+      await updateResponse.json();
+      
+      // Small delay to ensure database transaction is fully committed
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      const state = await getGameState(targetSfen);
       setGameState(state);
       
-      // Truncate move history to only include moves up to and including the selected move
-      setMoveHistory(moveHistory.slice(0, moveIndex + 1));
-      setMoveCount(moveIndex + 1);
+      setMoveHistory(updatedSession.moves.map((m: MoveRecordBackend) => ({
+        moveNumber: m.move_number,
+        player: (m.player === 'black' ? 'b' : 'w') as 'b' | 'w',
+        move: m.move_algebraic,
+        timestamp: 0,
+        timeSinceLastMove: m.time_spent * 1000,
+        sfen: m.position_after
+      })));
       
-      // Update game time to the timestamp of the selected move
-      setGameTime(targetMove.timestamp);
-      accumulatedTimeRef.current = targetMove.timestamp;
-      
-      // Clear cached hints
-      setCachedHintAnalysis(null);
-      setCachedHintSfen(null);
-      setCachedHintTurn(null);
-      
+      const removedCount = oldMoveCount - targetMoveNumber;
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: `Reverted to move ${targetMove.moveNumber} (${targetMove.move}). All subsequent moves have been removed.`,
+        content: `🔄 **Reverted to move ${targetMoveNumber}** (${targetMoveName})\n\n${removedCount > 0 ? `Moves ${targetMoveNumber + 1}-${oldMoveCount} removed from board.\n` : ''}Analysis for reverted moves preserved above for review.`,
         messageType: 'system'
       }]);
     } catch (error) {
