@@ -239,15 +239,19 @@ export default function Home() {
       const updatedSession = await getSession(currentSession.session_id);
       setCurrentSession(updatedSession);
       
-      // Update move history from backend
-      setMoveHistory(updatedSession.moves.map((m: MoveRecordBackend) => ({
-        moveNumber: m.move_number,
-        player: (m.player === 'black' ? 'b' : 'w') as 'b' | 'w',
-        move: m.move_algebraic,
-        timestamp: 0, // Not tracking cumulative time yet
-        timeSinceLastMove: m.time_spent * 1000, // Convert back to ms
-        sfen: m.position_after
-      })));
+      // Update move history from backend with cumulative timestamps
+      let cumulativeTime = 0;
+      setMoveHistory(updatedSession.moves.map((m: MoveRecordBackend) => {
+        cumulativeTime += m.time_spent * 1000; // Convert to ms and accumulate
+        return {
+          moveNumber: m.move_number,
+          player: (m.player === 'black' ? 'b' : 'w') as 'b' | 'w',
+          move: m.move_algebraic,
+          timestamp: cumulativeTime,
+          timeSinceLastMove: m.time_spent * 1000, // Convert back to ms
+          sfen: m.position_after
+        };
+      }));
 
       // Show move confirmation
       const playerColor = gameState.turn === 'b' ? 'Black' : 'White';
@@ -610,14 +614,19 @@ export default function Home() {
       const state = await getGameState(targetSfen);
       setGameState(state);
       
-      setMoveHistory(updatedSession.moves.map((m: MoveRecordBackend) => ({
-        moveNumber: m.move_number,
-        player: (m.player === 'black' ? 'b' : 'w') as 'b' | 'w',
-        move: m.move_algebraic,
-        timestamp: 0,
-        timeSinceLastMove: m.time_spent * 1000,
-        sfen: m.position_after
-      })));
+      // Calculate cumulative timestamps for move history
+      let cumulativeTime = 0;
+      setMoveHistory(updatedSession.moves.map((m: MoveRecordBackend) => {
+        cumulativeTime += m.time_spent * 1000; // Convert to ms and accumulate
+        return {
+          moveNumber: m.move_number,
+          player: (m.player === 'black' ? 'b' : 'w') as 'b' | 'w',
+          move: m.move_algebraic,
+          timestamp: cumulativeTime,
+          timeSinceLastMove: m.time_spent * 1000,
+          sfen: m.position_after
+        };
+      }));
       
       const removedCount = oldMoveCount - targetMoveNumber;
       setMessages(prev => [...prev, {
