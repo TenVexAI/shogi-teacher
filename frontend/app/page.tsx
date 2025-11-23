@@ -8,6 +8,7 @@ import SoundSettingsModal, { SoundSettings } from '@/components/SoundSettingsMod
 import EngineManagementModal from '@/components/EngineManagementModal';
 import MoveHistory, { MoveRecord } from '@/components/MoveHistory';
 import Sidebar from '@/components/Sidebar';
+import ResourcesWindow from '@/components/ResourcesWindow';
 import { 
   getGameState, analyzePosition, explainPosition, updateConfig, getConfig,
   createSession, getSession, getHint, recordMove, 
@@ -52,6 +53,7 @@ export default function Home() {
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isSoundSettingsOpen, setIsSoundSettingsOpen] = useState(false);
   const [isEngineManagementOpen, setIsEngineManagementOpen] = useState(false);
+  const [isResourcesOpen, setIsResourcesOpen] = useState(false);
   const [soundSettings, setSoundSettings] = useState<SoundSettings>({
     uiEnabled: false,
     musicEnabled: false,
@@ -681,6 +683,7 @@ export default function Home() {
           currentShowBestMove={showBestMove}
           currentShowBoardOptions={showBoardOptionsPanel}
           onOpenSounds={() => setIsSoundSettingsOpen(true)}
+          onOpenResources={() => setIsResourcesOpen(true)}
           soundToggles={{
             uiEnabled: uiSoundEnabled,
             musicEnabled: musicSoundEnabled,
@@ -726,6 +729,13 @@ export default function Home() {
         <EngineManagementModal 
           isOpen={isEngineManagementOpen}
           onClose={handleCloseEngineManagement}
+        />
+
+        {/* Resources & LLM Window */}
+        <ResourcesWindow 
+          isOpen={isResourcesOpen}
+          onClose={() => setIsResourcesOpen(false)}
+          sessionId={currentSession?.session_id}
         />
 
         <div className="flex h-screen">

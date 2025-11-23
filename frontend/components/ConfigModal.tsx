@@ -11,6 +11,7 @@ interface ConfigModalProps {
     currentShowBestMove?: boolean;
     currentShowBoardOptions?: boolean;
     onOpenSounds?: () => void;
+    onOpenResources?: () => void;
     soundToggles?: {
         uiEnabled: boolean;
         musicEnabled: boolean;
@@ -19,8 +20,7 @@ interface ConfigModalProps {
     onSoundToggle?: (category: 'ui' | 'music' | 'ambient', enabled: boolean) => void;
 }
 
-export default function ConfigModal({ isOpen, onClose, onSave, currentUseLLM = true, currentApiKey = '', currentShowBestMove = false, currentShowBoardOptions = true, onOpenSounds, soundToggles, onSoundToggle }: ConfigModalProps) {
-    const [apiKey, setApiKey] = useState('');
+export default function ConfigModal({ isOpen, onClose, onSave, currentUseLLM = true, currentShowBestMove = false, currentShowBoardOptions = true, onOpenSounds, onOpenResources, soundToggles, onSoundToggle }: ConfigModalProps) {
     const [useLLM, setUseLLM] = useState(currentUseLLM);
     const [showBestMove, setShowBestMove] = useState(currentShowBestMove);
     const [showBoardOptions, setShowBoardOptions] = useState(currentShowBoardOptions);
@@ -32,7 +32,6 @@ export default function ConfigModal({ isOpen, onClose, onSave, currentUseLLM = t
         if (!isOpen) {
             setError('');
             setSuccess(false);
-            setApiKey('');
         } else {
             setUseLLM(currentUseLLM);
             setShowBestMove(currentShowBestMove);
@@ -47,7 +46,8 @@ export default function ConfigModal({ isOpen, onClose, onSave, currentUseLLM = t
         setIsSaving(true);
 
         try {
-            await onSave(apiKey, useLLM, showBestMove, showBoardOptions);
+            // API key is now managed in Resources window, pass empty string
+            await onSave('', useLLM, showBestMove, showBoardOptions);
             setSuccess(true);
             setTimeout(() => {
                 onClose();
@@ -75,27 +75,6 @@ export default function ConfigModal({ isOpen, onClose, onSave, currentUseLLM = t
                 </div>
 
                 <form onSubmit={handleSubmit}>
-                    <div className="mb-4">
-                        <label htmlFor="apiKey" className="block text-sm font-medium text-text-primary mb-2">
-                            Claude API Key
-                        </label>
-                        <input
-                            type="password"
-                            id="apiKey"
-                            value={apiKey}
-                            onChange={(e) => setApiKey(e.target.value)}
-                            placeholder={currentApiKey ? '••••••••••••••••' : 'sk-ant-...'}
-                            className="w-full px-3 py-2 bg-background-primary border border-border text-text-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-purple placeholder:text-text-secondary"
-                            required={useLLM && !currentApiKey}
-                        />
-                        <p className="text-xs text-text-secondary mt-1">
-                            {currentApiKey 
-                                ? 'Leave empty to keep existing key. Enter a new key to update.'
-                                : 'Get your API key from console.anthropic.com'
-                            }
-                        </p>
-                    </div>
-
                     <div className="mb-4">
                         <label className="flex items-center justify-between cursor-pointer">
                             <div>
@@ -232,6 +211,24 @@ export default function ConfigModal({ isOpen, onClose, onSave, currentUseLLM = t
                                 <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
                             </svg>
                             Advanced Sound Settings
+                        </button>
+                    )}
+
+                    {/* LLM Settings & Resources Button */}
+                    {onOpenResources && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                onClose();
+                                onOpenResources();
+                            }}
+                            className="w-full mb-4 px-4 py-3 bg-linear-to-r from-accent-cyan to-accent-purple text-white rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2 font-semibold"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
+                                <circle cx="12" cy="13" r="2"></circle>
+                            </svg>
+                            LLM Settings & Resources
                         </button>
                     )}
 

@@ -1,10 +1,26 @@
+# -*- coding: utf-8 -*-
+import sys
+import os
+
+# Force UTF-8 encoding for Windows
+if sys.platform == 'win32':
+    # Set environment variable for all subprocesses
+    os.environ['PYTHONIOENCODING'] = 'utf-8'
+    os.environ['PYTHONUTF8'] = '1'
+    # Reconfigure stdout/stderr if possible
+    try:
+        if sys.stdout.encoding != 'utf-8':
+            sys.stdout.reconfigure(encoding='utf-8')
+        if sys.stderr.encoding != 'utf-8':
+            sys.stderr.reconfigure(encoding='utf-8')
+    except Exception:
+        pass  # Python < 3.7 doesn't have reconfigure
+
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from pathlib import Path
-import os
-import sys
 import shogi
 from dotenv import load_dotenv
 from engine_manager import EngineManager
@@ -16,7 +32,8 @@ from models import (
     MoveRequest, MoveResponse, MoveRecord,
     HintRequest, HintResponse, MoveAnalysis,
     AnalyzeRequest, AnalyzeResponse,
-    LLMQuery, LLMResponse
+    LLMQuery, LLMResponse,
+    ReferenceFileCreate, ReferenceFile, SessionReferenceToggle
 )
 
 # Fix for Windows asyncio subprocess support
@@ -265,7 +282,7 @@ class ConversationHistoryRequest(BaseModel):
     conversation_history: Optional[List[Dict[str, str]]] = None
 
 @app.post("/session/{session_id}/explain")
-async def explain_position_with_context(session_id: str, request: ConversationHistoryRequest):
+async def explain_position_with_context(session_id: str, request: ConversationHistoryRequest, db = Depends(get_db)):
     """
     Get LLM explanation with full game context and conversation history.
     
@@ -284,6 +301,21 @@ async def explain_position_with_context(session_id: str, request: ConversationHi
         
         # Build game context
         game_context = teacher.build_game_context(session, include_moves=10)
+        
+        # Get enabled reference files for this session
+        from database import ReferenceFileDB, SessionReferenceDB
+        enabled_refs = db.query(ReferenceFileDB).join(
+            SessionReferenceDB,
+            (SessionReferenceDB.reference_id == ReferenceFileDB.id) &
+            (SessionReferenceDB.session_id == session_id) &
+            (SessionReferenceDB.enabled == True)
+        ).all()
+        
+        # Append reference file content to context
+        if enabled_refs:
+            game_context += "\n\n**Reference Materials:**"
+            for ref_file in enabled_refs:
+                game_context += f"\n\n--- {ref_file.name} ---\n{ref_file.content}"
         
         # Get current position analysis from appropriate engine
         board = shogi.Board(session.current_sfen)
@@ -337,7 +369,7 @@ async def explain_position_with_context(session_id: str, request: ConversationHi
 
 @app.get("/config")
 async def get_config():
-    """Get current configuration (API key masked for security)"""
+    """Get current configuration (API key masked for security) - LEGACY"""
     from config_handler import load_config, get_api_key
     api_key = get_api_key()
     
@@ -354,6 +386,70 @@ async def get_config():
         "claude_api_key": masked_key,
         "api_key_source": "config" if load_config().get("claude_api_key") else "env" if api_key else "none"
     }
+
+@app.get("/llm-config")
+async def get_llm_config():
+    """Get LLM configuration with masked API keys"""
+    from config_handler import get_llm_config as get_cfg
+    
+    cfg = get_cfg()
+    
+    # Mask API keys for security
+    masked_keys = {}
+    for provider, key in cfg["api_keys"].items():
+        if key and len(key) > 10:
+            masked_keys[provider] = key[:7] + "..." + "•" * 10
+        elif key:
+            masked_keys[provider] = "•" * 16
+        else:
+            masked_keys[provider] = ""
+    
+    return {
+        "api_keys": masked_keys,
+        "selected_provider": cfg["selected_provider"],
+        "selected_model": cfg["selected_model"],
+        "available_models": {
+            "claude": [
+                "claude-sonnet-4-5-20250929",
+                "claude-haiku-4-5-20251001",
+                "claude-opus-4-1-20250805"
+            ],
+            "openai": [
+                "gpt-5.1",
+                "gpt-5-pro",
+                "gpt-5-mini"
+            ],
+            "google": [
+                "gemini-3-pro-preview",
+                "gemini-2.5-pro",
+                "gemini-2.5-flash-lite"
+            ]
+        }
+    }
+
+class LLMConfigUpdate(BaseModel):
+    api_keys: Optional[Dict[str, str]] = None
+    selected_provider: Optional[str] = None
+    selected_model: Optional[str] = None
+
+@app.post("/llm-config")
+async def update_llm_config_endpoint(config: LLMConfigUpdate):
+    """Update LLM configuration"""
+    from config_handler import update_llm_config as update_cfg
+    global teacher
+    
+    success = update_cfg(
+        api_keys=config.api_keys,
+        provider=config.selected_provider,
+        model=config.selected_model
+    )
+    
+    if success:
+        # Reload LLM client with new config
+        teacher.reload_config()
+        return {"success": True, "message": "LLM configuration updated"}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to update configuration")
 
 class ConfigUpdate(BaseModel):
     claude_api_key: str
@@ -1102,4 +1198,163 @@ async def record_move(session_id: str, move_req: MoveRequest, background_tasks: 
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error recording move: {str(e)}")
+
+
+# ===== Reference File Endpoints =====
+
+@app.post("/reference-files", response_model=ReferenceFile)
+async def create_reference_file(file: ReferenceFileCreate, db = Depends(get_db)):
+    """Upload/create a new reference file"""
+    from database import ReferenceFileDB
+    from sqlalchemy import func
+    
+    try:
+        # Check if file with same name exists
+        existing = db.query(ReferenceFileDB).filter(
+            func.lower(ReferenceFileDB.name) == func.lower(file.name)
+        ).first()
+        
+        if existing:
+            raise HTTPException(status_code=400, detail=f"File '{file.name}' already exists")
+        
+        # Create new reference file
+        db_file = ReferenceFileDB(
+            name=file.name,
+            description=file.description,
+            file_type=file.file_type,
+            content=file.content,
+            file_size=len(file.content)
+        )
+        
+        db.add(db_file)
+        db.commit()
+        db.refresh(db_file)
+        
+        return db_file
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error creating reference file: {str(e)}")
+
+
+@app.get("/reference-files", response_model=List[ReferenceFile])
+async def list_reference_files(db = Depends(get_db)):
+    """List all reference files"""
+    from database import ReferenceFileDB
+    
+    try:
+        files = db.query(ReferenceFileDB).order_by(ReferenceFileDB.created_at.desc()).all()
+        return files
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error listing reference files: {str(e)}")
+
+
+@app.delete("/reference-files/{file_id}")
+async def delete_reference_file(file_id: int, db = Depends(get_db)):
+    """Delete a reference file"""
+    from database import ReferenceFileDB, SessionReferenceDB
+    
+    try:
+        # Get file
+        db_file = db.query(ReferenceFileDB).filter(ReferenceFileDB.id == file_id).first()
+        if not db_file:
+            raise HTTPException(status_code=404, detail="Reference file not found")
+        
+        # Delete session links first
+        db.query(SessionReferenceDB).filter(SessionReferenceDB.reference_id == file_id).delete()
+        
+        # Delete file
+        db.delete(db_file)
+        db.commit()
+        
+        return {"success": True, "message": f"Deleted file: {db_file.name}"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error deleting reference file: {str(e)}")
+
+
+@app.get("/sessions/{session_id}/reference-files")
+async def get_session_references(session_id: str, db = Depends(get_db)):
+    """Get all reference files with their enabled status for a session"""
+    from database import ReferenceFileDB, SessionReferenceDB
+    
+    try:
+        # Get all reference files
+        all_files = db.query(ReferenceFileDB).order_by(ReferenceFileDB.name).all()
+        
+        # Get enabled references for this session
+        enabled_refs = db.query(SessionReferenceDB).filter(
+            SessionReferenceDB.session_id == session_id,
+            SessionReferenceDB.enabled == True
+        ).all()
+        
+        enabled_ids = {ref.reference_id for ref in enabled_refs}
+        
+        # Build response with enabled status
+        result = []
+        for file in all_files:
+            result.append({
+                "id": file.id,
+                "name": file.name,
+                "description": file.description,
+                "file_type": file.file_type,
+                "file_size": file.file_size,
+                "created_at": file.created_at,
+                "enabled": file.id in enabled_ids
+            })
+        
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting session references: {str(e)}")
+
+
+@app.post("/sessions/{session_id}/reference-files/{file_id}/toggle")
+async def toggle_session_reference(session_id: str, file_id: int, enabled: bool, db = Depends(get_db)):
+    """Toggle a reference file for a session"""
+    from database import SessionReferenceDB, ReferenceFileDB, GameSessionDB
+    
+    try:
+        # Verify session exists
+        session = db.query(GameSessionDB).filter(GameSessionDB.session_id == session_id).first()
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        # Verify file exists
+        file = db.query(ReferenceFileDB).filter(ReferenceFileDB.id == file_id).first()
+        if not file:
+            raise HTTPException(status_code=404, detail="Reference file not found")
+        
+        # Check if link exists
+        link = db.query(SessionReferenceDB).filter(
+            SessionReferenceDB.session_id == session_id,
+            SessionReferenceDB.reference_id == file_id
+        ).first()
+        
+        if link:
+            # Update existing link
+            link.enabled = enabled
+        else:
+            # Create new link
+            link = SessionReferenceDB(
+                session_id=session_id,
+                reference_id=file_id,
+                enabled=enabled
+            )
+            db.add(link)
+        
+        db.commit()
+        
+        return {"success": True, "enabled": enabled}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error toggling reference: {str(e)}")
 

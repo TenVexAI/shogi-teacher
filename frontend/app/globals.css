@@ -177,3 +177,12 @@ html {
 .animate-color-shift {
   animation: color-shift 5s ease-in-out infinite;
 }
+
+/* Static gradient for LLM messages */
+.llm-gradient-animated {
+  background: linear-gradient(
+    to right,
+    var(--bg-primary),
+    var(--accent-purple)
+  );
+}

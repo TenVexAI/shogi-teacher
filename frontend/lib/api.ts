@@ -219,3 +219,88 @@ export async function triggerAnalysis(sessionId: string, background: boolean = t
     return response.json();
 }
 
+// ===== Reference File API =====
+
+export async function uploadReferenceFile(name: string, description: string, fileType: string, content: string) {
+    const response = await fetch(`${API_BASE_URL}/reference-files`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            name,
+            description,
+            file_type: fileType,
+            content
+        }),
+    });
+    if (!response.ok) {
+        throw new Error('Failed to upload reference file');
+    }
+    return response.json();
+}
+
+export async function listReferenceFiles() {
+    const response = await fetch(`${API_BASE_URL}/reference-files`);
+    if (!response.ok) {
+        throw new Error('Failed to list reference files');
+    }
+    return response.json();
+}
+
+export async function deleteReferenceFile(fileId: number) {
+    const response = await fetch(`${API_BASE_URL}/reference-files/${fileId}`, {
+        method: 'DELETE',
+    });
+    if (!response.ok) {
+        throw new Error('Failed to delete reference file');
+    }
+    return response.json();
+}
+
+export async function getSessionReferences(sessionId: string) {
+    const response = await fetch(`${API_BASE_URL}/sessions/${sessionId}/reference-files`);
+    if (!response.ok) {
+        throw new Error('Failed to get session references');
+    }
+    return response.json();
+}
+
+export async function toggleSessionReference(sessionId: string, fileId: number, enabled: boolean) {
+    const response = await fetch(`${API_BASE_URL}/sessions/${sessionId}/reference-files/${fileId}/toggle?enabled=${enabled}`, {
+        method: 'POST',
+    });
+    if (!response.ok) {
+        throw new Error('Failed to toggle reference');
+    }
+    return response.json();
+}
+
+// ===== LLM Config API =====
+
+export async function getLLMConfig() {
+    const response = await fetch(`${API_BASE_URL}/llm-config`);
+    if (!response.ok) {
+        throw new Error('Failed to get LLM configuration');
+    }
+    return response.json();
+}
+
+export async function updateLLMConfig(config: {
+    api_keys?: Record<string, string>,
+    selected_provider?: string,
+    selected_model?: string
+}) {
+    const response = await fetch(`${API_BASE_URL}/llm-config`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(config),
+    });
+    if (!response.ok) {
+        throw new Error('Failed to update LLM configuration');
+    }
+    return response.json();
+}
+

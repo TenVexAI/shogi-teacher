@@ -1,14 +1,86 @@
 from anthropic import Anthropic
 from typing import Dict, Any, Optional, List
-from config_handler import get_api_key
+from config_handler import get_llm_config
+import os
 
 class ClaudeTeacher:
     def __init__(self):
-        api_key = get_api_key()
-        if api_key:
-            self.client = Anthropic(api_key=api_key)
-        else:
-            self.client = None
+        self.reload_config()
+    
+    def reload_config(self):
+        """Reload LLM configuration from config file"""
+        config = get_llm_config()
+        self.provider = config["selected_provider"]
+        self.model = config["selected_model"]
+        api_keys = config["api_keys"]
+        
+        # Initialize clients based on available API keys
+        self.claude_client = None
+        self.openai_client = None
+        self.google_client = None
+        
+        # Helper function to validate API key (filter out masked/invalid keys)
+        def is_valid_api_key(key: str) -> bool:
+            """Check if API key is valid (not masked or empty)"""
+            if not key:
+                return False
+            # Filter out masked keys (bullet characters, ellipsis, etc.)
+            if '•' in key or '...' in key or '*' in key:
+                return False
+            # API keys should be ASCII-only
+            try:
+                key.encode('ascii')
+                return True
+            except UnicodeEncodeError:
+                return False
+        
+        # Clean up invalid keys from config (and save if any were removed)
+        cleaned_keys = {}
+        keys_removed = False
+        for provider, key in api_keys.items():
+            if is_valid_api_key(key):
+                cleaned_keys[provider] = key
+            elif key:  # Key exists but is invalid
+                keys_removed = True
+                print(f"Warning: Removing invalid API key for {provider} from config")
+        
+        # If we removed any invalid keys, update the config file
+        if keys_removed:
+            from config_handler import update_llm_config as update_cfg
+            update_cfg(api_keys=cleaned_keys, provider=None, model=None)
+            print("Cleaned invalid API keys from config.json")
+        
+        # Use cleaned keys for initialization
+        if "claude" in cleaned_keys:
+            try:
+                self.claude_client = Anthropic(api_key=cleaned_keys["claude"].strip())
+            except Exception as e:
+                print(f"Failed to initialize Claude client: {e}")
+        
+        if "openai" in cleaned_keys:
+            try:
+                import openai
+                self.openai_client = openai.OpenAI(api_key=cleaned_keys["openai"].strip())
+            except Exception as e:
+                print(f"Failed to initialize OpenAI client: {e}")
+        
+        if "google" in cleaned_keys:
+            try:
+                import google.generativeai as genai
+                genai.configure(api_key=cleaned_keys["google"].strip())
+                self.google_client = genai
+            except Exception as e:
+                print(f"Failed to initialize Google client: {e}")
+    
+    def get_active_client(self):
+        """Get the currently selected LLM client"""
+        if self.provider == "claude":
+            return self.claude_client
+        elif self.provider == "openai":
+            return self.openai_client
+        elif self.provider == "google":
+            return self.google_client
+        return None
     
     def build_game_context(self, session: Any, include_moves: int = 10) -> str:
         """
@@ -60,8 +132,9 @@ class ClaudeTeacher:
         return "\n".join(context_parts)
 
     async def explain(self, sfen: str, analysis: Dict[str, Any], context: str = "", conversation_history: Optional[List[Dict[str, str]]] = None) -> str:
-        if not self.client:
-            return "Claude API key not found. Please set CLAUDE_API_KEY in .env or configure it in settings."
+        client = self.get_active_client()
+        if not client:
+            return f"No API key configured for {self.provider}. Please add your API key in the Resources & LLM window."
         
         best_move = analysis.get("bestmove", "unknown")
         score_cp = analysis.get("score_cp", 0)
@@ -151,24 +224,121 @@ Use proper shogi terminology throughout. Use simple language suitable for interm
         messages = []
         
         # Add conversation history if provided (skip first system message if it exists)
+        # Limit to last 10 messages to prevent context from becoming too large
         if conversation_history:
-            for msg in conversation_history:
-                # Only add user and assistant messages, skip system messages
-                if msg.get("role") in ["user", "assistant"]:
-                    messages.append({
-                        "role": msg["role"],
-                        "content": msg["content"]
-                    })
+            # Filter to user/assistant messages only
+            valid_history = [
+                msg for msg in conversation_history 
+                if msg.get("role") in ["user", "assistant"]
+            ]
+            # Take only the last 10 messages
+            recent_history = valid_history[-10:] if len(valid_history) > 10 else valid_history
+            
+            for msg in recent_history:
+                messages.append({
+                    "role": msg["role"],
+                    "content": msg["content"]
+                })
         
         # Add current prompt as the latest user message
         messages.append({"role": "user", "content": prompt})
         
         try:
-            message = self.client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=1024,
-                messages=messages
-            )
-            return message.content[0].text
+            if self.provider == "claude":
+                response = client.messages.create(
+                    model=self.model,
+                    max_tokens=1024,
+                    messages=messages
+                )
+                return response.content[0].text
+                
+            elif self.provider == "openai":
+                print(f"OpenAI: Sending request with model: {self.model}")
+                print(f"OpenAI: Message count: {len(messages)}")
+                
+                # GPT-5 reasoning models need more tokens for output
+                # Use higher limit to account for internal reasoning tokens
+                response = client.chat.completions.create(
+                    model=self.model,
+                    max_completion_tokens=4096,
+                    messages=messages
+                )
+                
+                print(f"OpenAI: Response received")
+                print(f"OpenAI: Choices count: {len(response.choices)}")
+                
+                choice = response.choices[0]
+                finish_reason = choice.finish_reason
+                message = choice.message
+                content = message.content
+                refusal = getattr(message, 'refusal', None)
+                
+                print(f"OpenAI: Finish reason: {finish_reason}")
+                print(f"OpenAI: Content: {content}")
+                print(f"OpenAI: Refusal: {refusal}")
+                print(f"OpenAI: Content type: {type(content)}")
+                print(f"OpenAI: Content length: {len(content) if content else 0}")
+                
+                if refusal:
+                    return f"OpenAI refused to respond: {refusal}"
+                
+                if not content:
+                    if finish_reason == "length":
+                        return "The response was cut off due to token limits. Try asking a shorter question or starting a new conversation."
+                    return "OpenAI returned an empty response"
+                
+                # Append a note if the response was cut off
+                if finish_reason == "length":
+                    content += "\n\n*(Response was cut off due to length limit)*"
+                
+                return content
+                
+            elif self.provider == "google":
+                # Google Gemini uses a different format
+                model = client.GenerativeModel(self.model)
+                
+                # Convert messages to Gemini format
+                gemini_messages = []
+                for msg in messages:
+                    role = "user" if msg["role"] == "user" else "model"
+                    gemini_messages.append({
+                        "role": role,
+                        "parts": [msg["content"]]
+                    })
+                
+                # Start chat with history
+                if len(gemini_messages) > 1:
+                    chat = model.start_chat(history=gemini_messages[:-1])
+                    response = chat.send_message(gemini_messages[-1]["parts"][0])
+                else:
+                    response = model.generate_content(gemini_messages[0]["parts"][0])
+                
+                return response.text
+            
+            else:
+                return f"Unsupported provider: {self.provider}"
+                
         except Exception as e:
-            return f"Error generating explanation: {e}"
+            # Handle exception message encoding safely
+            import traceback
+            import sys
+            
+            # Get error details
+            error_details = traceback.format_exc()
+            
+            # Try to get a clean error message
+            try:
+                error_msg = str(e)
+            except:
+                error_msg = repr(e)
+            
+            # Log the full traceback for debugging (with encoding safety)
+            try:
+                print(f"LLM Error: {error_msg}", file=sys.stderr)
+                print(error_details, file=sys.stderr)
+            except UnicodeEncodeError:
+                # If console can't handle Unicode, log without special chars
+                print(f"LLM Error occurred (encoding issue in error message)", file=sys.stderr)
+            
+            # Return a safe error message
+            return f"Error generating explanation: {error_msg}"

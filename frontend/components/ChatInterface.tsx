@@ -180,8 +180,8 @@ export default function ChatInterface({ messages, onSendMessage, isLoading, onGe
                         borderColor = 'border-gray-300';
                         textColor = 'text-gray-900';
                     } else if (message.messageType === 'llm') {
-                        // LLM messages: Gradient purple→black→cyan
-                        bgColor = 'bg-gradient-to-r from-accent-purple to-accent-cyan';
+                        // LLM messages: Animated gradient purple→cyan
+                        bgColor = 'llm-gradient-animated';
                         textColor = 'text-white';
                     } else if (message.messageType === 'system') {
                         // System messages: Solid purple
