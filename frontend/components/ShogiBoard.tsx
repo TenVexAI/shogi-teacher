@@ -230,11 +230,28 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
     
     // Derive lastMovePositions from the parent's lastMoveUsi prop
     const lastMovePositions = useMemo(() => {
-        if (lastMoveUsi && !lastMoveUsi.includes('*')) {
-            // Parse the USI move to get positions (skip drop moves)
+        if (!lastMoveUsi) return null;
+        
+        if (lastMoveUsi.includes('*')) {
+            // Handle drop moves (e.g., "P*5e")
+            const parts = lastMoveUsi.split('*');
+            if (parts.length !== 2) return null;
+            
+            const destination = parts[1];
+            if (destination.length < 2) return null;
+            
+            const toCol = 9 - parseInt(destination[0]);
+            const toRow = destination.charCodeAt(1) - 'a'.charCodeAt(0);
+            
+            // For drop moves, only highlight the destination square
+            return {
+                from: { row: -1, col: -1 }, // Invalid position, won't match any square
+                to: { row: toRow, col: toCol }
+            };
+        } else {
+            // Parse regular moves
             return usiToPosition(lastMoveUsi);
         }
-        return null;
     }, [lastMoveUsi]);
 
     // Wrapper functions to save settings when changed

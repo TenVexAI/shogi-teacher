@@ -185,6 +185,7 @@ export default function Home() {
       const state = await getGameState(session.current_sfen);
       setGameState(state);
       setMoveHistory([]);
+      setLastMoveUsi(null);
       setIsClockRunning(false);
       setGameTime(0);
       clockStartTimeRef.current = 0;
@@ -631,6 +632,10 @@ export default function Home() {
           sfen: m.position_after
         };
       }));
+      
+      // Set last move highlight to the move we reverted to (or null if at start)
+      const lastMoveRecord = updatedSession.moves[updatedSession.moves.length - 1];
+      setLastMoveUsi(lastMoveRecord ? lastMoveRecord.move_usi : null);
       
       const removedCount = oldMoveCount - targetMoveNumber;
       setMessages(prev => [...prev, {
