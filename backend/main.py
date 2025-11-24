@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys
 import os
+import logging
 
 # Force UTF-8 encoding for Windows
 if sys.platform == 'win32':
@@ -15,6 +16,17 @@ if sys.platform == 'win32':
             sys.stderr.reconfigure(encoding='utf-8')
     except Exception:
         pass  # Python < 3.7 doesn't have reconfigure
+
+# Filter out OBS polling endpoint logs
+class EndpointFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return not (
+            record.getMessage().find("/ui-preferences") != -1 or
+            record.getMessage().find("/session/list") != -1
+        )
+
+# Add filter to uvicorn access logger
+logging.getLogger("uvicorn.access").addFilter(EndpointFilter())
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware

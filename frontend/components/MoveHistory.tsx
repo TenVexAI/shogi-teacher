@@ -63,6 +63,17 @@ export default function MoveHistory({ moves, currentTurn, isClockRunning = false
         return `${minutes}m ${seconds}s`;
     };
 
+    // Calculate cumulative time for each player
+    const movesWithPlayerTime = moves.map((move, index) => {
+        let playerCumulativeTime = 0;
+        for (let i = 0; i <= index; i++) {
+            if (moves[i].player === move.player) {
+                playerCumulativeTime += moves[i].timeSinceLastMove;
+            }
+        }
+        return { ...move, playerCumulativeTime };
+    });
+
     return (
         <div className="bg-background-secondary rounded-lg shadow-md border border-border h-full flex flex-col">
             <div className="bg-linear-to-r from-accent-cyan to-accent-purple text-white p-4 rounded-t-lg">
@@ -90,7 +101,7 @@ export default function MoveHistory({ moves, currentTurn, isClockRunning = false
                     </div>
                 ) : (
                     <div className="space-y-0.1">
-                        {moves.map((move, index) => (
+                        {movesWithPlayerTime.map((move, index) => (
                             <div
                                 key={index}
                                 onClick={() => {
@@ -121,7 +132,7 @@ export default function MoveHistory({ moves, currentTurn, isClockRunning = false
                                     </div>
                                     
                                     <div className="text-text-secondary text-left min-w-[50px]">
-                                        {formatTime(move.timestamp)}
+                                        {formatTime(move.playerCumulativeTime)}
                                     </div>
                                 </div>
                             </div>
