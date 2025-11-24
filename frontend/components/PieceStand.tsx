@@ -6,10 +6,15 @@ interface PieceStandProps {
     onPieceDrop?: (piece: string) => void;
     boardFlipped?: boolean;
     position?: 'top' | 'bottom';
+    useWesternNotation?: boolean;
 }
 
 const PIECE_SYMBOLS: { [key: string]: string } = {
     'P': '歩', 'L': '香', 'N': '桂', 'S': '銀', 'G': '金', 'B': '角', 'R': '飛'
+};
+
+const WESTERN_PIECE_SYMBOLS: { [key: string]: string } = {
+    'P': 'P', 'L': 'L', 'N': 'N', 'S': 'S', 'G': 'G', 'B': 'B', 'R': 'R'
 };
 
 // Get scale factor based on piece type
@@ -29,7 +34,7 @@ const getPieceScale = (piece: string): number => {
     }
 };
 
-export default function PieceStand({ pieces, color, onPieceDrop, boardFlipped = false, position = 'top' }: PieceStandProps) {
+export default function PieceStand({ pieces, color, onPieceDrop, boardFlipped = false, position = 'top', useWesternNotation = false }: PieceStandProps) {
     // Create a 5x7 grid for piece placement
     const grid: (string | null)[][] = Array(5).fill(null).map(() => Array(7).fill(null));
     
@@ -85,7 +90,7 @@ export default function PieceStand({ pieces, color, onPieceDrop, boardFlipped = 
 
     return (
         <div 
-            className="relative w-75 h-70"
+            className="relative w-75 h-70 rounded-sm overflow-hidden"
             style={{ 
                 backgroundImage: 'url(/images/piece-stand.png)',
                 backgroundSize: '100% 100%',
@@ -109,19 +114,19 @@ export default function PieceStand({ pieces, color, onPieceDrop, boardFlipped = 
                         const transformValue = shouldRotate 
                             ? `rotate(180deg) scale(${pieceScale})` 
                             : `scale(${pieceScale})`;
+                        const pieceSymbols = useWesternNotation ? WESTERN_PIECE_SYMBOLS : PIECE_SYMBOLS;
                         
                         return (
                             <div
                                 key={`${rowIndex}-${colIndex}`}
                                 className="shogi-piece cursor-pointer hover:scale-110 transition-transform flex items-center justify-center"
                                 onClick={() => onPieceDrop?.(piece)}
-                                title={`Click to drop ${PIECE_SYMBOLS[piece]}`}
                                 style={{
                                     transform: transformValue,
                                 }}
                             >
                                 <span className="shogi-piece-text text-3xl font-bold select-none text-black font-shogi">
-                                    {PIECE_SYMBOLS[piece]}
+                                    {pieceSymbols[piece.toUpperCase()]}
                                 </span>
                             </div>
                         );

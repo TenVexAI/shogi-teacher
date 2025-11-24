@@ -6,10 +6,15 @@ interface CapturedPiecesProps {
     onPieceDrop?: (piece: string) => void;
     boardFlipped?: boolean;
     isTopPanel?: boolean;
+    useWesternNotation?: boolean;
 }
 
 const PIECE_SYMBOLS: { [key: string]: string } = {
     'P': '歩', 'L': '香', 'N': '桂', 'S': '銀', 'G': '金', 'B': '角', 'R': '飛'
+};
+
+const WESTERN_PIECE_SYMBOLS: { [key: string]: string } = {
+    'P': 'P', 'L': 'L', 'N': 'N', 'S': 'S', 'G': 'G', 'B': 'B', 'R': 'R'
 };
 
 // Get scale factor based on piece type
@@ -29,7 +34,7 @@ const getPieceScale = (piece: string): number => {
     }
 };
 
-export default function CapturedPieces({ pieces, color, onPieceDrop, boardFlipped = false, isTopPanel = false }: CapturedPiecesProps) {
+export default function CapturedPieces({ pieces, color, onPieceDrop, boardFlipped = false, isTopPanel = false, useWesternNotation = false }: CapturedPiecesProps) {
     const colorName = color === 'b' ? 'Black' : 'White';
     const bgColor = color === 'b' ? 'bg-[#111111]' : 'bg-gray-100';
     const textColor = color === 'b' ? 'text-white' : 'text-gray-800';
@@ -58,18 +63,19 @@ export default function CapturedPieces({ pieces, color, onPieceDrop, boardFlippe
                         const transformValue = shouldRotate 
                             ? `rotate(180deg) scale(${pieceScale})` 
                             : `scale(${pieceScale})`;
+                        const pieceSymbols = useWesternNotation ? WESTERN_PIECE_SYMBOLS : PIECE_SYMBOLS;
                         return (
                             <div
                                 key={`${piece}-${index}`}
                                 className="shogi-piece cursor-pointer hover:scale-110 transition-transform"
                                 onClick={() => onPieceDrop?.(piece)}
-                                title={`Click to drop ${PIECE_SYMBOLS[piece]}`}
+                                title={`Click to drop ${pieceSymbols[piece]}`}
                                 style={{
                                     transform: transformValue,
                                 }}
                             >
-                                <span className="shogi-piece-text text-3xl font-bold select-none text-black font-shogi">
-                                    {PIECE_SYMBOLS[piece]}
+                                <span className="shogi-piece-text text-2xl font-bold select-none text-black font-shogi">
+                                    {pieceSymbols[piece]}
                                 </span>
                             </div>
                         );

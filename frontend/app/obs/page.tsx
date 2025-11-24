@@ -121,6 +121,7 @@ export default function OBSView() {
           showJapaneseCoords={uiSettings.useJapaneseCoords}
           useWesternNotation={uiSettings.useWesternNotation}
           boardFlipped={uiSettings.boardFlipped}
+          showMovementOverlay={uiSettings.showMovementOverlay}
         />
       </div>
     </div>

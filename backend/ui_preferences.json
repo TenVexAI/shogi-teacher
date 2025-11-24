@@ -9,7 +9,7 @@
   "uiSoundEnabled": true,
   "ambientSoundEnabled": true,
   "musicSoundEnabled": true,
-  "highlightLastMove": true,
+  "highlightLastMove": false,
   "boardFlipped": false,
   "allSoundsMuted": false
 }

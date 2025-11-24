@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Power, Volume2, VolumeX, BookOpen, Cpu, Monitor } from 'lucide-react';
+import { Settings, Power, Volume2, VolumeX, BookOpen, Cpu } from 'lucide-react';
 
 interface SidebarProps {
   onOpenSettings: () => void;
@@ -79,15 +79,6 @@ export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllS
               <Volume2 className="w-6 h-6 text-accent-cyan transition-opacity opacity-0 group-hover:opacity-100 absolute" />
             </>
           )}
-        </button>
-
-        {/* OBS View Button */}
-        <button
-          onClick={() => window.open('/obs', '_blank', 'width=1920,height=1080')}
-          className="w-10 h-10 flex items-center justify-center group transition-colors"
-          title="Open OBS Browser Source View"
-        >
-          <Monitor className="w-6 h-6 text-text-secondary group-hover:text-accent-purple transition-colors" />
         </button>
 
         {/* Settings Button */}

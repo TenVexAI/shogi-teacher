@@ -421,6 +421,7 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
                 }
                 boardFlipped={boardFlipped}
                 isTopPanel={true}
+                useWesternNotation={useWesternNotation}
             />
 
 
@@ -442,7 +443,7 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
                 <div className="flex">
                     {/* The actual board */}
                     <div 
-                        className="p-2 relative"
+                        className="p-2 relative rounded-sm overflow-hidden"
                         style={{
                             backgroundImage: 'url(/images/wood-grain.png)',
                             backgroundSize: 'cover',
@@ -525,7 +526,7 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
                                                                 : (isWhitePiece ? 'rotate(180deg)' : 'rotate(0deg)')} scale(${pieceScale})`
                                                         }}
                                                     >
-                                                        <span className={`shogi-piece-text ${useWesternNotation ? 'text-xl' : 'text-3xl'} font-bold select-none ${useWesternNotation ? 'font-pixel' : 'font-shogi'} ${isPromoted ? 'text-red-600' : 'text-black'}`}>
+                                                        <span className={`shogi-piece-text text-2xl font-bold select-none font-shogi ${isPromoted ? 'text-red-600' : 'text-black'}`}>
                                                             {pieceSymbol}
                                                         </span>
                                                     </div>
@@ -668,6 +669,7 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
                 }
                 boardFlipped={boardFlipped}
                 isTopPanel={false}
+                useWesternNotation={useWesternNotation}
             />
 
             {/* Board Controls Row */}

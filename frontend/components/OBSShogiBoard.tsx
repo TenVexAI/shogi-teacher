@@ -11,6 +11,7 @@ interface OBSShogiBoardProps {
     showJapaneseCoords?: boolean;
     useWesternNotation?: boolean;
     boardFlipped?: boolean;
+    showMovementOverlay?: boolean;
 }
 
 const PIECE_SYMBOLS: { [key: string]: string } = {
@@ -27,6 +28,36 @@ const WESTERN_PIECE_SYMBOLS: { [key: string]: string } = {
     '+p': '+P', '+l': '+L', '+n': '+N', '+s': '+S', '+b': '+B', '+r': '+R',
     'P': 'P', 'L': 'L', 'N': 'N', 'S': 'S', 'G': 'G', 'B': 'B', 'R': 'R', 'K': 'K',
     '+P': '+P', '+L': '+L', '+N': '+N', '+S': '+S', '+B': '+B', '+R': '+R',
+};
+
+type MovementPattern = { [direction: number]: 'dot' | 'line' };
+
+const PIECE_MOVEMENTS: { [key: string]: MovementPattern | 'knight' } = {
+    'p': { 4: 'dot' }, 'P': { 0: 'dot' },
+    'l': { 4: 'line' }, 'L': { 0: 'line' },
+    'n': 'knight', 'N': 'knight',
+    's': { 3: 'dot', 4: 'dot', 5: 'dot', 1: 'dot', 7: 'dot' },
+    'S': { 0: 'dot', 1: 'dot', 3: 'dot', 5: 'dot', 7: 'dot' },
+    'g': { 0: 'dot', 2: 'dot', 3: 'dot', 4: 'dot', 5: 'dot', 6: 'dot' },
+    'G': { 0: 'dot', 1: 'dot', 2: 'dot', 4: 'dot', 6: 'dot', 7: 'dot' },
+    'b': { 1: 'line', 3: 'line', 5: 'line', 7: 'line' },
+    'B': { 1: 'line', 3: 'line', 5: 'line', 7: 'line' },
+    'r': { 0: 'line', 2: 'line', 4: 'line', 6: 'line' },
+    'R': { 0: 'line', 2: 'line', 4: 'line', 6: 'line' },
+    'k': { 0: 'dot', 1: 'dot', 2: 'dot', 3: 'dot', 4: 'dot', 5: 'dot', 6: 'dot', 7: 'dot' },
+    'K': { 0: 'dot', 1: 'dot', 2: 'dot', 3: 'dot', 4: 'dot', 5: 'dot', 6: 'dot', 7: 'dot' },
+    '+p': { 0: 'dot', 2: 'dot', 3: 'dot', 4: 'dot', 5: 'dot', 6: 'dot' },
+    '+P': { 0: 'dot', 1: 'dot', 2: 'dot', 4: 'dot', 6: 'dot', 7: 'dot' },
+    '+l': { 0: 'dot', 2: 'dot', 3: 'dot', 4: 'dot', 5: 'dot', 6: 'dot' },
+    '+L': { 0: 'dot', 1: 'dot', 2: 'dot', 4: 'dot', 6: 'dot', 7: 'dot' },
+    '+n': { 0: 'dot', 2: 'dot', 3: 'dot', 4: 'dot', 5: 'dot', 6: 'dot' },
+    '+N': { 0: 'dot', 1: 'dot', 2: 'dot', 4: 'dot', 6: 'dot', 7: 'dot' },
+    '+s': { 0: 'dot', 2: 'dot', 3: 'dot', 4: 'dot', 5: 'dot', 6: 'dot' },
+    '+S': { 0: 'dot', 1: 'dot', 2: 'dot', 4: 'dot', 6: 'dot', 7: 'dot' },
+    '+b': { 0: 'dot', 1: 'line', 2: 'dot', 3: 'line', 4: 'dot', 5: 'line', 6: 'dot', 7: 'line' },
+    '+B': { 0: 'dot', 1: 'line', 2: 'dot', 3: 'line', 4: 'dot', 5: 'line', 6: 'dot', 7: 'line' },
+    '+r': { 0: 'line', 1: 'dot', 2: 'line', 3: 'dot', 4: 'line', 5: 'dot', 6: 'line', 7: 'dot' },
+    '+R': { 0: 'line', 1: 'dot', 2: 'line', 3: 'dot', 4: 'line', 5: 'dot', 6: 'line', 7: 'dot' },
 };
 
 const JAPANESE_COORDINATES = ['一', '二', '三', '四', '五', '六', '七', '八', '九'];
@@ -78,7 +109,8 @@ export default function OBSShogiBoard({
     highlightLastMove = true,
     showJapaneseCoords = false,
     useWesternNotation = false,
-    boardFlipped = false
+    boardFlipped = false,
+    showMovementOverlay = false
 }: OBSShogiBoardProps) {
     const board = useMemo(() => parseSfen(gameState.sfen), [gameState.sfen]);
     
@@ -113,6 +145,7 @@ export default function OBSShogiBoard({
                     color={boardFlipped ? "b" : "w"}
                     boardFlipped={boardFlipped}
                     position="top"
+                    useWesternNotation={useWesternNotation}
                 />
             </div>
 
@@ -123,6 +156,7 @@ export default function OBSShogiBoard({
                     color={boardFlipped ? "w" : "b"}
                     boardFlipped={boardFlipped}
                     position="bottom"
+                    useWesternNotation={useWesternNotation}
                 />
             </div>
 
@@ -131,7 +165,7 @@ export default function OBSShogiBoard({
                 <div className="flex">
                     {/* The actual board with equal padding on all sides for coordinates */}
                     <div 
-                        className="relative"
+                        className="relative rounded-sm overflow-hidden"
                         style={{
                             backgroundImage: 'url(/images/wood-grain.png)',
                             backgroundSize: 'cover',
@@ -205,7 +239,7 @@ export default function OBSShogiBoard({
                                             default: return 1.0;
                                         }
                                     };
-                                    const pieceScale = piece ? getPieceScale(piece) : 1.0;
+                                    const pieceScale = piece ? getPieceScale(piece) * 1.3 : 1.3;
                                     
                                     const hasStarPointTopRight = (rowIndex === 3 && colIndex === 2) || 
                                                                  (rowIndex === 3 && colIndex === 5) ||
@@ -231,18 +265,98 @@ export default function OBSShogiBoard({
                                                 />
                                             )}
                                             {piece && (
-                                                <div 
-                                                    className="shogi-piece relative z-10"
-                                                    style={{ 
-                                                        transform: `${boardFlipped 
-                                                            ? (isWhitePiece ? 'rotate(180deg)' : 'rotate(0deg)')
-                                                            : (isWhitePiece ? 'rotate(180deg)' : 'rotate(0deg)')} scale(${pieceScale})`
-                                                    }}
-                                                >
-                                                    <span className={`shogi-piece-text ${useWesternNotation ? 'text-xl' : 'text-3xl'} font-bold select-none ${useWesternNotation ? 'font-pixel' : 'font-shogi'} ${isPromoted ? 'text-red-600' : 'text-black'}`}>
-                                                        {pieceSymbol}
-                                                    </span>
-                                                </div>
+                                                <>
+                                                    <div 
+                                                        className="shogi-piece relative z-10"
+                                                        style={{ 
+                                                            transform: `${boardFlipped 
+                                                                ? (isWhitePiece ? 'rotate(180deg)' : 'rotate(0deg)')
+                                                                : (isWhitePiece ? 'rotate(180deg)' : 'rotate(0deg)')} scale(${pieceScale})`
+                                                        }}
+                                                    >
+                                                        <span className={`shogi-piece-text ${useWesternNotation ? 'text-2xl' : 'text-3xl'} font-bold select-none font-shogi ${isPromoted ? 'text-red-600' : 'text-black'}`}>
+                                                            {pieceSymbol}
+                                                        </span>
+                                                    </div>
+                                                    
+                                                    {/* Movement Overlay */}
+                                                    {showMovementOverlay && (
+                                                        <div className="absolute inset-0 pointer-events-none z-20">
+                                                            {(() => {
+                                                                const movement = PIECE_MOVEMENTS[piece];
+                                                                if (!movement) return null;
+                                                                
+                                                                if (movement === 'knight') {
+                                                                    const topPosition = isWhitePiece ? '75%' : '25%';
+                                                                    return (
+                                                                        <>
+                                                                            <div 
+                                                                                className="absolute text-xl font-bold text-accent-purple opacity-70"
+                                                                                style={{ 
+                                                                                    top: topPosition, 
+                                                                                    left: '25%', 
+                                                                                    transform: `translate(-50%, -50%) ${isWhitePiece ? 'rotate(-90deg) scaleX(-1)' : 'rotate(-90deg)'}`
+                                                                                }}
+                                                                            >
+                                                                                ⤴
+                                                                            </div>
+                                                                            <div 
+                                                                                className="absolute text-xl font-bold text-accent-purple opacity-70"
+                                                                                style={{ 
+                                                                                    top: topPosition, 
+                                                                                    left: '75%', 
+                                                                                    transform: `translate(-50%, -50%) ${isWhitePiece ? 'rotate(90deg)' : 'rotate(90deg) scaleX(-1)'}`
+                                                                                }}
+                                                                            >
+                                                                                ⤴
+                                                                            </div>
+                                                                        </>
+                                                                    );
+                                                                }
+                                                                
+                                                                const directionOffsets = [
+                                                                    [-1, 0], [-1, 1], [0, 1], [1, 1],
+                                                                    [1, 0], [1, -1], [0, -1], [-1, -1],
+                                                                ];
+                                                                
+                                                                return Object.entries(movement).map(([dir, type]) => {
+                                                                    const direction = parseInt(dir);
+                                                                    const [dy, dx] = directionOffsets[direction];
+                                                                    const distance = type === 'dot' ? 30 : 32;
+                                                                    const top = 50 + (dy * distance);
+                                                                    const left = 50 + (dx * distance);
+                                                                    
+                                                                    return (
+                                                                        <div
+                                                                            key={direction}
+                                                                            className="absolute"
+                                                                            style={{
+                                                                                top: `${top}%`,
+                                                                                left: `${left}%`,
+                                                                                transform: 'translate(-50%, -50%)',
+                                                                            }}
+                                                                        >
+                                                                            {type === 'dot' ? (
+                                                                                <div className="w-2.5 h-2.5 rounded-full bg-accent-purple opacity-70" />
+                                                                            ) : (
+                                                                                <div 
+                                                                                    className="w-1 h-2.5 bg-accent-purple opacity-70"
+                                                                                    style={{
+                                                                                        transform: dx === 0 
+                                                                                            ? 'none'
+                                                                                            : dy === 0
+                                                                                                ? 'rotate(90deg)'
+                                                                                                : `rotate(${Math.atan2(dy, dx) * (180 / Math.PI) + 90}deg)`
+                                                                                    }}
+                                                                                />
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                });
+                                                            })()}
+                                                        </div>
+                                                    )}
+                                                </>
                                             )}
                                         </div>
                                     );
