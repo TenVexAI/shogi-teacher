@@ -40,9 +40,9 @@ const DEFAULT_SETTINGS: UISettings = {
 // Cache for settings to avoid excessive API calls
 let cachedSettings: UISettings | null = null;
 
-export async function loadUISettings(): Promise<UISettings> {
-  // Return cached if available
-  if (cachedSettings) {
+export async function loadUISettings(forceRefresh = false): Promise<UISettings> {
+  // Return cached if available and not forcing refresh
+  if (cachedSettings && !forceRefresh) {
     return cachedSettings;
   }
 
@@ -64,6 +64,11 @@ export async function loadUISettings(): Promise<UISettings> {
 }
 
 export function loadUISettingsSync(): UISettings {
+  // Check for OBS override first (used by OBS browser source)
+  if (typeof window !== 'undefined' && (window as any).__OBS_UI_SETTINGS__) {
+    return (window as any).__OBS_UI_SETTINGS__;
+  }
+  
   // Return cached settings or defaults for synchronous calls
   if (!cachedSettings) {
     cachedSettings = DEFAULT_SETTINGS;

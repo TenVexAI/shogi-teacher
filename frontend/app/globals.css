@@ -186,3 +186,13 @@ html {
     var(--accent-purple)
   );
 }
+
+/* Hide scrollbar for OBS browser source */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}
