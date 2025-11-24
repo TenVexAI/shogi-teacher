@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { GameState } from '@/types/game';
 import CapturedPieces from './CapturedPieces';
 import { Languages, FlipVertical, Type, Zap, Compass } from 'lucide-react';
@@ -204,6 +204,29 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
     const [useWesternNotation, setUseWesternNotation] = useState(uiSettings.useWesternNotation);
     const [highlightLastMove, setHighlightLastMove] = useState(uiSettings.highlightLastMove);
     const [showMovementOverlay, setShowMovementOverlay] = useState(uiSettings.showMovementOverlay);
+    const [acknowledgedCheckState, setAcknowledgedCheckState] = useState<{inCheck: boolean, isGameOver: boolean}>({ inCheck: false, isGameOver: false });
+    
+    // Derive notification state from game state
+    const showNotificationModal = showCheckNotification && ((gameState.is_game_over && !acknowledgedCheckState.isGameOver) || (gameState.in_check && !acknowledgedCheckState.inCheck && !gameState.is_game_over));
+    
+    const notificationMessage = useMemo(() => {
+        if (gameState.is_game_over) {
+            const winner = gameState.winner === 'b' ? 'Black' : 'White';
+            return `詰み! ${winner} Wins!`;
+        } else if (gameState.in_check) {
+            const attackerColor = gameState.turn === 'b' ? 'White' : 'Black';
+            const defenderColor = gameState.turn === 'b' ? 'Black' : 'White';
+            return `王手! ${attackerColor} put ${defenderColor} in check!`;
+        }
+        return '';
+    }, [gameState.is_game_over, gameState.winner, gameState.in_check, gameState.turn]);
+    
+    // Reset acknowledged state when game state changes to a different check/checkmate
+    useEffect(() => {
+        if (!gameState.in_check && !gameState.is_game_over) {
+            setAcknowledgedCheckState({ inCheck: false, isGameOver: false });
+        }
+    }, [gameState.in_check, gameState.is_game_over]);
     
     // Derive lastMovePositions from the parent's lastMoveUsi prop
     const lastMovePositions = useMemo(() => {
@@ -369,10 +392,6 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
         setLegalMoves([]);
     };
 
-    const attackerColor = gameState.turn === 'b' ? 'White' : 'Black';
-    const defenderColor = gameState.turn === 'b' ? 'Black' : 'White';
-    const isGameOver = gameState.is_game_over;
-
     return (
         <div className="flex flex-col items-center gap-4">
             {/* Top captured pieces - swap based on board orientation */}
@@ -387,20 +406,6 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
                 isTopPanel={true}
             />
 
-            {/* Reserved space for check notification (top) */}
-            <div className="h-6 flex items-center justify-center">
-                {showCheckNotification && (boardFlipped ? gameState.turn === 'b' : gameState.turn === 'w') && (
-                    isGameOver ? (
-                        <div className="font-bold text-base font-pixel text-accent-cyan">
-                            🏆 Checkmate! {gameState.winner === 'b' ? 'Black' : 'White'} Wins!
-                        </div>
-                    ) : gameState.in_check ? (
-                        <div className="font-semibold text-sm font-pixel animate-color-shift">
-                            ⚠️ {attackerColor} put {defenderColor} in Check!
-                        </div>
-                    ) : null
-                )}
-            </div>
 
             <div className="inline-block" style={{ transform: boardFlipped ? 'rotate(180deg)' : 'none' }}>
                 {/* Column numbers (9 to 1) */}
@@ -485,7 +490,7 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
                                             {/* Star point at grid intersection (top-right corner) */}
                                             {hasStarPointTopRight && (
                                                 <div 
-                                                    className="absolute w-1.5 h-1.5 bg-black rounded-full z-50"
+                                                    className="absolute w-1.5 h-1.5 bg-black rounded-full z-0"
                                                     style={{
                                                         right: '-0.5px',
                                                         top: '-1.0px',
@@ -635,20 +640,6 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
                 </div>
             </div>
 
-            {/* Reserved space for check notification (bottom) */}
-            <div className="h-6 flex items-center justify-center">
-                {showCheckNotification && (boardFlipped ? gameState.turn === 'w' : gameState.turn === 'b') && (
-                    isGameOver ? (
-                        <div className="font-bold text-base font-pixel text-accent-cyan">
-                            🏆 Checkmate! {gameState.winner === 'b' ? 'Black' : 'White'} Wins!
-                        </div>
-                    ) : gameState.in_check ? (
-                        <div className="font-semibold text-sm font-pixel animate-color-shift">
-                            ⚠️ {attackerColor} put {defenderColor} in Check!
-                        </div>
-                    ) : null
-                )}
-            </div>
 
             {/* Bottom captured pieces - swap based on board orientation */}
             <CapturedPieces
@@ -768,7 +759,7 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
                 {showBestMove && onBestMove && (
                     <button
                         onClick={onBestMove}
-                        disabled={isLoading || isGameOver || !currentPlayerHasEngine}
+                        disabled={isLoading || gameState.is_game_over || !currentPlayerHasEngine}
                         className="flex items-center gap-3 px-6 py-3 rounded-lg font-bold transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed bg-accent-cyan text-background-primary"
                     >
                         <div 
@@ -808,6 +799,31 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
                                 className="px-6 py-3 bg-background-primary border border-border text-text-primary rounded-lg hover:bg-background-secondary transition-colors font-pixel"
                             >
                                 No, Keep
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Check/Checkmate Notification Modal */}
+            {showNotificationModal && (
+                <div 
+                    className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+                    onClick={() => setAcknowledgedCheckState({ inCheck: gameState.in_check, isGameOver: gameState.is_game_over })}
+                >
+                    <div 
+                        className="bg-background-secondary border border-accent-cyan rounded-lg p-4 shadow-lg"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <h3 className="text-sm font-semibold text-text-primary mb-3 font-pixel text-center">
+                            {notificationMessage}
+                        </h3>
+                        <div className="flex justify-center">
+                            <button
+                                onClick={() => setAcknowledgedCheckState({ inCheck: gameState.in_check, isGameOver: gameState.is_game_over })}
+                                className="px-4 py-2 bg-accent-cyan text-background-primary rounded hover:bg-[#0fc9ad] transition-colors font-pixel text-xs"
+                            >
+                                OK
                             </button>
                         </div>
                     </div>
