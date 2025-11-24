@@ -43,7 +43,7 @@ export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllS
 
   return (
     <div className="w-12 h-full bg-background-secondary flex flex-col items-center py-4 shrink-0 border-r border-border">
-      {/* Top section - Learn & Engine Management buttons */}
+      {/* Top section - Learn button */}
       <div className="flex flex-col gap-4">
         <button
           onClick={onOpenLearn}
@@ -56,19 +56,11 @@ export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllS
               : 'text-text-secondary group-hover:text-accent-cyan'
           }`} />
         </button>
-
-        <button
-          onClick={onOpenEngineManagement}
-          className="w-10 h-10 flex items-center justify-center group transition-colors"
-          title="Engine Management"
-        >
-          <Cpu className="w-6 h-6 text-text-secondary group-hover:text-accent-purple transition-colors" />
-        </button>
       </div>
 
       <div className="flex-1"></div>
 
-      {/* Bottom section - Sound, Settings and Shutdown */}
+      {/* Bottom section - Sound, Settings, Engine Management and Shutdown */}
       <div className="flex flex-col gap-4">
         {/* Sound Toggle Button */}
         <button
@@ -96,6 +88,15 @@ export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllS
           title="Settings"
         >
           <Settings className="w-6 h-6 text-text-secondary group-hover:text-accent-cyan transition-colors" />
+        </button>
+
+        {/* Engine Management Button */}
+        <button
+          onClick={onOpenEngineManagement}
+          className="w-10 h-10 flex items-center justify-center group transition-colors"
+          title="Engine Management"
+        >
+          <Cpu className="w-6 h-6 text-text-secondary group-hover:text-accent-purple transition-colors" />
         </button>
 
         {/* Shutdown Button */}

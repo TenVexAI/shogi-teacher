@@ -9,9 +9,10 @@ import EngineManagementModal from '@/components/EngineManagementModal';
 import MoveHistory, { MoveRecord } from '@/components/MoveHistory';
 import Sidebar from '@/components/Sidebar';
 import ResourcesWindow from '@/components/ResourcesWindow';
+import ResumeSessionModal from '@/components/ResumeSessionModal';
 import { 
   getGameState, analyzePosition, explainPosition, updateConfig, getConfig,
-  createSession, getSession, getHint, recordMove, 
+  createSession, getSession, getHint, recordMove, listSessions,
   GameSession, HintResponse, MoveRecordBackend
 } from '@/lib/api';
 import { GameState } from '@/types/game';
@@ -73,6 +74,8 @@ export default function Home() {
   const [ambientSoundEnabled, setAmbientSoundEnabled] = useState(false);
   const [showClockStartModal, setShowClockStartModal] = useState(false);
   const [lastMoveUsi, setLastMoveUsi] = useState<string | null>(null);
+  const [showResumeModal, setShowResumeModal] = useState(false);
+  const [lastSession, setLastSession] = useState<GameSession | null>(null);
   const [pendingMove, setPendingMove] = useState<string | null>(null);
   const [moveHistory, setMoveHistory] = useState<MoveRecord[]>([]);
   const [gameTime, setGameTime] = useState(0);
@@ -83,7 +86,14 @@ export default function Home() {
 
   useEffect(() => {
     // Initialize game and load config
-    loadInitialGame();
+    const initializeApp = async () => {
+      const hasRecentSession = await checkForRecentSession();
+      if (!hasRecentSession) {
+        await loadInitialGame();
+      }
+    };
+    
+    initializeApp();
     loadConfig();
     loadEngineConfig();
     
@@ -172,6 +182,76 @@ export default function Home() {
       }
     } catch (error) {
       console.error('Failed to load engine config:', error);
+    }
+  };
+
+  const checkForRecentSession = async () => {
+    try {
+      const sessions = await listSessions(true, 1);
+      if (sessions.length > 0) {
+        const recentSession = sessions[0];
+        // Only offer to resume if there are moves (not a fresh session)
+        if (recentSession.moves.length > 0) {
+          setLastSession(recentSession);
+          setShowResumeModal(true);
+          return true;
+        }
+      }
+      return false;
+    } catch (error) {
+      console.error('Failed to check for recent session:', error);
+      return false;
+    }
+  };
+
+  const resumeSession = async () => {
+    if (!lastSession) return;
+    
+    try {
+      setCurrentSession(lastSession);
+      
+      // Load game state from session SFEN
+      const state = await getGameState(lastSession.current_sfen);
+      setGameState(state);
+      
+      // Calculate cumulative timestamps for move history
+      let cumulativeTime = 0;
+      setMoveHistory(lastSession.moves.map((m: MoveRecordBackend) => {
+        cumulativeTime += m.time_spent * 1000; // Convert to ms and accumulate
+        return {
+          moveNumber: m.move_number,
+          player: (m.player === 'black' ? 'b' : 'w') as 'b' | 'w',
+          move: m.move_algebraic,
+          timestamp: cumulativeTime,
+          timeSinceLastMove: m.time_spent * 1000,
+          sfen: m.position_after
+        };
+      }));
+      
+      // Set last move highlight to the most recent move
+      const lastMoveRecord = lastSession.moves[lastSession.moves.length - 1];
+      setLastMoveUsi(lastMoveRecord ? lastMoveRecord.move_usi : null);
+      
+      setIsClockRunning(false);
+      setGameTime(cumulativeTime);
+      clockStartTimeRef.current = 0;
+      lastMoveTimeRef.current = 0;
+      accumulatedTimeRef.current = cumulativeTime;
+      
+      setMessages([
+        {
+          role: 'assistant',
+          content: `**Game Resumed**\n\nWelcome back! You have ${lastSession.moves.length} moves on the board.\n\nContinue playing or ask me any questions about the game.`,
+          messageType: 'system'
+        }
+      ]);
+      
+      setShowResumeModal(false);
+      audioManager.playUISound('new_game');
+    } catch (error) {
+      console.error('Failed to resume session:', error);
+      setShowResumeModal(false);
+      loadInitialGame(); // Fall back to new game
     }
   };
 
@@ -715,6 +795,16 @@ export default function Home() {
           onClose={() => setIsSoundSettingsOpen(false)}
           onSave={handleSaveSoundSettings}
           currentSettings={soundSettings}
+        />
+
+        <ResumeSessionModal
+          isOpen={showResumeModal}
+          lastSession={lastSession}
+          onResume={resumeSession}
+          onNewGame={() => {
+            setShowResumeModal(false);
+            loadInitialGame();
+          }}
         />
 
         {/* Clock Start Confirmation Modal */}

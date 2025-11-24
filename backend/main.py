@@ -671,6 +671,31 @@ async def get_cuda_status():
             "warnings": ["Unable to check CUDA status. Error: " + str(e)]
         }
 
+@app.get("/system/info")
+async def get_system_info():
+    """Get system information (CPU cores and total RAM)."""
+    try:
+        import psutil
+        import os
+        
+        # Get CPU cores (logical processors)
+        cpu_cores = os.cpu_count() or 4
+        
+        # Get total system memory in GB
+        total_memory_bytes = psutil.virtual_memory().total
+        total_memory_gb = total_memory_bytes / (1024 ** 3)
+        
+        return {
+            "cpu_cores": cpu_cores,
+            "total_memory_gb": round(total_memory_gb, 2)
+        }
+    except Exception as e:
+        print(f"Error getting system info: {e}")
+        return {
+            "cpu_cores": 4,
+            "total_memory_gb": 8.0
+        }
+
 @app.get("/engines/config")
 async def get_engine_config():
     """Get current engine configuration."""
@@ -813,6 +838,12 @@ async def create_game_session(request: GameSessionCreate):
         raise HTTPException(status_code=500, detail=f"Failed to create session: {str(e)}")
 
 
+@app.get("/session/list", response_model=List[GameSession])
+async def list_game_sessions(active_only: bool = True, limit: int = 50):
+    """List game sessions"""
+    return session_manager.list_sessions(active_only=active_only, limit=limit)
+
+
 @app.get("/session/{session_id}", response_model=GameSession)
 async def get_game_session(session_id: str):
     """Get a game session by ID"""
@@ -820,12 +851,6 @@ async def get_game_session(session_id: str):
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     return session
-
-
-@app.get("/session/list", response_model=List[GameSession])
-async def list_game_sessions(active_only: bool = True, limit: int = 50):
-    """List game sessions"""
-    return session_manager.list_sessions(active_only=active_only, limit=limit)
 
 
 @app.put("/session/{session_id}", response_model=GameSession)

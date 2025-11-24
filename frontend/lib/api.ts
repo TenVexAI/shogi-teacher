@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 
 export async function getGameState(sfen?: string) {
     const url = sfen ? `${API_BASE_URL}/game/state?sfen=${encodeURIComponent(sfen)}` : `${API_BASE_URL}/game/state`;
@@ -169,6 +169,14 @@ export async function getSession(sessionId: string) {
         throw new Error('Failed to get session');
     }
     return response.json() as Promise<GameSession>;
+}
+
+export async function listSessions(activeOnly: boolean = true, limit: number = 50) {
+    const response = await fetch(`${API_BASE_URL}/session/list?active_only=${activeOnly}&limit=${limit}`);
+    if (!response.ok) {
+        throw new Error('Failed to list sessions');
+    }
+    return response.json() as Promise<GameSession[]>;
 }
 
 export async function getHint(sessionId: string, side?: string) {

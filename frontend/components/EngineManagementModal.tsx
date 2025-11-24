@@ -64,6 +64,11 @@ interface CudaStatus {
   warnings: string[];
 }
 
+interface SystemInfo {
+  cpuCores: number;
+  totalMemoryGB: number;
+}
+
 export default function EngineManagementModal({ isOpen, onClose }: EngineManagementModalProps) {
   const [engines, setEngines] = useState<Engine[]>([]);
   const [config, setConfig] = useState<EngineConfig>({
@@ -77,6 +82,7 @@ export default function EngineManagementModal({ isOpen, onClose }: EngineManagem
   const [advancedSettingsOpen, setAdvancedSettingsOpen] = useState(false);
   const [advancedSettingsRole, setAdvancedSettingsRole] = useState<'black' | 'white' | 'analysis'>('black');
   const [cudaStatus, setCudaStatus] = useState<CudaStatus | null>(null);
+  const [systemInfo, setSystemInfo] = useState<SystemInfo>({ cpuCores: navigator.hardwareConcurrency || 4, totalMemoryGB: 8 });
   const previouslyFocusedElement = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -85,12 +91,63 @@ export default function EngineManagementModal({ isOpen, onClose }: EngineManagem
       fetchEngines();
       fetchConfig();
       fetchCudaStatus();
+      fetchSystemInfo();
     } else if (previouslyFocusedElement.current) {
       setTimeout(() => {
         previouslyFocusedElement.current?.focus();
       }, 0);
     }
   }, [isOpen]);
+
+  const fetchSystemInfo = async () => {
+    try {
+      const response = await fetch('http://127.0.0.1:8000/system/info');
+      const data = await response.json();
+      setSystemInfo({
+        cpuCores: data.cpu_cores || navigator.hardwareConcurrency || 4,
+        totalMemoryGB: data.total_memory_gb || 8
+      });
+    } catch {
+      // Fallback to browser API if backend endpoint doesn't exist
+      setSystemInfo({
+        cpuCores: navigator.hardwareConcurrency || 4,
+        totalMemoryGB: 8 // Conservative estimate
+      });
+    }
+  };
+
+  const calculateResourceUsage = () => {
+    let totalThreads = 0;
+    let totalMemoryMB = 0;
+
+    const roles: Array<'black' | 'white' | 'analysis'> = ['black', 'white', 'analysis'];
+    roles.forEach(role => {
+      if (role === 'analysis' && !config.analysis.enabled) return;
+      if (!config[role].engineId) return;
+
+      const options = config[role].customOptions;
+      
+      // Parse Threads option (default to 1 if not set)
+      const threads = parseInt(options['Threads'] || options['threads'] || '1');
+      totalThreads += threads;
+
+      // Parse Hash option in MB (default to 16MB if not set)
+      const hash = parseInt(options['Hash'] || options['hash'] || '16');
+      totalMemoryMB += hash;
+    });
+
+    return {
+      threads: totalThreads,
+      memoryMB: totalMemoryMB,
+      memoryGB: totalMemoryMB / 1024
+    };
+  };
+
+  const resourceUsage = calculateResourceUsage();
+  const threadUsagePercent = (resourceUsage.threads / systemInfo.cpuCores) * 100;
+  const memoryUsagePercent = (resourceUsage.memoryGB / systemInfo.totalMemoryGB) * 100;
+  const threadsOverAllocated = resourceUsage.threads > systemInfo.cpuCores;
+  const memoryOverAllocated = resourceUsage.memoryGB > systemInfo.totalMemoryGB * 0.8; // Warn at 80%
 
   const fetchEngines = async () => {
     try {
@@ -303,6 +360,52 @@ export default function EngineManagementModal({ isOpen, onClose }: EngineManagem
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* Resource Usage Summary */}
+          {(config.black.engineId || config.white.engineId || (config.analysis.enabled && config.analysis.engineId)) && (
+            <div className="bg-background-primary border border-border rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-text-primary mb-3">Engine Configuration System Resource Usage</h3>
+              <div className="grid grid-cols-2 gap-4">
+                {/* CPU Threads */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-text-secondary">CPU Threads</span>
+                    <span className={`text-xs font-semibold ${threadsOverAllocated ? 'text-red-400' : threadUsagePercent > 75 ? 'text-yellow-400' : 'text-accent-cyan'}`}>
+                      {resourceUsage.threads} / {systemInfo.cpuCores}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-700 rounded-full h-2">
+                    <div 
+                      className={`h-2 rounded-full transition-all ${threadsOverAllocated ? 'bg-red-500' : threadUsagePercent > 75 ? 'bg-yellow-500' : 'bg-accent-cyan'}`}
+                      style={{ width: `${Math.min(threadUsagePercent, 100)}%` }}
+                    />
+                  </div>
+                  {threadsOverAllocated && (
+                    <p className="text-xs text-red-400 mt-1">Warning: Over-allocated threads may cause performance issues</p>
+                  )}
+                </div>
+
+                {/* Memory */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-text-secondary">Memory (Hash)</span>
+                    <span className={`text-xs font-semibold ${memoryOverAllocated ? 'text-red-400' : memoryUsagePercent > 75 ? 'text-yellow-400' : 'text-accent-cyan'}`}>
+                      {resourceUsage.memoryGB.toFixed(2)} GB / {systemInfo.totalMemoryGB.toFixed(1)} GB
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-700 rounded-full h-2">
+                    <div 
+                      className={`h-2 rounded-full transition-all ${memoryOverAllocated ? 'bg-red-500' : memoryUsagePercent > 75 ? 'bg-yellow-500' : 'bg-accent-cyan'}`}
+                      style={{ width: `${Math.min(memoryUsagePercent, 100)}%` }}
+                    />
+                  </div>
+                  {memoryOverAllocated && (
+                    <p className="text-xs text-red-400 mt-1">Warning: High memory usage may cause system instability</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Error Message */}
           {error && (
             <div className="bg-red-500/10 border border-red-500 rounded p-4 text-red-400">
@@ -315,6 +418,11 @@ export default function EngineManagementModal({ isOpen, onClose }: EngineManagem
             <div className="text-center py-8 text-text-secondary">Loading engines...</div>
           ) : (
             <>
+              {/* Separator */}
+              {(config.black.engineId || config.white.engineId || (config.analysis.enabled && config.analysis.engineId)) && (
+                <div className="border-t border-border -mx-6"></div>
+              )}
+
               {/* Black Engine */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
