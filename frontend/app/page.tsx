@@ -489,6 +489,8 @@ export default function Home() {
           }
         }
       ]);
+      // Play sound for hint messages
+      audioManager.playUISound('message');
     } catch (error) {
       console.error('Failed to get hint:', error);
       addAssistantMessage('⚠️ Could not get hint. Make sure an engine is assigned to the current player.', 'system');
@@ -609,7 +611,10 @@ export default function Home() {
       messageType,
       engineName
     }]);
-    audioManager.playUISound('message');
+    // Only play sound for LLM messages
+    if (messageType === 'llm') {
+      audioManager.playUISound('message');
+    }
   };
 
   const handleClockToggle = () => {

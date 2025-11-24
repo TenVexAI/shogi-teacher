@@ -99,6 +99,9 @@ export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllS
           <Cpu className="w-6 h-6 text-text-secondary group-hover:text-accent-purple transition-colors" />
         </button>
 
+        {/* Separator */}
+        <div className="w-12 border-t border-border my-2 -mx-1"></div>
+
         {/* Shutdown Button */}
         <button
           onClick={handleShutdown}

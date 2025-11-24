@@ -496,7 +496,7 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
                                             key={`${rowIndex}-${colIndex}`}
                                             onClick={() => handleSquareClick(rowIndex, colIndex)}
                                             className={`
-                        relative w-12 h-12 border border-gray-700 flex items-center justify-center
+                        relative w-12 h-12 border border-gray-800 flex items-center justify-center
                         cursor-pointer hover:bg-amber-200 transition-colors
                         ${isSelected(rowIndex, colIndex) ? 'bg-blue-300' : ''}
                         ${isLegalMove(rowIndex, colIndex) ? 'bg-green-200' : ''}
@@ -507,7 +507,7 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
                                             {/* Star point at grid intersection (top-right corner) */}
                                             {hasStarPointTopRight && (
                                                 <div 
-                                                    className="absolute w-1.5 h-1.5 bg-black rounded-full z-0"
+                                                    className="absolute w-1.5 h-1.5 bg-gray-800 rounded-full z-10"
                                                     style={{
                                                         right: '-0.5px',
                                                         top: '-1.0px',
