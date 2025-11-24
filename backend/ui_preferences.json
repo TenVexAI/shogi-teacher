@@ -1,5 +1,5 @@
 {
-  "useLLM": false,
+  "useLLM": true,
   "showBestMove": true,
   "showBoardOptionsPanel": true,
   "showMovementOverlay": false,

@@ -14,6 +14,11 @@ class ClaudeTeacher:
         self.model = config["selected_model"]
         api_keys = config["api_keys"]
         
+        # Load LLM settings
+        self.claude_thinking = config.get("claude_thinking", False)
+        self.openai_reasoning_effort = config.get("openai_reasoning_effort", "medium")
+        self.verbosity = config.get("verbosity", "medium")
+        
         # Initialize clients based on available API keys
         self.claude_client = None
         self.openai_client = None
@@ -81,6 +86,47 @@ class ClaudeTeacher:
         elif self.provider == "google":
             return self.google_client
         return None
+    
+    def get_verbosity_instruction(self) -> str:
+        """Get the verbosity instruction based on user setting"""
+        if self.verbosity == "low":
+            return "\n\nIMPORTANT: Be concise and direct. Provide brief explanations."
+        elif self.verbosity == "high":
+            return "\n\nIMPORTANT: Provide comprehensive, detailed explanations with examples."
+        else:  # medium (default)
+            return ""
+    
+    def get_valid_reasoning_effort(self) -> str:
+        """
+        Get valid reasoning effort for the current model.
+        Different GPT-5 models support different reasoning levels.
+        """
+        model_lower = self.model.lower()
+        
+        # GPT-5.1 supports none, low, medium, high (default: none)
+        if "gpt-5.1" in model_lower or "gpt-5-1" in model_lower:
+            valid_levels = ["none", "low", "medium", "high"]
+            if self.openai_reasoning_effort in valid_levels:
+                return self.openai_reasoning_effort
+            # Default to none if invalid
+            return "none"
+        
+        # GPT-5 Mini supports minimal, low, medium, high
+        if "gpt-5-mini" in model_lower:
+            valid_levels = ["minimal", "low", "medium", "high"]
+            if self.openai_reasoning_effort in valid_levels:
+                return self.openai_reasoning_effort
+            # Map 'none' to 'minimal' for mini
+            if self.openai_reasoning_effort == "none":
+                return "minimal"
+            return "low"  # Default
+        
+        # For other GPT-5 models, default to medium
+        if "gpt-5" in model_lower:
+            return "medium"
+        
+        # For non-GPT-5 models (o1, o3), use as-is
+        return self.openai_reasoning_effort
     
     def build_game_context(self, session: Any, include_moves: int = 10) -> str:
         """
@@ -218,6 +264,9 @@ Please provide a clear, educational explanation covering:
 Use proper shogi terminology throughout. Use simple language suitable for intermediate players. Focus on concrete, actionable ideas rather than vague concepts.
 """)
         
+        # Add verbosity instruction
+        prompt_parts.append(self.get_verbosity_instruction())
+        
         prompt = "\n".join(prompt_parts)
         
         # Build messages array with conversation history
@@ -245,53 +294,121 @@ Use proper shogi terminology throughout. Use simple language suitable for interm
         
         try:
             if self.provider == "claude":
-                response = client.messages.create(
-                    model=self.model,
-                    max_tokens=1024,
-                    messages=messages
-                )
-                return response.content[0].text
+                # Determine max_tokens based on whether thinking is enabled
+                # When thinking is enabled, max_tokens must be > budget_tokens
+                max_tokens = 1024
+                if self.claude_thinking and "sonnet-4" in self.model.lower():
+                    max_tokens = 8000  # 5000 for thinking + 3000 for response
+                
+                # Build API parameters
+                api_params = {
+                    "model": self.model,
+                    "max_tokens": max_tokens,
+                    "messages": messages
+                }
+                
+                # Add extended thinking if enabled (for Sonnet 4.5+ models)
+                if self.claude_thinking and "sonnet-4" in self.model.lower():
+                    api_params["thinking"] = {
+                        "type": "enabled",
+                        "budget_tokens": 5000
+                    }
+                
+                response = client.messages.create(**api_params)
+                
+                # Extract text from response (handle thinking blocks)
+                # When thinking is enabled, content may have multiple blocks: ThinkingBlock + TextBlock
+                result_text = ""
+                for block in response.content:
+                    # Skip thinking blocks, only extract text blocks
+                    if hasattr(block, 'text'):
+                        result_text += block.text
+                
+                return result_text
                 
             elif self.provider == "openai":
                 print(f"OpenAI: Sending request with model: {self.model}")
                 print(f"OpenAI: Message count: {len(messages)}")
                 
-                # GPT-5 reasoning models need more tokens for output
-                # Use higher limit to account for internal reasoning tokens
-                response = client.chat.completions.create(
-                    model=self.model,
-                    max_completion_tokens=4096,
-                    messages=messages
-                )
+                # Check if this is a GPT-5 model (uses Responses API)
+                is_gpt5 = "gpt-5" in self.model.lower()
                 
-                print(f"OpenAI: Response received")
-                print(f"OpenAI: Choices count: {len(response.choices)}")
-                
-                choice = response.choices[0]
-                finish_reason = choice.finish_reason
-                message = choice.message
-                content = message.content
-                refusal = getattr(message, 'refusal', None)
-                
-                print(f"OpenAI: Finish reason: {finish_reason}")
-                print(f"OpenAI: Content: {content}")
-                print(f"OpenAI: Refusal: {refusal}")
-                print(f"OpenAI: Content type: {type(content)}")
-                print(f"OpenAI: Content length: {len(content) if content else 0}")
-                
-                if refusal:
-                    return f"OpenAI refused to respond: {refusal}"
-                
-                if not content:
+                # Build API parameters (different for Responses API vs Chat Completions API)
+                if is_gpt5:
+                    # Responses API uses 'input' parameter instead of 'messages'
+                    # Convert messages array to a single input string
+                    input_text = "\n\n".join([
+                        f"{msg['role']}: {msg['content']}" for msg in messages
+                    ])
+                    
+                    # Get valid reasoning effort for this specific model
+                    valid_effort = self.get_valid_reasoning_effort()
+                    print(f"OpenAI: Using reasoning effort: {valid_effort} (requested: {self.openai_reasoning_effort})")
+                    
+                    # Responses API uses nested objects for reasoning and text parameters
+                    api_params = {
+                        "model": self.model,
+                        "input": input_text,
+                        "reasoning": {
+                            "effort": valid_effort
+                        },
+                        "text": {
+                            "verbosity": self.verbosity
+                        }
+                    }
+                    
+                    # GPT-5 models use the Responses API
+                    response = client.responses.create(**api_params)
+                    
+                    print(f"OpenAI: Response received")
+                    print(f"OpenAI: Output text: {response.output_text}")
+                    
+                    # Responses API returns output_text directly
+                    return response.output_text
+                    
+                else:
+                    # Chat Completions API
+                    api_params = {
+                        "model": self.model,
+                        "max_completion_tokens": 4096,
+                        "messages": messages
+                    }
+                    
+                    # Add reasoning_effort for o1/o3 models
+                    if "o1" in self.model.lower() or "o3" in self.model.lower():
+                        api_params["reasoning_effort"] = self.openai_reasoning_effort
+                    
+                    # Other models use Chat Completions API
+                    response = client.chat.completions.create(**api_params)
+                    
+                    print(f"OpenAI: Response received")
+                    print(f"OpenAI: Choices count: {len(response.choices)}")
+                    
+                    choice = response.choices[0]
+                    finish_reason = choice.finish_reason
+                    message = choice.message
+                    content = message.content
+                    refusal = getattr(message, 'refusal', None)
+                    
+                    print(f"OpenAI: Finish reason: {finish_reason}")
+                    print(f"OpenAI: Content: {content}")
+                    print(f"OpenAI: Refusal: {refusal}")
+                    print(f"OpenAI: Content type: {type(content)}")
+                    print(f"OpenAI: Content length: {len(content) if content else 0}")
+                    
+                    if refusal:
+                        return f"OpenAI refused to respond: {refusal}"
+                    
+                    if not content:
+                        if finish_reason == "length":
+                            return "The response was cut off due to token limits. Try asking a shorter question or starting a new conversation."
+                        return "OpenAI returned an empty response"
+                    
+                    # Append a note if the response was cut off
                     if finish_reason == "length":
-                        return "The response was cut off due to token limits. Try asking a shorter question or starting a new conversation."
-                    return "OpenAI returned an empty response"
-                
-                # Append a note if the response was cut off
-                if finish_reason == "length":
-                    content += "\n\n*(Response was cut off due to length limit)*"
-                
-                return content
+                        content += "\n\n*(Response was cut off due to length limit)*"
+                    
+                    return content
                 
             elif self.provider == "google":
                 # Google Gemini uses a different format

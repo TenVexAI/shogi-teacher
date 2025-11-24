@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Settings2, Info } from 'lucide-react';
 
 interface AdvancedSetting {
@@ -48,6 +48,7 @@ export default function AdvancedEngineSettingsModal({
   const [values, setValues] = useState<Record<string, string>>(currentOptions);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const previouslyFocusedElement = useRef<HTMLElement | null>(null);
 
   const fetchSettings = useCallback(async () => {
     if (!engineId) return;
@@ -75,7 +76,12 @@ export default function AdvancedEngineSettingsModal({
 
   useEffect(() => {
     if (isOpen && engineId) {
+      previouslyFocusedElement.current = document.activeElement as HTMLElement;
       fetchSettings();
+    } else if (!isOpen && previouslyFocusedElement.current) {
+      setTimeout(() => {
+        previouslyFocusedElement.current?.focus();
+      }, 0);
     }
   }, [isOpen, engineId, fetchSettings]);
 
@@ -114,8 +120,8 @@ export default function AdvancedEngineSettingsModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-60">
-      <div className="bg-background-secondary border border-border rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-60" onClick={onClose}>
+      <div className="bg-background-secondary border border-border rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-border">
           <div className="flex items-center gap-3">

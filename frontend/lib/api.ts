@@ -289,7 +289,10 @@ export async function getLLMConfig() {
 export async function updateLLMConfig(config: {
     api_keys?: Record<string, string>,
     selected_provider?: string,
-    selected_model?: string
+    selected_model?: string,
+    claude_thinking?: boolean,
+    openai_reasoning_effort?: string,
+    verbosity?: string
 }) {
     const response = await fetch(`${API_BASE_URL}/llm-config`, {
         method: 'POST',

@@ -154,7 +154,7 @@ export default function ChatInterface({ messages, onSendMessage, isLoading, onGe
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {messages.length === 0 && (
                     <div className="text-center text-text-secondary mt-8">
-                        <p className="text-lg">Welcome to Shogi Teacher!</p>
+                        <p className="text-lg">Learn to play Shogi!</p>
                         <p className="text-sm mt-2">Make a move or ask a question to get started.</p>
                     </div>
                 )}

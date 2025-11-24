@@ -1,7 +1,7 @@
 'use client';
 
 import { Info, Settings2 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import AdvancedEngineSettingsModal from './AdvancedEngineSettingsModal';
 
 interface Engine {
@@ -77,12 +77,18 @@ export default function EngineManagementModal({ isOpen, onClose }: EngineManagem
   const [advancedSettingsOpen, setAdvancedSettingsOpen] = useState(false);
   const [advancedSettingsRole, setAdvancedSettingsRole] = useState<'black' | 'white' | 'analysis'>('black');
   const [cudaStatus, setCudaStatus] = useState<CudaStatus | null>(null);
+  const previouslyFocusedElement = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (isOpen) {
+      previouslyFocusedElement.current = document.activeElement as HTMLElement;
       fetchEngines();
       fetchConfig();
       fetchCudaStatus();
+    } else if (previouslyFocusedElement.current) {
+      setTimeout(() => {
+        previouslyFocusedElement.current?.focus();
+      }, 0);
     }
   }, [isOpen]);
 
@@ -282,8 +288,8 @@ export default function EngineManagementModal({ isOpen, onClose }: EngineManagem
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-background-secondary border border-border rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-background-secondary border border-border rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-border">
           <h2 className="text-2xl font-bold text-text-primary">Engine Management</h2>

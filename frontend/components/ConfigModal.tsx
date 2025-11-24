@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface ConfigModalProps {
     isOpen: boolean;
@@ -27,12 +27,19 @@ export default function ConfigModal({ isOpen, onClose, onSave, currentUseLLM = t
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
+    const previouslyFocusedElement = useRef<HTMLElement | null>(null);
 
     useEffect(() => {
         if (!isOpen) {
             setError('');
             setSuccess(false);
+            if (previouslyFocusedElement.current) {
+                setTimeout(() => {
+                    previouslyFocusedElement.current?.focus();
+                }, 0);
+            }
         } else {
+            previouslyFocusedElement.current = document.activeElement as HTMLElement;
             setUseLLM(currentUseLLM);
             setShowBestMove(currentShowBestMove);
             setShowBoardOptions(currentShowBoardOptions);
@@ -62,8 +69,8 @@ export default function ConfigModal({ isOpen, onClose, onSave, currentUseLLM = t
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50">
-            <div className="bg-background-secondary border border-border rounded-lg shadow-xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50" onClick={onClose}>
+            <div className="bg-background-secondary border border-border rounded-lg shadow-xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-2xl font-bold text-text-primary">Settings</h2>
                     <button

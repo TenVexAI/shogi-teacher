@@ -50,6 +50,9 @@ def get_llm_config() -> dict:
         - api_keys: {provider: key}
         - selected_provider: str ('claude', 'openai', 'google')
         - selected_model: str (model identifier)
+        - claude_thinking: bool (enable extended thinking)
+        - openai_reasoning_effort: str ('minimal', 'low', 'medium', 'high')
+        - verbosity: str ('low', 'medium', 'high')
     """
     config = load_config()
     
@@ -64,10 +67,20 @@ def get_llm_config() -> dict:
     return {
         "api_keys": api_keys,
         "selected_provider": config.get("llm_provider", "claude"),
-        "selected_model": config.get("llm_model", "claude-haiku-4-5-20251001")
+        "selected_model": config.get("llm_model", "claude-haiku-4-5-20251001"),
+        "claude_thinking": config.get("llm_claude_thinking", False),
+        "openai_reasoning_effort": config.get("llm_openai_reasoning_effort", "medium"),
+        "verbosity": config.get("llm_verbosity", "medium")
     }
 
-def update_llm_config(api_keys: Optional[dict] = None, provider: Optional[str] = None, model: Optional[str] = None) -> bool:
+def update_llm_config(
+    api_keys: Optional[dict] = None, 
+    provider: Optional[str] = None, 
+    model: Optional[str] = None,
+    claude_thinking: Optional[bool] = None,
+    openai_reasoning_effort: Optional[str] = None,
+    verbosity: Optional[str] = None
+) -> bool:
     """
     Update LLM configuration.
     
@@ -75,6 +88,9 @@ def update_llm_config(api_keys: Optional[dict] = None, provider: Optional[str] =
         api_keys: Dict of {provider: api_key} to update
         provider: Selected provider ('claude', 'openai', 'google')
         model: Selected model identifier
+        claude_thinking: Enable/disable Claude extended thinking
+        openai_reasoning_effort: OpenAI reasoning effort ('minimal', 'low', 'medium', 'high')
+        verbosity: Response verbosity ('low', 'medium', 'high')
     """
     config = load_config()
     
@@ -94,5 +110,14 @@ def update_llm_config(api_keys: Optional[dict] = None, provider: Optional[str] =
     
     if model is not None:
         config["llm_model"] = model
+    
+    if claude_thinking is not None:
+        config["llm_claude_thinking"] = claude_thinking
+    
+    if openai_reasoning_effort is not None:
+        config["llm_openai_reasoning_effort"] = openai_reasoning_effort
+    
+    if verbosity is not None:
+        config["llm_verbosity"] = verbosity
     
     return save_config(config)

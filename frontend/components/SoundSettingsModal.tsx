@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { audioManager } from '@/lib/audioManager';
 
 interface SoundSettingsModalProps {
@@ -28,6 +28,7 @@ export default function SoundSettingsModal({ isOpen, onClose, onSave, currentSet
     const [ambientVolumes, setAmbientVolumes] = useState<number[]>(currentSettings.ambientVolumes);
 
     const ambientLabels = audioManager.getAmbientLabels();
+    const previouslyFocusedElement = useRef<HTMLElement | null>(null);
 
     useEffect(() => {
         setUiEnabled(currentSettings.uiEnabled);
@@ -37,6 +38,16 @@ export default function SoundSettingsModal({ isOpen, onClose, onSave, currentSet
         setMusicVolume(currentSettings.musicVolume);
         setAmbientVolumes(currentSettings.ambientVolumes);
     }, [currentSettings]);
+
+    useEffect(() => {
+        if (isOpen) {
+            previouslyFocusedElement.current = document.activeElement as HTMLElement;
+        } else if (previouslyFocusedElement.current) {
+            setTimeout(() => {
+                previouslyFocusedElement.current?.focus();
+            }, 0);
+        }
+    }, [isOpen]);
 
     const handleSave = () => {
         onSave({
@@ -79,8 +90,8 @@ export default function SoundSettingsModal({ isOpen, onClose, onSave, currentSet
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50">
-            <div className="bg-background-secondary border border-border rounded-lg shadow-xl p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50" onClick={onClose}>
+            <div className="bg-background-secondary border border-border rounded-lg shadow-xl p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                 <h2 className="text-2xl font-bold text-accent-purple mb-6 font-pixel">Advanced Sound Settings</h2>
                 
                 {/* Category Toggles */}

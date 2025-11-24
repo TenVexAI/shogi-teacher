@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Upload, Trash2, Eye, EyeOff, FileText } from 'lucide-react';
 import {
   getLLMConfig,
@@ -31,6 +31,9 @@ interface LLMConfig {
   selected_provider: string;
   selected_model: string;
   available_models: Record<string, string[]>;
+  claude_thinking: boolean;
+  openai_reasoning_effort: string;
+  verbosity: string;
 }
 
 export default function ResourcesWindow({ isOpen, onClose, sessionId }: ResourcesWindowProps) {
@@ -47,7 +50,15 @@ export default function ResourcesWindow({ isOpen, onClose, sessionId }: Resource
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
   const [selectedProvider, setSelectedProvider] = useState('claude');
   const [selectedModel, setSelectedModel] = useState('');
+  const [claudeThinking, setClaudeThinking] = useState(false);
+  const [openaiReasoningEffort, setOpenaiReasoningEffort] = useState('medium');
+  const [verbosity, setVerbosity] = useState('medium');
   const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  
+  // Focus management to prevent focus trap
+  const previouslyFocusedElement = useRef<HTMLElement | null>(null);
 
   const loadFiles = useCallback(async () => {
     try {
@@ -70,6 +81,9 @@ export default function ResourcesWindow({ isOpen, onClose, sessionId }: Resource
       setApiKeys(config.api_keys || {});
       setSelectedProvider(config.selected_provider);
       setSelectedModel(config.selected_model);
+      setClaudeThinking(config.claude_thinking || false);
+      setOpenaiReasoningEffort(config.openai_reasoning_effort || 'medium');
+      setVerbosity(config.verbosity || 'medium');
     } catch (error) {
       console.error('Failed to load LLM config:', error);
     }
@@ -77,8 +91,20 @@ export default function ResourcesWindow({ isOpen, onClose, sessionId }: Resource
 
   useEffect(() => {
     if (isOpen) {
+      // Save currently focused element
+      previouslyFocusedElement.current = document.activeElement as HTMLElement;
+      setSaveSuccess(false);
+      setSaveError('');
       loadFiles();
       loadLLMConfig();
+    } else {
+      // Restore focus when modal closes
+      if (previouslyFocusedElement.current) {
+        // Small delay to ensure modal is fully closed
+        setTimeout(() => {
+          previouslyFocusedElement.current?.focus();
+        }, 0);
+      }
     }
   }, [isOpen, loadFiles, loadLLMConfig]);
 
@@ -138,6 +164,9 @@ export default function ResourcesWindow({ isOpen, onClose, sessionId }: Resource
 
   const handleSaveLLMConfig = async () => {
     setSaving(true);
+    setSaveError('');
+    setSaveSuccess(false);
+    
     try {
       // Only send non-masked API keys (filter out masked values)
       const cleanedKeys: Record<string, string> = {};
@@ -151,11 +180,19 @@ export default function ResourcesWindow({ isOpen, onClose, sessionId }: Resource
       await updateLLMConfig({
         api_keys: cleanedKeys,
         selected_provider: selectedProvider,
-        selected_model: selectedModel
+        selected_model: selectedModel,
+        claude_thinking: claudeThinking,
+        openai_reasoning_effort: openaiReasoningEffort,
+        verbosity: verbosity
       });
-      alert('LLM configuration saved!');
+      
+      setSaveSuccess(true);
+      // Auto-close modal after 1 second
+      setTimeout(() => {
+        onClose();
+      }, 1000);
     } catch {
-      alert('Failed to save LLM configuration');
+      setSaveError('Failed to save LLM configuration. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -164,8 +201,14 @@ export default function ResourcesWindow({ isOpen, onClose, sessionId }: Resource
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-background-secondary border border-border rounded-lg shadow-xl p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+    <div 
+      className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-background-secondary border border-border rounded-lg shadow-xl p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <h2 className="text-2xl font-bold text-accent-purple mb-6 font-pixel">LLM Settings & Resources</h2>
 
@@ -245,6 +288,60 @@ export default function ResourcesWindow({ isOpen, onClose, sessionId }: Resource
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Provider-Specific Settings */}
+          {selectedProvider === 'claude' && (
+            <div className="p-3 bg-background-primary rounded border border-border">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={claudeThinking}
+                  onChange={(e) => setClaudeThinking(e.target.checked)}
+                  className="w-4 h-4"
+                />
+                <div>
+                  <span className="text-sm font-semibold text-text-primary">Extended Thinking</span>
+                  <p className="text-xs text-text-secondary">Enable deeper reasoning for complex problems (Sonnet 4.5+ only)</p>
+                </div>
+              </label>
+            </div>
+          )}
+
+          {selectedProvider === 'openai' && (
+            <div className="p-3 bg-background-primary rounded border border-border">
+              <label className="block text-sm font-semibold mb-2 text-text-primary">Reasoning Effort</label>
+              <select
+                value={openaiReasoningEffort}
+                onChange={(e) => setOpenaiReasoningEffort(e.target.value)}
+                className="w-full p-2 bg-background-secondary border border-border rounded text-text-primary text-sm"
+              >
+                <option value="minimal">Minimal - Fastest</option>
+                <option value="low">Low - Quick answers</option>
+                <option value="medium">Medium - Balanced (default)</option>
+                <option value="high">High - Deep reasoning</option>
+              </select>
+              <p className="text-xs text-text-secondary mt-1">Controls thinking depth for GPT-5/reasoning models</p>
+            </div>
+          )}
+
+          {/* Verbosity Setting (All Providers) */}
+          <div className="p-3 bg-background-primary rounded border border-border">
+            <label className="block text-sm font-semibold mb-2 text-text-primary">Response Verbosity</label>
+            <select
+              value={verbosity}
+              onChange={(e) => setVerbosity(e.target.value)}
+              className="w-full p-2 bg-background-secondary border border-border rounded text-text-primary text-sm"
+            >
+              <option value="low">Low - Concise and brief</option>
+              <option value="medium">Medium - Balanced (default)</option>
+              <option value="high">High - Detailed with examples</option>
+            </select>
+            <p className="text-xs text-text-secondary mt-1">
+              {selectedProvider === 'openai' && 'gpt-5' ? 
+                'Uses native API parameter + prompt adjustment' : 
+                'Adjusts prompt to control response length'}
+            </p>
           </div>
         </div>
 
@@ -363,6 +460,18 @@ export default function ResourcesWindow({ isOpen, onClose, sessionId }: Resource
           </div>
         </div>
 
+        {/* Feedback Messages */}
+        {saveSuccess && (
+          <div className="mt-6 p-3 bg-green-500/10 border border-green-500/30 rounded-lg text-green-400 text-sm font-semibold text-center">
+            ✓ LLM configuration saved successfully!
+          </div>
+        )}
+        {saveError && (
+          <div className="mt-6 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm font-semibold text-center">
+            {saveError}
+          </div>
+        )}
+
         {/* Buttons */}
         <div className="flex gap-3 justify-end mt-6">
           <button
@@ -373,10 +482,10 @@ export default function ResourcesWindow({ isOpen, onClose, sessionId }: Resource
           </button>
           <button
             onClick={handleSaveLLMConfig}
-            disabled={saving}
+            disabled={saving || saveSuccess}
             className="px-4 py-2 rounded-lg font-semibold text-sm bg-accent-purple hover:bg-[#8a6fd1] text-white transition-colors disabled:opacity-50"
           >
-            {saving ? 'Saving...' : 'Save Settings'}
+            {saving ? 'Saving...' : saveSuccess ? 'Saved!' : 'Save Configuration'}
           </button>
         </div>
       </div>

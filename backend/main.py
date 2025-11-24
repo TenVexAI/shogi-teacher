@@ -408,6 +408,9 @@ async def get_llm_config():
         "api_keys": masked_keys,
         "selected_provider": cfg["selected_provider"],
         "selected_model": cfg["selected_model"],
+        "claude_thinking": cfg.get("claude_thinking", False),
+        "openai_reasoning_effort": cfg.get("openai_reasoning_effort", "medium"),
+        "verbosity": cfg.get("verbosity", "medium"),
         "available_models": {
             "claude": [
                 "claude-sonnet-4-5-20250929",
@@ -416,7 +419,6 @@ async def get_llm_config():
             ],
             "openai": [
                 "gpt-5.1",
-                "gpt-5-pro",
                 "gpt-5-mini"
             ],
             "google": [
@@ -431,6 +433,9 @@ class LLMConfigUpdate(BaseModel):
     api_keys: Optional[Dict[str, str]] = None
     selected_provider: Optional[str] = None
     selected_model: Optional[str] = None
+    claude_thinking: Optional[bool] = None
+    openai_reasoning_effort: Optional[str] = None
+    verbosity: Optional[str] = None
 
 @app.post("/llm-config")
 async def update_llm_config_endpoint(config: LLMConfigUpdate):
@@ -441,7 +446,10 @@ async def update_llm_config_endpoint(config: LLMConfigUpdate):
     success = update_cfg(
         api_keys=config.api_keys,
         provider=config.selected_provider,
-        model=config.selected_model
+        model=config.selected_model,
+        claude_thinking=config.claude_thinking,
+        openai_reasoning_effort=config.openai_reasoning_effort,
+        verbosity=config.verbosity
     )
     
     if success:

@@ -12,6 +12,23 @@ const PIECE_SYMBOLS: { [key: string]: string } = {
     'P': '歩', 'L': '香', 'N': '桂', 'S': '銀', 'G': '金', 'B': '角', 'R': '飛'
 };
 
+// Get scale factor based on piece type
+const getPieceScale = (piece: string): number => {
+    if (!piece) return 1.0;
+    const baseType = piece.replace('+', '').toLowerCase();
+    switch (baseType) {
+        case 'k': return 1.0;  // King
+        case 'r': return 0.97; // Rook
+        case 'b': return 0.97; // Bishop
+        case 'g': return 0.94; // Gold
+        case 's': return 0.94; // Silver
+        case 'n': return 0.91; // Knight
+        case 'l': return 0.88; // Lance
+        case 'p': return 0.85; // Pawn
+        default: return 1.0;
+    }
+};
+
 export default function CapturedPieces({ pieces, color, onPieceDrop, boardFlipped = false, isTopPanel = false }: CapturedPiecesProps) {
     const colorName = color === 'b' ? 'Black' : 'White';
     const bgColor = color === 'b' ? 'bg-[#111111]' : 'bg-gray-100';
@@ -35,23 +52,28 @@ export default function CapturedPieces({ pieces, color, onPieceDrop, boardFlippe
                 {individualPieces.length === 0 ? (
                     <div className="text-xs opacity-60">None</div>
                 ) : (
-                    individualPieces.map((piece, index) => (
-                        <div
-                            key={`${piece}-${index}`}
-                            className="shogi-piece cursor-pointer hover:scale-110 transition-transform"
-                            onClick={() => onPieceDrop?.(piece)}
-                            title={`Click to drop ${PIECE_SYMBOLS[piece]}`}
-                            style={{
-                                transform: boardFlipped 
-                                    ? (color === 'b' ? 'rotate(180deg)' : 'none')
-                                    : (color === 'w' ? 'rotate(180deg)' : 'none'),
-                            }}
-                        >
-                            <span className="shogi-piece-text text-3xl font-bold select-none text-black font-shogi">
-                                {PIECE_SYMBOLS[piece]}
-                            </span>
-                        </div>
-                    ))
+                    individualPieces.map((piece, index) => {
+                        const pieceScale = getPieceScale(piece);
+                        const shouldRotate = boardFlipped ? color === 'b' : color === 'w';
+                        const transformValue = shouldRotate 
+                            ? `rotate(180deg) scale(${pieceScale})` 
+                            : `scale(${pieceScale})`;
+                        return (
+                            <div
+                                key={`${piece}-${index}`}
+                                className="shogi-piece cursor-pointer hover:scale-110 transition-transform"
+                                onClick={() => onPieceDrop?.(piece)}
+                                title={`Click to drop ${PIECE_SYMBOLS[piece]}`}
+                                style={{
+                                    transform: transformValue,
+                                }}
+                            >
+                                <span className="shogi-piece-text text-3xl font-bold select-none text-black font-shogi">
+                                    {PIECE_SYMBOLS[piece]}
+                                </span>
+                            </div>
+                        );
+                    })
                 )}
             </div>
         </div>

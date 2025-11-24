@@ -72,6 +72,7 @@ export default function Home() {
   const [musicSoundEnabled, setMusicSoundEnabled] = useState(false);
   const [ambientSoundEnabled, setAmbientSoundEnabled] = useState(false);
   const [showClockStartModal, setShowClockStartModal] = useState(false);
+  const [lastMoveUsi, setLastMoveUsi] = useState<string | null>(null);
   const [pendingMove, setPendingMove] = useState<string | null>(null);
   const [moveHistory, setMoveHistory] = useState<MoveRecord[]>([]);
   const [gameTime, setGameTime] = useState(0);
@@ -192,7 +193,7 @@ export default function Home() {
       setMessages([
         {
           role: 'assistant',
-          content: `Welcome to Shogi Teacher! I'm here to help you learn and improve your shogi skills.\n\n**Game Mode**: ${session.mode}\n\nStart the clock and make a move to begin, or ask me any questions about the game.`,
+          content: `Learn to play Shogi! I'm here to help you learn and improve your shogi skills.\n\n**Game Mode**: ${session.mode}\n\nStart the clock and make a move to begin, or ask me any questions about the game.`,
           messageType: 'system'
         }
       ]);
@@ -231,6 +232,9 @@ export default function Home() {
       // Update game state from new SFEN
       const newState = await getGameState(result.new_sfen);
       setGameState(newState);
+      
+      // Track the last move for highlighting
+      setLastMoveUsi(move);
 
       // Play sound effect based on which player moved
       audioManager.playPieceSound(gameState.turn === 'b');
@@ -784,6 +788,7 @@ export default function Home() {
                 isLoading={isLoading}
                 engineConfig={engineConfig || undefined}
                 showBoardOptionsPanel={showBoardOptionsPanel}
+                lastMoveUsi={lastMoveUsi}
               />
             ) : (
               <div className="flex items-center justify-center h-96">

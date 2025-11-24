@@ -32,6 +32,7 @@ interface ShogiBoardProps {
     isCheck?: boolean;
     engineConfig?: EngineConfig;
     showBoardOptionsPanel?: boolean;
+    lastMoveUsi?: string | null;
 }
 
 const PIECE_SYMBOLS: { [key: string]: string } = {
@@ -191,7 +192,7 @@ function mustPromote(piece: string, toRow: number, isBlack: boolean): boolean {
     return false;
 }
 
-export default function ShogiBoard({ gameState, onMove, showBestMove = false, onBestMove, isLoading = false, showCheckNotification = true, engineConfig, showBoardOptionsPanel = true }: ShogiBoardProps) {
+export default function ShogiBoard({ gameState, onMove, showBestMove = false, onBestMove, isLoading = false, showCheckNotification = true, engineConfig, showBoardOptionsPanel = true, lastMoveUsi }: ShogiBoardProps) {
     const board = useMemo(() => parseSfen(gameState.sfen), [gameState.sfen]);
     const [selectedSquare, setSelectedSquare] = useState<Position | null>(null);
     const [selectedDropPiece, setSelectedDropPiece] = useState<string | null>(null);
@@ -203,7 +204,15 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
     const [useWesternNotation, setUseWesternNotation] = useState(uiSettings.useWesternNotation);
     const [highlightLastMove, setHighlightLastMove] = useState(uiSettings.highlightLastMove);
     const [showMovementOverlay, setShowMovementOverlay] = useState(uiSettings.showMovementOverlay);
-    const [lastMovePositions, setLastMovePositions] = useState<{ from: Position; to: Position } | null>(null);
+    
+    // Derive lastMovePositions from the parent's lastMoveUsi prop
+    const lastMovePositions = useMemo(() => {
+        if (lastMoveUsi && !lastMoveUsi.includes('*')) {
+            // Parse the USI move to get positions (skip drop moves)
+            return usiToPosition(lastMoveUsi);
+        }
+        return null;
+    }, [lastMoveUsi]);
 
     // Wrapper functions to save settings when changed
     const toggleJapaneseCoords = () => {
@@ -279,8 +288,6 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
                 const row_usi = String.fromCharCode('a'.charCodeAt(0) + row);
                 const dropMove = `${selectedDropPiece}*${col_usi}${row_usi}`;
                 onMove(dropMove);
-                // Track drop move (no 'from' position for drops, so use same position)
-                setLastMovePositions({ from: { row, col }, to: { row, col } });
             }
             setSelectedDropPiece(null);
             setLegalMoves([]);
@@ -334,8 +341,6 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
                     // No promotion possible, just move
                     const usiMove = positionToUsi(selectedSquare, { row, col });
                     onMove(usiMove);
-                    // Track last move for highlighting
-                    setLastMovePositions({ from: selectedSquare, to: { row, col } });
                 }
             }
 
@@ -357,9 +362,6 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
         
         const usiMove = positionToUsi(pendingMove.from, pendingMove.to, promote);
         onMove(usiMove);
-        
-        // Track last move for highlighting
-        setLastMovePositions({ from: pendingMove.from, to: pendingMove.to });
         
         setShowPromotionDialog(false);
         setPendingMove(null);
@@ -402,7 +404,7 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
 
             <div className="inline-block" style={{ transform: boardFlipped ? 'rotate(180deg)' : 'none' }}>
                 {/* Column numbers (9 to 1) */}
-                <div className="flex" style={{ marginLeft: useJapaneseCoords ? '12px' : '44px' }}>
+                <div className="flex" style={{ marginLeft: '12px' }}>
                     {[9, 8, 7, 6, 5, 4, 3, 2, 1].map(num => (
                         <div 
                             key={num} 
@@ -416,23 +418,15 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
 
                 {/* Board with row letters/numbers */}
                 <div className="flex">
-                    {/* Left coordinates (a-i or empty if Japanese coords) */}
-                    {!useJapaneseCoords && (
-                        <div className="flex flex-col justify-center">
-                            {['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'].map(letter => (
-                                <div 
-                                    key={letter} 
-                                    className="w-8 h-12 flex items-center justify-center text-sm font-semibold text-text-primary font-pixel drop-shadow-lg"
-                                    style={{ transform: boardFlipped ? 'rotate(180deg)' : 'none' }}
-                                >
-                                    {letter}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
                     {/* The actual board */}
-                    <div className="border-4 border-gray-700 bg-amber-100 p-2">
+                    <div 
+                        className="p-2 relative"
+                        style={{
+                            backgroundImage: 'url(/images/wood-grain.png)',
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center'
+                        }}
+                    >
                         {board.map((row, rowIndex) => (
                             <div key={rowIndex} className="flex">
                                 {row.map((piece, colIndex) => {
@@ -450,6 +444,31 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
 
                                     const isPromoted = piece && piece.startsWith('+');
                                     
+                                    // Get scale factor based on piece type
+                                    const getPieceScale = (piece: string | null): number => {
+                                        if (!piece) return 1.0;
+                                        const baseType = piece.replace('+', '').toLowerCase();
+                                        switch (baseType) {
+                                            case 'k': return 1.0;  // King
+                                            case 'r': return 0.97; // Rook
+                                            case 'b': return 0.97; // Bishop
+                                            case 'g': return 0.94; // Gold
+                                            case 's': return 0.94; // Silver
+                                            case 'n': return 0.91; // Knight
+                                            case 'l': return 0.88; // Lance
+                                            case 'p': return 0.85; // Pawn
+                                            default: return 1.0;
+                                        }
+                                    };
+                                    const pieceScale = piece ? getPieceScale(piece) : 1.0;
+                                    
+                                    // Check if this square should have a star point at its corner
+                                    // Star points go at the intersections: row c-d & f-g with columns 7 & 3
+                                    const hasStarPointTopRight = (rowIndex === 3 && colIndex === 2) || 
+                                                                 (rowIndex === 3 && colIndex === 5) ||
+                                                                 (rowIndex === 6 && colIndex === 2) || 
+                                                                 (rowIndex === 6 && colIndex === 5);
+                                    
                                     return (
                                         <div
                                             key={`${rowIndex}-${colIndex}`}
@@ -463,14 +482,25 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
                         ${isLastMoveSquare ? 'bg-cyan-200/40 ring-2 ring-cyan-400/60' : ''}
                       `}
                                         >
+                                            {/* Star point at grid intersection (top-right corner) */}
+                                            {hasStarPointTopRight && (
+                                                <div 
+                                                    className="absolute w-1.5 h-1.5 bg-black rounded-full z-50"
+                                                    style={{
+                                                        right: '-0.5px',
+                                                        top: '-1.0px',
+                                                        transform: 'translate(50%, -50%)'
+                                                    }}
+                                                />
+                                            )}
                                             {piece && (
                                                 <>
                                                     <div 
                                                         className="shogi-piece relative z-10"
                                                         style={{ 
-                                                            transform: boardFlipped 
+                                                            transform: `${boardFlipped 
                                                                 ? (isWhitePiece ? 'rotate(180deg)' : 'rotate(0deg)')
-                                                                : (isWhitePiece ? 'rotate(180deg)' : 'rotate(0deg)')
+                                                                : (isWhitePiece ? 'rotate(180deg)' : 'rotate(0deg)')} scale(${pieceScale})`
                                                         }}
                                                     >
                                                         <span className={`shogi-piece-text ${useWesternNotation ? 'text-xl' : 'text-3xl'} font-bold select-none ${useWesternNotation ? 'font-pixel' : 'font-shogi'} ${isPromoted ? 'text-red-600' : 'text-black'}`}>
@@ -579,10 +609,10 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
                         ))}
                     </div>
                     
-                    {/* Right coordinates (Japanese numerals if enabled) */}
-                    {useJapaneseCoords && (
-                        <div className="flex flex-col justify-center">
-                            {JAPANESE_COORDINATES.map((coord, idx) => (
+                    {/* Right coordinates (a-i or Japanese numerals based on toggle) */}
+                    <div className="flex flex-col justify-center">
+                        {useJapaneseCoords 
+                            ? JAPANESE_COORDINATES.map((coord, idx) => (
                                 <div 
                                     key={idx} 
                                     className="w-8 h-12 flex items-center justify-center text-lg font-semibold text-text-primary font-shogi drop-shadow-lg"
@@ -590,9 +620,18 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
                                 >
                                     {coord}
                                 </div>
-                            ))}
-                        </div>
-                    )}
+                            ))
+                            : ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'].map(letter => (
+                                <div 
+                                    key={letter} 
+                                    className="w-8 h-12 flex items-center justify-center text-sm font-semibold text-text-primary font-pixel drop-shadow-lg"
+                                    style={{ transform: boardFlipped ? 'rotate(180deg)' : 'none' }}
+                                >
+                                    {letter}
+                                </div>
+                            ))
+                        }
+                    </div>
                 </div>
             </div>
 
