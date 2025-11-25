@@ -103,6 +103,34 @@ function usiToPosition(usi: string): { from: { row: number; col: number }; to: {
     };
 }
 
+function parseLastMoveUsi(lastMoveUsi: string | null): { from: { row: number; col: number }; to: { row: number; col: number } } | null {
+    if (!lastMoveUsi) {
+        return null;
+    }
+    
+    if (!lastMoveUsi.includes('*')) {
+        return usiToPosition(lastMoveUsi);
+    }
+    
+    const parts = lastMoveUsi.split('*');
+    if (parts.length !== 2) {
+        return null;
+    }
+    
+    const destination = parts[1];
+    if (destination.length < 2) {
+        return null;
+    }
+    
+    const toCol = 9 - parseInt(destination[0]);
+    const toRow = destination.charCodeAt(1) - 'a'.charCodeAt(0);
+    
+    return {
+        from: { row: -1, col: -1 },
+        to: { row: toRow, col: toCol }
+    };
+}
+
 export default function OBSShogiBoard({ 
     gameState, 
     lastMoveUsi,
@@ -113,28 +141,7 @@ export default function OBSShogiBoard({
     showMovementOverlay = false
 }: OBSShogiBoardProps) {
     const board = useMemo(() => parseSfen(gameState.sfen), [gameState.sfen]);
-    
-    const lastMovePositions = useMemo(() => {
-        if (!lastMoveUsi) return null;
-        
-        if (lastMoveUsi.includes('*')) {
-            const parts = lastMoveUsi.split('*');
-            if (parts.length !== 2) return null;
-            
-            const destination = parts[1];
-            if (destination.length < 2) return null;
-            
-            const toCol = 9 - parseInt(destination[0]);
-            const toRow = destination.charCodeAt(1) - 'a'.charCodeAt(0);
-            
-            return {
-                from: { row: -1, col: -1 },
-                to: { row: toRow, col: toCol }
-            };
-        } else {
-            return usiToPosition(lastMoveUsi);
-        }
-    }, [lastMoveUsi]);
+    const lastMovePositions = parseLastMoveUsi(lastMoveUsi);
 
     return (
         <div className="relative flex items-center justify-center" style={{ marginLeft: -150, marginTop: -250 }}>

@@ -27,6 +27,8 @@ interface Message {
     messageType?: 'system' | 'llm' | 'engine-black' | 'engine-white';
     engineName?: string;
     hintData?: HintData;
+    id?: string;
+    isThinking?: boolean;
 }
 
 interface ChatInterfaceProps {
@@ -209,7 +211,14 @@ export default function ChatInterface({ messages, onSendMessage, isLoading, onGe
                                         <HintRenderer hint={message.hintData} />
                                     ) : (
                                         <div className={`prose prose-sm max-w-none ${textColor === 'text-white' ? 'prose-invert' : ''}`}>
-                                            <ReactMarkdown>{message.content}</ReactMarkdown>
+                                            {message.isThinking ? (
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0" />
+                                                    <span><ReactMarkdown>{message.content}</ReactMarkdown></span>
+                                                </div>
+                                            ) : (
+                                                <ReactMarkdown>{message.content}</ReactMarkdown>
+                                            )}
                                         </div>
                                     )
                                 ) : (

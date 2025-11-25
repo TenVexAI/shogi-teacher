@@ -6,12 +6,14 @@ Handles game session lifecycle, move recording, and state management.
 
 import uuid
 import shogi
+import json
 from datetime import datetime
+from pathlib import Path
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 
 from database import GameSessionDB, MoveRecordDB, SessionLocal
-from models import GameSession, GameSessionCreate, MoveRecord, MoveAnalysis
+from models import GameSession, GameSessionCreate, MoveRecord, MoveAnalysis, GameMode
 
 
 class SessionManager:
@@ -19,7 +21,30 @@ class SessionManager:
     
     def __init__(self):
         """Initialize session manager"""
-        pass
+        self._engine_names_cache: Dict[str, str] = {}
+    
+    def _get_engine_name(self, engine_id: str) -> str:
+        """Get engine display name from config.json"""
+        if engine_id in self._engine_names_cache:
+            return self._engine_names_cache[engine_id]
+        
+        # Try to load from engine config
+        engines_dir = Path(__file__).parent / "engines"
+        config_path = engines_dir / engine_id / "config.json"
+        
+        if config_path.exists():
+            try:
+                with open(config_path, 'r') as f:
+                    config = json.load(f)
+                    name = config.get('name', engine_id)
+                    self._engine_names_cache[engine_id] = name
+                    return name
+            except:
+                pass
+        
+        # Fallback to engine_id
+        self._engine_names_cache[engine_id] = engine_id
+        return engine_id
     
     def create_session(self, request: GameSessionCreate) -> GameSession:
         """
@@ -43,11 +68,26 @@ class SessionManager:
                 board = shogi.Board()
                 starting_sfen = board.sfen()
             
-            # Auto-detect game mode
-            mode = self._detect_game_mode(
+            # Use provided game_mode or auto-detect
+            if hasattr(request, 'game_mode') and request.game_mode:
+                mode = request.game_mode
+            else:
+                mode = self._detect_game_mode(
+                    request.white_player,
+                    request.black_player,
+                    request.analyst_enabled
+                )
+            
+            # Determine player names
+            white_name = self._resolve_player_name(
+                request.white_name,
                 request.white_player,
+                request.white_engine
+            )
+            black_name = self._resolve_player_name(
+                request.black_name,
                 request.black_player,
-                request.analyst_enabled
+                request.black_engine
             )
             
             # Create database record
@@ -55,6 +95,8 @@ class SessionManager:
                 session_id=session_id,
                 white_player=request.white_player,
                 black_player=request.black_player,
+                white_name=white_name,
+                black_name=black_name,
                 white_engine=request.white_engine,
                 black_engine=request.black_engine,
                 analyst_engine=request.analyst_engine,
@@ -74,6 +116,34 @@ class SessionManager:
             
         finally:
             db.close()
+    
+    def _resolve_player_name(self, provided_name: Optional[str], player_type: str, engine_id: Optional[str]) -> str:
+        """
+        Resolve player display name.
+        
+        Args:
+            provided_name: User-provided name (if any)
+            player_type: "human" or engine_id
+            engine_id: Engine ID if assigned
+            
+        Returns:
+            Resolved display name
+        """
+        # If user provided a name, use it
+        if provided_name:
+            return provided_name
+        
+        # If human player, default to "Guest"
+        if player_type == "human":
+            return "Guest"
+        
+        # If computer player, use engine name
+        if engine_id:
+            return self._get_engine_name(engine_id)
+        elif player_type != "human":
+            return self._get_engine_name(player_type)
+        
+        return "Guest"
     
     def get_session(self, session_id: str) -> Optional[GameSession]:
         """Get a game session by ID"""
@@ -262,20 +332,18 @@ class SessionManager:
         """
         Auto-detect game mode based on setup.
         
-        Returns: "casual", "training", "competitive", "analysis"
+        Returns: "human_vs_human", "human_vs_computer", "computer_vs_computer"
         """
         is_human_vs_human = white_player == "human" and black_player == "human"
         is_human_vs_engine = (white_player == "human") != (black_player == "human")
         is_engine_vs_engine = white_player != "human" and black_player != "human"
         
         if is_engine_vs_engine:
-            return "analysis"  # Watching engines play
-        elif analyst_enabled and is_human_vs_engine:
-            return "training"  # Learning with analysis
+            return GameMode.COMPUTER_VS_COMPUTER.value
         elif is_human_vs_engine:
-            return "competitive"  # Playing seriously
+            return GameMode.HUMAN_VS_COMPUTER.value
         else:
-            return "casual"  # Human vs human, no analysis
+            return GameMode.HUMAN_VS_HUMAN.value
     
     def _calculate_move_quality(self, hint_analysis: Dict, 
                                 post_analysis: Dict) -> tuple[Optional[int], Optional[str]]:
@@ -330,12 +398,15 @@ class SessionManager:
             updated_at=db_session.updated_at,
             white_player=db_session.white_player,
             black_player=db_session.black_player,
+            white_name=db_session.white_name or "Guest",
+            black_name=db_session.black_name or "Guest",
             white_engine=db_session.white_engine,
             black_engine=db_session.black_engine,
             analyst_engine=db_session.analyst_engine,
             analyst_enabled=db_session.analyst_enabled,
             analyst_movetime=db_session.analyst_movetime,
             mode=db_session.mode,
+            is_paused=db_session.is_paused or False,
             moves=moves,
             user_notes=db_session.user_notes,
             reference_files=reference_files,

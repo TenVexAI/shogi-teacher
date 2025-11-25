@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import ShogiBoard from '@/components/ShogiBoard';
 import ChatInterface from '@/components/ChatInterface';
 import ConfigModal from '@/components/ConfigModal';
@@ -10,12 +10,15 @@ import MoveHistory, { MoveRecord } from '@/components/MoveHistory';
 import Sidebar from '@/components/Sidebar';
 import ResourcesWindow from '@/components/ResourcesWindow';
 import ResumeSessionModal from '@/components/ResumeSessionModal';
+import NewGameModal, { GameConfig } from '@/components/NewGameModal';
+import ExportGameModal from '@/components/ExportGameModal';
 import { 
   getGameState, analyzePosition, explainPosition, updateConfig, getConfig,
   createSession, getSession, getHint, recordMove, listSessions,
-  GameSession, HintResponse, MoveRecordBackend
+  importGame, exportGame, requestComputerMove,
+  GameSession, HintResponse, MoveRecordBackend, CreateSessionOptions
 } from '@/lib/api';
-import { GameState } from '@/types/game';
+import { GameState, GameFormat } from '@/types/game';
 import { audioManager } from '@/lib/audioManager';
 import { loadUISettings, saveUISettings } from '@/lib/settings';
 
@@ -42,6 +45,8 @@ interface Message {
   messageType?: 'system' | 'llm' | 'engine-black' | 'engine-white';
   engineName?: string;
   hintData?: HintData;
+  id?: string;  // For tracking and updating messages
+  isThinking?: boolean;  // Show animated spinner
 }
 
 export default function Home() {
@@ -83,6 +88,12 @@ export default function Home() {
   const lastMoveTimeRef = useRef<number>(0);
   const accumulatedTimeRef = useRef<number>(0);
   const [engineConfig, setEngineConfig] = useState<{ black: { engineId: string | null; strengthLevel: number }; white: { engineId: string | null; strengthLevel: number } } | null>(null);
+  
+  // Game mode state
+  const [isNewGameModalOpen, setIsNewGameModalOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [availableEngines, setAvailableEngines] = useState<{ id: string; name: string }[]>([]);
+  const [isComputerThinking, setIsComputerThinking] = useState(false);
 
   useEffect(() => {
     // Initialize game and load config
@@ -255,10 +266,36 @@ export default function Home() {
     }
   };
 
-  const loadInitialGame = async () => {
+  const loadInitialGame = async (config?: GameConfig) => {
     try {
+      // Build session options from config
+      const options: CreateSessionOptions = {
+        gameMode: config?.mode || 'human_vs_human',
+        whitePlayer: 'human',
+        blackPlayer: 'human',
+        whiteName: config?.whiteName,
+        blackName: config?.blackName,
+        whiteEngine: config?.whiteEngine || 'yaneuraou',
+        blackEngine: config?.blackEngine || 'yaneuraou',
+      };
+      
+      // Configure for human vs computer
+      if (config?.mode === 'human_vs_computer') {
+        if (config.humanPlaysAs === 'black') {
+          options.whitePlayer = config.whiteEngine || 'yaneuraou';
+        } else {
+          options.blackPlayer = config.blackEngine || 'yaneuraou';
+        }
+      }
+      
+      // Configure for computer vs computer
+      if (config?.mode === 'computer_vs_computer') {
+        options.blackPlayer = config.blackEngine || 'yaneuraou';
+        options.whitePlayer = config.whiteEngine || 'yaneuraou';
+      }
+      
       // Create a new session
-      const session = await createSession('human', 'human');
+      const session = await createSession(options);
       setCurrentSession(session);
       
       // Load game state from session SFEN
@@ -445,9 +482,269 @@ export default function Home() {
   };
 
   const handleNewGame = () => {
-    loadInitialGame();
+    setIsNewGameModalOpen(true);
+  };
+
+  const handleStartNewGame = (config: GameConfig) => {
+    loadInitialGame(config);
     audioManager.playUISound('new_game');
   };
+
+  const handleImportGame = async (content: string, format?: string) => {
+    try {
+      setIsLoading(true);
+      const result = await importGame(content, format);
+      
+      if (result.success && result.session_id) {
+        // Load the imported session
+        const session = await getSession(result.session_id);
+        setCurrentSession(session);
+        
+        const state = await getGameState(session.current_sfen);
+        setGameState(state);
+        
+        // Build move history
+        let cumulativeTime = 0;
+        setMoveHistory(session.moves.map((m: MoveRecordBackend) => {
+          cumulativeTime += m.time_spent * 1000;
+          return {
+            moveNumber: m.move_number,
+            player: (m.player === 'black' ? 'b' : 'w') as 'b' | 'w',
+            move: m.move_algebraic,
+            timestamp: cumulativeTime,
+            timeSinceLastMove: m.time_spent * 1000,
+            sfen: m.position_after
+          };
+        }));
+        
+        // Set last move highlight
+        const lastMoveRecord = session.moves[session.moves.length - 1];
+        setLastMoveUsi(lastMoveRecord ? lastMoveRecord.move_usi : null);
+        
+        addAssistantMessage(
+          `**Game Imported**\n\n${result.message}\n\nFormat: ${result.detected_format?.toUpperCase() || 'Auto-detected'}`,
+          'system'
+        );
+        audioManager.playUISound('new_game');
+      } else {
+        addAssistantMessage(`❌ Import failed: ${result.message}`, 'system');
+      }
+    } catch (error) {
+      console.error('Failed to import game:', error);
+      addAssistantMessage('❌ Failed to import game. Please check the file format.', 'system');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleExportGame = async (
+    format: GameFormat, 
+    whiteName?: string, 
+    blackName?: string, 
+    filename?: string
+  ): Promise<{ content: string; filename: string } | null> => {
+    if (!currentSession) return null;
+    
+    try {
+      const result = await exportGame(
+        currentSession.session_id,
+        format,
+        whiteName,
+        blackName,
+        undefined,
+        filename
+      );
+      
+      if (result.success) {
+        return { content: result.content, filename: result.filename };
+      }
+      return null;
+    } catch (error) {
+      console.error('Failed to export game:', error);
+      return null;
+    }
+  };
+
+  // Check if it's computer's turn and trigger auto-move
+  const checkAndTriggerComputerMove = useCallback(async () => {
+    if (!currentSession || !gameState || isComputerThinking || isLoading) return;
+    if (gameState.is_game_over) return;
+    
+    // Don't move if clock isn't running
+    if (!isClockRunning) return;
+    
+    const mode = currentSession.mode;
+    const currentTurn = gameState.turn; // 'b' or 'w'
+    
+    // Determine if current player is computer
+    let isComputerTurn = false;
+    
+    if (mode === 'computer_vs_computer') {
+      isComputerTurn = !currentSession.is_paused;
+    } else if (mode === 'human_vs_computer') {
+      // Check which side is computer
+      const blackIsComputer = currentSession.black_player !== 'human';
+      const whiteIsComputer = currentSession.white_player !== 'human';
+      isComputerTurn = (currentTurn === 'b' && blackIsComputer) || (currentTurn === 'w' && whiteIsComputer);
+    }
+    
+    if (!isComputerTurn) return;
+    
+    // Add thinking message
+    const playerName = currentTurn === 'b' ? currentSession.black_name : currentSession.white_name;
+    const thinkingId = Date.now().toString();
+    
+    setMessages(prev => [
+      ...prev,
+      {
+        role: 'assistant',
+        content: `**${playerName}** is thinking...`,
+        messageType: 'system',
+        id: thinkingId,
+        isThinking: true
+      }
+    ]);
+    
+    setIsComputerThinking(true);
+    
+    try {
+      const result = await requestComputerMove(currentSession.session_id, 2000);
+      
+      if (result.success && result.move_usi) {
+        // Update game state
+        const newState = await getGameState(result.new_sfen || '');
+        setGameState(newState);
+        setLastMoveUsi(result.move_usi);
+        
+        // Play sound
+        audioManager.playPieceSound(currentTurn === 'b');
+        
+        // Refresh session
+        const updatedSession = await getSession(currentSession.session_id);
+        setCurrentSession(updatedSession);
+        
+        // Update move history
+        let cumulativeTime = 0;
+        setMoveHistory(updatedSession.moves.map((m: MoveRecordBackend) => {
+          cumulativeTime += m.time_spent * 1000;
+          return {
+            moveNumber: m.move_number,
+            player: (m.player === 'black' ? 'b' : 'w') as 'b' | 'w',
+            move: m.move_algebraic,
+            timestamp: cumulativeTime,
+            timeSinceLastMove: m.time_spent * 1000,
+            sfen: m.position_after
+          };
+        }));
+        
+        // Update thinking message to show the move
+        const moveNumber = updatedSession.moves.length;
+        const thinkingTime = (result.thinking_time / 1000).toFixed(1);
+        setMessages(prev => prev.map(msg => 
+          msg.id === thinkingId 
+            ? {
+                ...msg,
+                content: `**${playerName}** played: **${result.move_algebraic}** (move ${moveNumber}, ${thinkingTime}s)${result.is_game_over ? '\n\n**Game Over!**' : ''}`,
+                isThinking: false
+              }
+            : msg
+        ));
+      } else {
+        // Update thinking message to show error
+        setMessages(prev => prev.map(msg => 
+          msg.id === thinkingId 
+            ? { ...msg, content: `**${playerName}** failed to make a move`, isThinking: false }
+            : msg
+        ));
+      }
+    } catch (error) {
+      console.error('Computer move failed:', error);
+      // Update thinking message to show error
+      setMessages(prev => prev.map(msg => 
+        msg.id === thinkingId 
+          ? { ...msg, content: `**${playerName}** failed to make a move`, isThinking: false }
+          : msg
+      ));
+    } finally {
+      setIsComputerThinking(false);
+    }
+  }, [currentSession, gameState, isComputerThinking, isLoading, isClockRunning]);
+
+  // Effect to trigger computer moves
+  useEffect(() => {
+    if (!currentSession || !gameState) return;
+    
+    const mode = currentSession.mode;
+    if (mode !== 'human_vs_computer' && mode !== 'computer_vs_computer') return;
+    
+    // Don't move if clock isn't running (respects pause)
+    if (!isClockRunning) return;
+    
+    // Small delay before computer moves
+    const timeout = setTimeout(() => {
+      checkAndTriggerComputerMove();
+    }, 500);
+    
+    return () => clearTimeout(timeout);
+  }, [currentSession?.mode, gameState?.turn, currentSession?.is_paused, isClockRunning, checkAndTriggerComputerMove]);
+
+  // Helper to check if user can interact with pieces
+  const canUserInteract = (): boolean => {
+    if (!currentSession || !gameState) return false;
+    if (gameState.is_game_over) return false;
+    if (isComputerThinking) return false;
+    
+    const mode = currentSession.mode;
+    const currentTurn = gameState.turn;
+    
+    if (mode === 'computer_vs_computer') {
+      return false; // User never interacts in computer vs computer
+    }
+    
+    if (mode === 'human_vs_computer') {
+      const blackIsHuman = currentSession.black_player === 'human';
+      const whiteIsHuman = currentSession.white_player === 'human';
+      return (currentTurn === 'b' && blackIsHuman) || (currentTurn === 'w' && whiteIsHuman);
+    }
+    
+    return true; // human_vs_human - always can interact
+  };
+
+  // Helper to check if hint/best move buttons should be enabled
+  const canUseHintButtons = (): boolean => {
+    if (!currentSession || !gameState) return false;
+    if (gameState.is_game_over) return false;
+    if (isComputerThinking) return false;
+    
+    const mode = currentSession.mode;
+    
+    if (mode === 'computer_vs_computer') {
+      return false; // No hints in computer vs computer
+    }
+    
+    return canUserInteract();
+  };
+
+  // Load available engines for the modal
+  useEffect(() => {
+    const loadEngines = async () => {
+      try {
+        const response = await fetch('http://127.0.0.1:8000/engines');
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableEngines(data.engines || []);
+        }
+      } catch (error) {
+        console.error('Failed to load engines:', error);
+        // Fallback
+        setAvailableEngines([
+          { id: 'yaneuraou', name: 'YaneuraOu' },
+          { id: 'fairy-stockfish', name: 'Fairy-Stockfish' }
+        ]);
+      }
+    };
+    loadEngines();
+  }, []);
 
   const handleGetHint = async () => {
     if (!gameState || !currentSession) return;
@@ -812,6 +1109,32 @@ export default function Home() {
           }}
         />
 
+        <NewGameModal
+          isOpen={isNewGameModalOpen}
+          onClose={() => setIsNewGameModalOpen(false)}
+          onStartGame={handleStartNewGame}
+          onImportGame={handleImportGame}
+          currentEngineConfig={engineConfig ? {
+            black: { 
+              engineId: engineConfig.black.engineId, 
+              engineName: availableEngines.find(e => e.id === engineConfig.black.engineId)?.name || engineConfig.black.engineId || 'Not configured'
+            },
+            white: { 
+              engineId: engineConfig.white.engineId, 
+              engineName: availableEngines.find(e => e.id === engineConfig.white.engineId)?.name || engineConfig.white.engineId || 'Not configured'
+            }
+          } : null}
+          onOpenEngineManagement={() => setIsEngineManagementOpen(true)}
+        />
+
+        <ExportGameModal
+          isOpen={isExportModalOpen}
+          onClose={() => setIsExportModalOpen(false)}
+          onExport={handleExportGame}
+          currentWhiteName={currentSession?.white_name || 'Guest'}
+          currentBlackName={currentSession?.black_name || 'Guest'}
+        />
+
         {/* Clock Start Confirmation Modal */}
         {showClockStartModal && (
           <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50">
@@ -880,16 +1203,18 @@ export default function Home() {
           {/* Center Column: Board */}
           <div className="shrink-0 flex flex-col items-center gap-4">
             {gameState ? (
-              <ShogiBoard 
-                gameState={gameState} 
-                onMove={handleMove}
-                showBestMove={showBestMove}
-                onBestMove={handleBestMove}
-                isLoading={isLoading}
-                engineConfig={engineConfig || undefined}
-                showBoardOptionsPanel={showBoardOptionsPanel}
-                lastMoveUsi={lastMoveUsi}
-              />
+              <>
+                <ShogiBoard 
+                  gameState={gameState} 
+                  onMove={canUserInteract() ? handleMove : () => {}}
+                  showBestMove={showBestMove && canUseHintButtons()}
+                  onBestMove={canUseHintButtons() ? handleBestMove : () => {}}
+                  isLoading={isLoading || isComputerThinking}
+                  engineConfig={engineConfig || undefined}
+                  showBoardOptionsPanel={showBoardOptionsPanel}
+                  lastMoveUsi={lastMoveUsi}
+                />
+              </>
             ) : (
               <div className="flex items-center justify-center h-96">
                 <div className="text-text-secondary">Loading game...</div>

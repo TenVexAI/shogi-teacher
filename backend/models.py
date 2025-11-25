@@ -5,8 +5,19 @@ These models handle validation and serialization for the REST API.
 """
 
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
+from enum import Enum
+
+
+# ===== Enums =====
+
+class GameMode(str, Enum):
+    """Game mode types"""
+    HUMAN_VS_HUMAN = "human_vs_human"
+    HUMAN_VS_COMPUTER = "human_vs_computer"
+    COMPUTER_VS_COMPUTER = "computer_vs_computer"
+    CASUAL = "casual"  # Legacy mode, treated as human_vs_human
 
 
 # ===== Analysis Models =====
@@ -89,6 +100,10 @@ class GameSession(BaseModel):
     white_player: str  # "human" or engine_id
     black_player: str  # "human" or engine_id
     
+    # Player names (display names)
+    white_name: str = "Guest"
+    black_name: str = "Guest"
+    
     # Engine assignments
     white_engine: Optional[str] = None
     black_engine: Optional[str] = None
@@ -98,6 +113,9 @@ class GameSession(BaseModel):
     
     # Game mode
     mode: str = "casual"
+    
+    # Computer vs Computer control
+    is_paused: bool = False
     
     # Move history
     moves: List[MoveRecord] = []
@@ -116,8 +134,18 @@ class GameSession(BaseModel):
 
 class GameSessionCreate(BaseModel):
     """Request to create a new game session"""
-    white_player: str = "human"
-    black_player: str = "human"
+    # Game mode
+    game_mode: str = "human_vs_human"  # human_vs_human, human_vs_computer, computer_vs_computer
+    
+    # Player configuration
+    white_player: str = "human"  # "human" or engine_id
+    black_player: str = "human"  # "human" or engine_id
+    
+    # Player names
+    white_name: Optional[str] = None  # None = use default (Guest or engine name)
+    black_name: Optional[str] = None  # None = use default (Guest or engine name)
+    
+    # Engine assignments
     white_engine: Optional[str] = None
     black_engine: Optional[str] = None
     analyst_engine: Optional[str] = None
@@ -137,6 +165,13 @@ class GameSessionUpdate(BaseModel):
     user_notes: Optional[str] = None
     is_active: Optional[bool] = None
     current_sfen: Optional[str] = None  # Allow updating current position
+    
+    # Player names (editable anytime)
+    white_name: Optional[str] = None
+    black_name: Optional[str] = None
+    
+    # Computer vs Computer control
+    is_paused: Optional[bool] = None
 
 
 # ===== Move Models =====
@@ -242,3 +277,63 @@ class SessionReferenceToggle(BaseModel):
     session_id: str
     reference_id: int
     enabled: bool
+
+
+# ===== Game Import/Export Models =====
+
+class GameImportRequest(BaseModel):
+    """Request to import a game from file content"""
+    content: str  # File content as string
+    format: Optional[str] = None  # 'kif', 'csa', 'ki2', 'psn' or None to auto-detect
+    white_name: Optional[str] = None  # Override player name
+    black_name: Optional[str] = None  # Override player name
+    game_mode: str = "human_vs_human"  # Game mode to use
+
+
+class GameImportResponse(BaseModel):
+    """Response from game import"""
+    success: bool
+    session_id: Optional[str] = None
+    message: str
+    move_count: int = 0
+    detected_format: Optional[str] = None
+
+
+class GameExportRequest(BaseModel):
+    """Request to export a game"""
+    session_id: str
+    format: str  # 'kif', 'csa', 'ki2', 'psn'
+    white_name: Optional[str] = None  # Override player name
+    black_name: Optional[str] = None  # Override player name
+    event_name: Optional[str] = None  # Custom event name
+    filename: Optional[str] = None  # Custom filename (without extension)
+
+
+class GameExportResponse(BaseModel):
+    """Response from game export"""
+    success: bool
+    content: str = ""
+    filename: str = ""
+    format: str = ""
+    message: str = ""
+
+
+# ===== Computer Move Models =====
+
+class ComputerMoveRequest(BaseModel):
+    """Request for computer to make a move"""
+    session_id: str
+    movetime: int = 3000  # Time in ms for engine to think
+
+
+class ComputerMoveResponse(BaseModel):
+    """Response from computer move"""
+    success: bool
+    move_usi: Optional[str] = None
+    move_algebraic: Optional[str] = None
+    new_sfen: Optional[str] = None
+    is_game_over: bool = False
+    winner: Optional[str] = None
+    engine_name: Optional[str] = None
+    thinking_time: float = 0.0
+    message: str = ""

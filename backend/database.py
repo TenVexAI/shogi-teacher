@@ -41,6 +41,10 @@ class GameSessionDB(Base):
     white_player = Column(String, nullable=False)  # "human" or engine_id
     black_player = Column(String, nullable=False)  # "human" or engine_id
     
+    # Player names (display names)
+    white_name = Column(String, default="Guest")
+    black_name = Column(String, default="Guest")
+    
     # Engine assignments
     white_engine = Column(String, nullable=True)  # Engine ID for hints/play
     black_engine = Column(String, nullable=True)  # Engine ID for hints/play
@@ -48,8 +52,11 @@ class GameSessionDB(Base):
     analyst_enabled = Column(Boolean, default=False)
     analyst_movetime = Column(Integer, default=3000)  # ms
     
-    # Game mode (auto-detected)
-    mode = Column(String, default="casual")  # casual, training, competitive, puzzle, analysis
+    # Game mode
+    mode = Column(String, default="human_vs_human")  # human_vs_human, human_vs_computer, computer_vs_computer
+    
+    # Computer vs Computer control
+    is_paused = Column(Boolean, default=False)
     
     # Current state
     current_sfen = Column(Text, nullable=False)
@@ -127,9 +134,44 @@ class SessionReferenceDB(Base):
     reference = relationship("ReferenceFileDB", back_populates="sessions")
 
 
+def migrate_db():
+    """Run database migrations to add new columns to existing tables"""
+    import sqlite3
+    
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    # Get existing columns in game_sessions table
+    cursor.execute("PRAGMA table_info(game_sessions)")
+    existing_columns = {row[1] for row in cursor.fetchall()}
+    
+    # Migrations for game_sessions table
+    migrations = [
+        ("white_name", "ALTER TABLE game_sessions ADD COLUMN white_name TEXT DEFAULT 'Guest'"),
+        ("black_name", "ALTER TABLE game_sessions ADD COLUMN black_name TEXT DEFAULT 'Guest'"),
+        ("is_paused", "ALTER TABLE game_sessions ADD COLUMN is_paused INTEGER DEFAULT 0"),
+    ]
+    
+    for column_name, sql in migrations:
+        if column_name not in existing_columns:
+            try:
+                cursor.execute(sql)
+                print(f"  ✓ Added column: {column_name}")
+            except sqlite3.OperationalError as e:
+                print(f"  ! Migration skipped for {column_name}: {e}")
+    
+    conn.commit()
+    conn.close()
+
+
 def init_db():
     """Initialize database tables"""
     Base.metadata.create_all(bind=engine)
+    
+    # Run migrations for existing databases
+    if DB_PATH.exists():
+        migrate_db()
+    
     print(f"✓ Database initialized: {DB_PATH}")
 
 

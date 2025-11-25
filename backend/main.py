@@ -45,7 +45,10 @@ from models import (
     HintRequest, HintResponse, MoveAnalysis,
     AnalyzeRequest, AnalyzeResponse,
     LLMQuery, LLMResponse,
-    ReferenceFileCreate, ReferenceFile, SessionReferenceToggle
+    ReferenceFileCreate, ReferenceFile, SessionReferenceToggle,
+    GameImportRequest, GameImportResponse,
+    GameExportRequest, GameExportResponse,
+    ComputerMoveRequest, ComputerMoveResponse
 )
 
 # Fix for Windows asyncio subprocess support
@@ -1402,4 +1405,339 @@ async def toggle_session_reference(session_id: str, file_id: int, enabled: bool,
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error toggling reference: {str(e)}")
+
+
+# ===== Game Import/Export Endpoints =====
+
+@app.post("/game/import", response_model=GameImportResponse)
+async def import_game(request: GameImportRequest):
+    """
+    Import a game from KIF, CSA, KI2, or PSN format.
+    Creates a new session with the imported moves.
+    """
+    try:
+        from game_formats import parse_game_file, detect_format, GameRecord
+        from datetime import datetime
+        
+        # Detect format if not specified
+        detected_format = request.format or detect_format(request.content)
+        
+        # Parse the game file
+        try:
+            record = parse_game_file(request.content, detected_format)
+        except Exception as e:
+            return GameImportResponse(
+                success=False,
+                message=f"Failed to parse {detected_format.upper()} file: {str(e)}",
+                detected_format=detected_format
+            )
+        
+        # Override player names if provided
+        white_name = request.white_name or record.metadata.white_name
+        black_name = request.black_name or record.metadata.black_name
+        
+        # Create a new session
+        session_request = GameSessionCreate(
+            game_mode=request.game_mode,
+            white_player="human",
+            black_player="human",
+            white_name=white_name,
+            black_name=black_name,
+            white_engine="yaneuraou",
+            black_engine="yaneuraou",
+            starting_sfen=record.starting_sfen
+        )
+        
+        session = session_manager.create_session(session_request)
+        
+        # Replay the moves
+        board = shogi.Board(record.starting_sfen)
+        
+        for parsed_move in record.moves:
+            try:
+                move = shogi.Move.from_usi(parsed_move.move_usi)
+                if move not in board.legal_moves:
+                    continue
+                
+                position_before = board.sfen()
+                player = "black" if board.turn == shogi.BLACK else "white"
+                
+                # Get algebraic notation
+                move_algebraic = usi_to_standard_notation(board, move)
+                
+                board.push(move)
+                position_after = board.sfen()
+                
+                # Record the move
+                session_manager.add_move(
+                    session_id=session.session_id,
+                    move_usi=parsed_move.move_usi,
+                    move_algebraic=move_algebraic,
+                    position_before=position_before,
+                    position_after=position_after,
+                    player=player,
+                    time_spent=parsed_move.time_spent
+                )
+            except Exception as e:
+                print(f"Error replaying move {parsed_move.move_usi}: {e}")
+                continue
+        
+        return GameImportResponse(
+            success=True,
+            session_id=session.session_id,
+            message=f"Successfully imported {len(record.moves)} moves from {detected_format.upper()} file",
+            move_count=len(record.moves),
+            detected_format=detected_format
+        )
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return GameImportResponse(
+            success=False,
+            message=f"Import failed: {str(e)}"
+        )
+
+
+@app.post("/game/export", response_model=GameExportResponse)
+async def export_game(request: GameExportRequest):
+    """
+    Export a game to KIF, CSA, KI2, or PSN format.
+    """
+    try:
+        from game_formats import export_game_file, GameRecord, GameMetadata, ParsedMove
+        from datetime import datetime
+        
+        # Get session
+        session = session_manager.get_session(request.session_id)
+        if not session:
+            return GameExportResponse(
+                success=False,
+                message="Session not found"
+            )
+        
+        # Build GameRecord from session
+        metadata = GameMetadata(
+            white_name=request.white_name or session.white_name,
+            black_name=request.black_name or session.black_name,
+            event=request.event_name or "Shogi Teacher Game",
+            date=session.created_at,
+            result="*"  # Game still in progress
+        )
+        
+        # Check for game result
+        board = shogi.Board(session.current_sfen)
+        if board.is_game_over():
+            if board.is_checkmate():
+                # Last player to move won
+                metadata.result = "0-1" if board.turn == shogi.BLACK else "1-0"
+            else:
+                metadata.result = "1/2-1/2"
+        
+        # Convert moves
+        parsed_moves = []
+        for move in session.moves:
+            parsed_moves.append(ParsedMove(
+                move_number=move.move_number,
+                player=move.player,
+                move_usi=move.move_usi,
+                move_algebraic=move.move_algebraic,
+                time_spent=move.time_spent
+            ))
+        
+        record = GameRecord(
+            metadata=metadata,
+            moves=parsed_moves,
+            starting_sfen="lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1"
+        )
+        
+        # Export to format
+        try:
+            content = export_game_file(record, request.format)
+        except ValueError as e:
+            return GameExportResponse(
+                success=False,
+                message=str(e)
+            )
+        
+        # Generate filename
+        if request.filename:
+            filename = request.filename
+        else:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            white = metadata.white_name.replace(" ", "_")
+            black = metadata.black_name.replace(" ", "_")
+            filename = f"{black}_vs_{white}_{timestamp}"
+        
+        # Add extension
+        extensions = {'kif': '.kif', 'csa': '.csa', 'ki2': '.ki2', 'psn': '.psn'}
+        filename += extensions.get(request.format.lower(), '.txt')
+        
+        return GameExportResponse(
+            success=True,
+            content=content,
+            filename=filename,
+            format=request.format,
+            message=f"Successfully exported {len(parsed_moves)} moves to {request.format.upper()}"
+        )
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return GameExportResponse(
+            success=False,
+            message=f"Export failed: {str(e)}"
+        )
+
+
+# ===== Computer Move Endpoint =====
+
+@app.post("/session/{session_id}/computer-move", response_model=ComputerMoveResponse)
+async def computer_move(session_id: str, request: ComputerMoveRequest):
+    """
+    Have the computer (engine) make a move for the current side.
+    Used in Human vs Computer and Computer vs Computer modes.
+    """
+    import time
+    
+    try:
+        # Get session
+        session = session_manager.get_session(session_id)
+        if not session:
+            return ComputerMoveResponse(
+                success=False,
+                message="Session not found"
+            )
+        
+        # Parse current position
+        board = shogi.Board(session.current_sfen)
+        
+        # Check if game is over
+        if board.is_game_over():
+            winner = None
+            if board.is_checkmate():
+                winner = "white" if board.turn == shogi.BLACK else "black"
+            return ComputerMoveResponse(
+                success=False,
+                is_game_over=True,
+                winner=winner,
+                message="Game is already over"
+            )
+        
+        # Determine which side to play
+        side = "black" if board.turn == shogi.BLACK else "white"
+        
+        # Get engine for this side
+        engine_id = session.black_engine if side == "black" else session.white_engine
+        if not engine_id:
+            return ComputerMoveResponse(
+                success=False,
+                message=f"No engine assigned to {side}"
+            )
+        
+        # Parse SFEN for engine
+        parts = session.current_sfen.split(" moves ")
+        position = parts[0]
+        moves = parts[1].split() if len(parts) > 1 else []
+        
+        # Get move from engine
+        start_time = time.time()
+        
+        analysis = engine_manager.analyze_position(
+            position=position,
+            moves=moves,
+            movetime=request.movetime
+        )
+        
+        thinking_time = time.time() - start_time
+        
+        if not analysis or 'bestmove' not in analysis:
+            return ComputerMoveResponse(
+                success=False,
+                message="Engine failed to produce a move"
+            )
+        
+        bestmove_usi = analysis['bestmove']
+        
+        # Validate move
+        try:
+            move = shogi.Move.from_usi(bestmove_usi)
+            if move not in board.legal_moves:
+                return ComputerMoveResponse(
+                    success=False,
+                    message=f"Engine produced illegal move: {bestmove_usi}"
+                )
+        except:
+            return ComputerMoveResponse(
+                success=False,
+                message=f"Invalid move format from engine: {bestmove_usi}"
+            )
+        
+        # Get algebraic notation
+        move_algebraic = usi_to_standard_notation(board, move)
+        position_before = board.sfen()
+        
+        # Apply move
+        board.push(move)
+        position_after = board.sfen()
+        
+        # Record the move
+        session_manager.add_move(
+            session_id=session_id,
+            move_usi=bestmove_usi,
+            move_algebraic=move_algebraic,
+            position_before=position_before,
+            position_after=position_after,
+            player=side,
+            time_spent=thinking_time
+        )
+        
+        # Check game state after move
+        is_game_over = board.is_game_over()
+        winner = None
+        if is_game_over and board.is_checkmate():
+            winner = side  # The side that just moved won
+        
+        # Get engine name
+        engine_name = None
+        if engine_id in engine_manager.available_engines:
+            engine_name = engine_manager.available_engines[engine_id].name
+        
+        return ComputerMoveResponse(
+            success=True,
+            move_usi=bestmove_usi,
+            move_algebraic=move_algebraic,
+            new_sfen=position_after,
+            is_game_over=is_game_over,
+            winner=winner,
+            engine_name=engine_name,
+            thinking_time=thinking_time,
+            message=f"{engine_name or engine_id} played {move_algebraic}"
+        )
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return ComputerMoveResponse(
+            success=False,
+            message=f"Error: {str(e)}"
+        )
+
+
+@app.post("/session/{session_id}/pause")
+async def pause_session(session_id: str):
+    """Pause a computer vs computer game"""
+    session = session_manager.update_session(session_id, is_paused=True)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"success": True, "is_paused": True}
+
+
+@app.post("/session/{session_id}/resume")
+async def resume_session(session_id: str):
+    """Resume a paused computer vs computer game"""
+    session = session_manager.update_session(session_id, is_paused=False)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"success": True, "is_paused": False}
 

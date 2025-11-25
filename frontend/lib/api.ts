@@ -100,12 +100,15 @@ export interface GameSession {
     session_id: string;
     white_player: string;
     black_player: string;
+    white_name: string;
+    black_name: string;
     white_engine: string | null;
     black_engine: string | null;
     analyst_engine: string | null;
     analyst_enabled: boolean;
     analyst_movetime: number;
     mode: string;
+    is_paused: boolean;
     current_sfen: string;
     is_active: boolean;
     created_at: string;
@@ -142,19 +145,49 @@ export interface HintResponse {
     expandable: boolean;
 }
 
-export async function createSession(white_player: string = 'human', black_player: string = 'human') {
+export interface CreateSessionOptions {
+    gameMode?: string;
+    whitePlayer?: string;
+    blackPlayer?: string;
+    whiteName?: string;
+    blackName?: string;
+    whiteEngine?: string;
+    blackEngine?: string;
+    analystEnabled?: boolean;
+    analystMovetime?: number;
+    startingSfen?: string;
+}
+
+export async function createSession(options: CreateSessionOptions = {}) {
+    const {
+        gameMode = 'human_vs_human',
+        whitePlayer = 'human',
+        blackPlayer = 'human',
+        whiteName,
+        blackName,
+        whiteEngine = 'yaneuraou',
+        blackEngine = 'yaneuraou',
+        analystEnabled = false,
+        analystMovetime = 3000,
+        startingSfen,
+    } = options;
+    
     const response = await fetch(`${API_BASE_URL}/session/create`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-            white_player,
-            black_player,
-            white_engine: 'yaneuraou',  // Default, can be changed
-            black_engine: 'yaneuraou',  // Default, can be changed
-            analyst_enabled: false,
-            analyst_movetime: 3000,
+            game_mode: gameMode,
+            white_player: whitePlayer,
+            black_player: blackPlayer,
+            white_name: whiteName,
+            black_name: blackName,
+            white_engine: whiteEngine,
+            black_engine: blackEngine,
+            analyst_enabled: analystEnabled,
+            analyst_movetime: analystMovetime,
+            starting_sfen: startingSfen,
         }),
     });
     if (!response.ok) {
@@ -311,6 +344,155 @@ export async function updateLLMConfig(config: {
     });
     if (!response.ok) {
         throw new Error('Failed to update LLM configuration');
+    }
+    return response.json();
+}
+
+
+// ===== Game Import/Export =====
+
+export interface GameImportResponse {
+    success: boolean;
+    session_id?: string;
+    message: string;
+    move_count: number;
+    detected_format?: string;
+}
+
+export interface GameExportResponse {
+    success: boolean;
+    content: string;
+    filename: string;
+    format: string;
+    message: string;
+}
+
+export async function importGame(
+    content: string,
+    format?: string,
+    whiteName?: string,
+    blackName?: string,
+    gameMode: string = 'human_vs_human'
+): Promise<GameImportResponse> {
+    const response = await fetch(`${API_BASE_URL}/game/import`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            content,
+            format,
+            white_name: whiteName,
+            black_name: blackName,
+            game_mode: gameMode,
+        }),
+    });
+    if (!response.ok) {
+        throw new Error('Failed to import game');
+    }
+    return response.json();
+}
+
+export async function exportGame(
+    sessionId: string,
+    format: string,
+    whiteName?: string,
+    blackName?: string,
+    eventName?: string,
+    filename?: string
+): Promise<GameExportResponse> {
+    const response = await fetch(`${API_BASE_URL}/game/export`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            session_id: sessionId,
+            format,
+            white_name: whiteName,
+            black_name: blackName,
+            event_name: eventName,
+            filename,
+        }),
+    });
+    if (!response.ok) {
+        throw new Error('Failed to export game');
+    }
+    return response.json();
+}
+
+
+// ===== Computer Move =====
+
+export interface ComputerMoveResponse {
+    success: boolean;
+    move_usi?: string;
+    move_algebraic?: string;
+    new_sfen?: string;
+    is_game_over: boolean;
+    winner?: string | null;
+    engine_name?: string;
+    thinking_time: number;
+    message: string;
+}
+
+export async function requestComputerMove(
+    sessionId: string,
+    movetime: number = 3000
+): Promise<ComputerMoveResponse> {
+    const response = await fetch(`${API_BASE_URL}/session/${sessionId}/computer-move`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            session_id: sessionId,
+            movetime,
+        }),
+    });
+    if (!response.ok) {
+        throw new Error('Failed to get computer move');
+    }
+    return response.json();
+}
+
+export async function pauseGame(sessionId: string): Promise<{ success: boolean; is_paused: boolean }> {
+    const response = await fetch(`${API_BASE_URL}/session/${sessionId}/pause`, {
+        method: 'POST',
+    });
+    if (!response.ok) {
+        throw new Error('Failed to pause game');
+    }
+    return response.json();
+}
+
+export async function resumeGame(sessionId: string): Promise<{ success: boolean; is_paused: boolean }> {
+    const response = await fetch(`${API_BASE_URL}/session/${sessionId}/resume`, {
+        method: 'POST',
+    });
+    if (!response.ok) {
+        throw new Error('Failed to resume game');
+    }
+    return response.json();
+}
+
+export async function updateSession(
+    sessionId: string,
+    updates: {
+        white_name?: string;
+        black_name?: string;
+        is_paused?: boolean;
+    }
+): Promise<GameSession> {
+    const response = await fetch(`${API_BASE_URL}/session/${sessionId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updates),
+    });
+    if (!response.ok) {
+        throw new Error('Failed to update session');
     }
     return response.json();
 }
