@@ -94,6 +94,7 @@ export default function Home() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [availableEngines, setAvailableEngines] = useState<{ id: string; name: string }[]>([]);
   const [isComputerThinking, setIsComputerThinking] = useState(false);
+  const [returnToNewGameModal, setReturnToNewGameModal] = useState(false);
 
   useEffect(() => {
     // Initialize game and load config
@@ -897,7 +898,12 @@ export default function Home() {
     setIsEngineManagementOpen(false);
     // Reload engine config to update best move button availability
     loadEngineConfig();
-    // Note: User must manually resume clock after closing modal
+    
+    // Return to new game modal if we came from there
+    if (returnToNewGameModal) {
+      setReturnToNewGameModal(false);
+      setIsNewGameModalOpen(true);
+    }
   };
 
   // Helper to add assistant message with sound
@@ -1124,7 +1130,10 @@ export default function Home() {
               engineName: availableEngines.find(e => e.id === engineConfig.white.engineId)?.name || engineConfig.white.engineId || 'Not configured'
             }
           } : null}
-          onOpenEngineManagement={() => setIsEngineManagementOpen(true)}
+          onOpenEngineManagement={() => {
+            setReturnToNewGameModal(true);
+            setIsEngineManagementOpen(true);
+          }}
         />
 
         <ExportGameModal
