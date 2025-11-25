@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { GameState } from '@/types/game';
 import CapturedPieces from './CapturedPieces';
 import { Languages, FlipVertical, Type, Zap, Compass } from 'lucide-react';
@@ -207,27 +207,25 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
     const [showMovementOverlay, setShowMovementOverlay] = useState(uiSettings.showMovementOverlay);
     const [acknowledgedCheckState, setAcknowledgedCheckState] = useState<{inCheck: boolean, isGameOver: boolean}>({ inCheck: false, isGameOver: false });
     
+    // Note: Acknowledged state resets automatically when the user clicks OK, setting it to match current state.
+    // When the game state changes (check clears, new game starts), the notification won't re-show
+    // until a new check or game over occurs that hasn't been acknowledged.
+    
     // Derive notification state from game state
     const showNotificationModal = showCheckNotification && ((gameState.is_game_over && !acknowledgedCheckState.isGameOver) || (gameState.in_check && !acknowledgedCheckState.inCheck && !gameState.is_game_over));
     
     const notificationMessage = useMemo(() => {
         if (gameState.is_game_over) {
             const winner = gameState.winner === 'b' ? 'Black' : 'White';
-            return `詰み! ${winner} Wins!`;
-        } else if (gameState.in_check) {
+            return `勝ち! ${winner} wins!`;
+        }
+        if (gameState.in_check) {
             const attackerColor = gameState.turn === 'b' ? 'White' : 'Black';
             const defenderColor = gameState.turn === 'b' ? 'Black' : 'White';
             return `王手! ${attackerColor} put ${defenderColor} in check!`;
         }
         return '';
     }, [gameState.is_game_over, gameState.winner, gameState.in_check, gameState.turn]);
-    
-    // Reset acknowledged state when game state changes to a different check/checkmate
-    useEffect(() => {
-        if (!gameState.in_check && !gameState.is_game_over) {
-            setAcknowledgedCheckState({ inCheck: false, isGameOver: false });
-        }
-    }, [gameState.in_check, gameState.is_game_over]);
     
     // Check if last move was a drop (piece placed from hand)
     const lastMoveWasDrop = useMemo(() => {

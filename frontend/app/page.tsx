@@ -673,6 +673,7 @@ export default function Home() {
   }, [currentSession, gameState, isComputerThinking, isLoading, isClockRunning]);
 
   // Effect to trigger computer moves
+  // We intentionally only depend on specific properties to avoid unnecessary re-triggers
   useEffect(() => {
     if (!currentSession || !gameState) return;
     
