@@ -170,6 +170,11 @@ class GameSessionUpdate(BaseModel):
     white_name: Optional[str] = None
     black_name: Optional[str] = None
     
+    # Game mode settings (can be changed mid-game)
+    mode: Optional[str] = None  # 'human_vs_human', 'human_vs_computer', 'computer_vs_computer'
+    black_player: Optional[str] = None  # 'human' or engine id
+    white_player: Optional[str] = None  # 'human' or engine id
+    
     # Computer vs Computer control
     is_paused: Optional[bool] = None
 

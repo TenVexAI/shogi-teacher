@@ -33,6 +33,7 @@ interface ShogiBoardProps {
     engineConfig?: EngineConfig;
     showBoardOptionsPanel?: boolean;
     lastMoveUsi?: string | null;
+    playerNames?: { black: string; white: string };
 }
 
 const PIECE_SYMBOLS: { [key: string]: string } = {
@@ -192,7 +193,7 @@ function mustPromote(piece: string, toRow: number, isBlack: boolean): boolean {
     return false;
 }
 
-export default function ShogiBoard({ gameState, onMove, showBestMove = false, onBestMove, isLoading = false, showCheckNotification = true, engineConfig, showBoardOptionsPanel = true, lastMoveUsi }: ShogiBoardProps) {
+export default function ShogiBoard({ gameState, onMove, showBestMove = false, onBestMove, isLoading = false, showCheckNotification = true, engineConfig, showBoardOptionsPanel = true, lastMoveUsi, playerNames }: ShogiBoardProps) {
     const board = useMemo(() => parseSfen(gameState.sfen), [gameState.sfen]);
     const [selectedSquare, setSelectedSquare] = useState<Position | null>(null);
     const [selectedDropPiece, setSelectedDropPiece] = useState<string | null>(null);
@@ -227,6 +228,11 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
             setAcknowledgedCheckState({ inCheck: false, isGameOver: false });
         }
     }, [gameState.in_check, gameState.is_game_over]);
+    
+    // Check if last move was a drop (piece placed from hand)
+    const lastMoveWasDrop = useMemo(() => {
+        return lastMoveUsi?.includes('*') ?? false;
+    }, [lastMoveUsi]);
     
     // Derive lastMovePositions from the parent's lastMoveUsi prop
     const lastMovePositions = useMemo(() => {
@@ -422,6 +428,7 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
                 boardFlipped={boardFlipped}
                 isTopPanel={true}
                 useWesternNotation={useWesternNotation}
+                playerName={boardFlipped ? playerNames?.black : playerNames?.white}
             />
 
 
@@ -464,6 +471,13 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
                                         (lastMovePositions.from.row === rowIndex && lastMovePositions.from.col === colIndex) ||
                                         (lastMovePositions.to.row === rowIndex && lastMovePositions.to.col === colIndex)
                                     );
+                                    
+                                    // Use purple for drops, cyan for regular moves
+                                    const lastMoveHighlightClass = isLastMoveSquare 
+                                        ? (lastMoveWasDrop 
+                                            ? 'bg-purple-200/40 ring-2 ring-purple-400/60' 
+                                            : 'bg-cyan-200/40 ring-2 ring-cyan-400/60')
+                                        : '';
 
                                     const isPromoted = piece && piece.startsWith('+');
                                     
@@ -502,7 +516,7 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
                         ${isSelected(rowIndex, colIndex) ? 'bg-blue-300' : ''}
                         ${isLegalMove(rowIndex, colIndex) ? 'bg-green-200' : ''}
                         ${selectedDropPiece && isLegalMove(rowIndex, colIndex) ? 'bg-purple-200' : ''}
-                        ${isLastMoveSquare ? 'bg-cyan-200/40 ring-2 ring-cyan-400/60' : ''}
+                        ${lastMoveHighlightClass}
                       `}
                                         >
                                             {/* Star point at grid intersection (top-right corner) */}
@@ -670,6 +684,7 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
                 boardFlipped={boardFlipped}
                 isTopPanel={false}
                 useWesternNotation={useWesternNotation}
+                playerName={boardFlipped ? playerNames?.white : playerNames?.black}
             />
 
             {/* Board Controls Row */}

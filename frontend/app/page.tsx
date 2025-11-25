@@ -12,6 +12,7 @@ import ResourcesWindow from '@/components/ResourcesWindow';
 import ResumeSessionModal from '@/components/ResumeSessionModal';
 import NewGameModal, { GameConfig } from '@/components/NewGameModal';
 import ExportGameModal from '@/components/ExportGameModal';
+import GameModeSettingsModal, { GameModeSettings } from '@/components/GameModeSettingsModal';
 import { 
   getGameState, analyzePosition, explainPosition, updateConfig, getConfig,
   createSession, getSession, getHint, recordMove, listSessions,
@@ -92,9 +93,11 @@ export default function Home() {
   // Game mode state
   const [isNewGameModalOpen, setIsNewGameModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isGameModeSettingsOpen, setIsGameModeSettingsOpen] = useState(false);
   const [availableEngines, setAvailableEngines] = useState<{ id: string; name: string }[]>([]);
   const [isComputerThinking, setIsComputerThinking] = useState(false);
   const [returnToNewGameModal, setReturnToNewGameModal] = useState(false);
+  const [returnToGameModeSettings, setReturnToGameModeSettings] = useState(false);
 
   useEffect(() => {
     // Initialize game and load config
@@ -377,10 +380,12 @@ export default function Home() {
       }));
 
       // Show move confirmation
-      const playerColor = gameState.turn === 'b' ? 'Black' : 'White';
+      const playerName = gameState.turn === 'b' 
+        ? (currentSession.black_name || 'Black') 
+        : (currentSession.white_name || 'White');
       const lastMove = result.move_record;
       
-      let message = `**${playerColor} played: ${lastMove.move_algebraic}**\n\n`;
+      let message = `**${playerName}** played **${lastMove.move_algebraic}**`;
       
       // Show move quality if available
       if (lastMove.classification) {
@@ -388,19 +393,16 @@ export default function Home() {
                      lastMove.classification === 'Good' ? '👍' :
                      lastMove.classification === 'Inaccuracy' ? '⚠️' :
                      lastMove.classification === 'Mistake' ? '❌' : '💥';
-        message += `${emoji} ${lastMove.classification}`;
+        message += ` ${emoji} ${lastMove.classification}`;
         if (lastMove.cp_loss) {
           message += ` (-${lastMove.cp_loss}cp)`;
         }
-        message += '\n\n';
       }
       
-      // Show analysis notification if enabled
-      if (result.analysis_started) {
-        message += '📊 *Engine 3 is analyzing this position...*\n\n';
+      // Add game over notification
+      if (newState.is_game_over) {
+        message += '\n\n**Game Over!**';
       }
-      
-      message += `**Now it's ${newState.turn === 'b' ? 'Black' : 'White'}'s turn**`;
 
       addAssistantMessage(message, 'system');
     } catch (error) {
@@ -581,7 +583,8 @@ export default function Home() {
     let isComputerTurn = false;
     
     if (mode === 'computer_vs_computer') {
-      isComputerTurn = !currentSession.is_paused;
+      // Both sides are computers - always computer's turn (clock running check is above)
+      isComputerTurn = true;
     } else if (mode === 'human_vs_computer') {
       // Check which side is computer
       const blackIsComputer = currentSession.black_player !== 'human';
@@ -639,13 +642,11 @@ export default function Home() {
         }));
         
         // Update thinking message to show the move
-        const moveNumber = updatedSession.moves.length;
-        const thinkingTime = (result.thinking_time / 1000).toFixed(1);
         setMessages(prev => prev.map(msg => 
           msg.id === thinkingId 
             ? {
                 ...msg,
-                content: `**${playerName}** played: **${result.move_algebraic}** (move ${moveNumber}, ${thinkingTime}s)${result.is_game_over ? '\n\n**Game Over!**' : ''}`,
+                content: `**${playerName}** played **${result.move_algebraic}**${result.is_game_over ? '\n\n**Game Over!**' : ''}`,
                 isThinking: false
               }
             : msg
@@ -904,6 +905,74 @@ export default function Home() {
       setReturnToNewGameModal(false);
       setIsNewGameModalOpen(true);
     }
+    
+    // Return to game mode settings if we came from there
+    if (returnToGameModeSettings) {
+      setReturnToGameModeSettings(false);
+      setIsGameModeSettingsOpen(true);
+    }
+  };
+
+  // Open Game Mode Settings (pauses the clock)
+  const handleOpenGameModeSettings = () => {
+    // Pause clock if running
+    if (isClockRunning) {
+      setIsClockRunning(false);
+      // Save accumulated time
+      if (clockStartTimeRef.current > 0) {
+        const elapsed = Date.now() - clockStartTimeRef.current;
+        accumulatedTimeRef.current += elapsed;
+      }
+    }
+    setIsGameModeSettingsOpen(true);
+  };
+
+  // Close Game Mode Settings
+  const handleCloseGameModeSettings = () => {
+    setIsGameModeSettingsOpen(false);
+  };
+
+  // Save Game Mode Settings
+  const handleSaveGameModeSettings = async (settings: GameModeSettings) => {
+    if (!currentSession) return;
+    
+    try {
+      // Determine the new mode
+      let newMode: string;
+      if (settings.blackPlayer === 'human' && settings.whitePlayer === 'human') {
+        newMode = 'human_vs_human';
+      } else if (settings.blackPlayer === 'computer' && settings.whitePlayer === 'computer') {
+        newMode = 'computer_vs_computer';
+      } else {
+        newMode = 'human_vs_computer';
+      }
+      
+      // Update the session via API
+      const response = await fetch(`http://127.0.0.1:8000/session/${currentSession.session_id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          black_player: settings.blackPlayer === 'computer' ? (engineConfig?.black.engineId || 'yaneuraou') : 'human',
+          white_player: settings.whitePlayer === 'computer' ? (engineConfig?.white.engineId || 'yaneuraou') : 'human',
+          black_name: settings.blackName || undefined,
+          white_name: settings.whiteName || undefined,
+          mode: newMode,
+        }),
+      });
+      
+      if (response.ok) {
+        // Refresh session
+        const updatedSession = await getSession(currentSession.session_id);
+        setCurrentSession(updatedSession);
+        
+        addAssistantMessage(
+          `Game mode updated to **${newMode.replace(/_/g, ' ')}**`,
+          'system'
+        );
+      }
+    } catch (error) {
+      console.error('Failed to update game mode settings:', error);
+    }
   };
 
   // Helper to add assistant message with sound
@@ -1144,6 +1213,37 @@ export default function Home() {
           currentBlackName={currentSession?.black_name || 'Guest'}
         />
 
+        <GameModeSettingsModal
+          isOpen={isGameModeSettingsOpen}
+          onClose={handleCloseGameModeSettings}
+          onSave={handleSaveGameModeSettings}
+          currentSettings={{
+            blackPlayer: currentSession?.black_player === 'human' ? 'human' : 'computer',
+            whitePlayer: currentSession?.white_player === 'human' ? 'human' : 'computer',
+            blackName: currentSession?.black_name || '',
+            whiteName: currentSession?.white_name || '',
+          }}
+          currentEngineConfig={engineConfig ? {
+            black: { 
+              engineId: engineConfig.black.engineId, 
+              engineName: availableEngines.find(e => e.id === engineConfig.black.engineId)?.name || engineConfig.black.engineId || 'Not configured'
+            },
+            white: { 
+              engineId: engineConfig.white.engineId, 
+              engineName: availableEngines.find(e => e.id === engineConfig.white.engineId)?.name || engineConfig.white.engineId || 'Not configured'
+            }
+          } : null}
+          onOpenEngineManagement={() => {
+            setReturnToGameModeSettings(true);
+            setIsGameModeSettingsOpen(false);
+            setIsEngineManagementOpen(true);
+          }}
+          onStartNewGame={() => {
+            setIsGameModeSettingsOpen(false);
+            setIsNewGameModalOpen(true);
+          }}
+        />
+
         {/* Clock Start Confirmation Modal */}
         {showClockStartModal && (
           <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50">
@@ -1191,6 +1291,7 @@ export default function Home() {
             onToggleAllSounds={handleToggleAllSounds}
             onOpenLearn={handleOpenLearn}
             onOpenEngineManagement={handleOpenEngineManagement}
+            onOpenGameModeSettings={handleOpenGameModeSettings}
           />
 
           {/* Main Content */}
@@ -1222,6 +1323,10 @@ export default function Home() {
                   engineConfig={engineConfig || undefined}
                   showBoardOptionsPanel={showBoardOptionsPanel}
                   lastMoveUsi={lastMoveUsi}
+                  playerNames={currentSession ? { 
+                    black: currentSession.black_name || 'Black', 
+                    white: currentSession.white_name || 'White' 
+                  } : undefined}
                 />
               </>
             ) : (

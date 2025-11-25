@@ -7,6 +7,7 @@ interface CapturedPiecesProps {
     boardFlipped?: boolean;
     isTopPanel?: boolean;
     useWesternNotation?: boolean;
+    playerName?: string;
 }
 
 const PIECE_SYMBOLS: { [key: string]: string } = {
@@ -34,8 +35,9 @@ const getPieceScale = (piece: string): number => {
     }
 };
 
-export default function CapturedPieces({ pieces, color, onPieceDrop, boardFlipped = false, isTopPanel = false, useWesternNotation = false }: CapturedPiecesProps) {
+export default function CapturedPieces({ pieces, color, onPieceDrop, boardFlipped = false, isTopPanel = false, useWesternNotation = false, playerName }: CapturedPiecesProps) {
     const colorName = color === 'b' ? 'Black' : 'White';
+    const displayName = playerName || colorName;
     const bgColor = color === 'b' ? 'bg-[#111111]' : 'bg-gray-100';
     const textColor = color === 'b' ? 'text-white' : 'text-gray-800';
     const alignClass = isTopPanel ? 'text-left justify-start' : 'text-right justify-end';
@@ -51,7 +53,7 @@ export default function CapturedPieces({ pieces, color, onPieceDrop, boardFlippe
     return (
         <div className={`${bgColor} ${textColor} p-3 rounded-lg w-[524px] h-[100px] border border-border overflow-y-auto`}>
             <div className={`text-sm font-semibold mb-2 font-pixel drop-shadow-lg ${alignClass}`}>
-                {colorName}&apos;s Captured Pieces
+                {displayName}&apos;s Captured Pieces
             </div>
             <div className={`flex flex-wrap gap-2 ${alignClass}`}>
                 {individualPieces.length === 0 ? (

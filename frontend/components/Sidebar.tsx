@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Power, Volume2, VolumeX, BookOpen, Cpu } from 'lucide-react';
+import { Settings, Power, Volume2, VolumeX, BookOpen, Cpu, Gamepad2 } from 'lucide-react';
 
 interface SidebarProps {
   onOpenSettings: () => void;
@@ -7,9 +7,10 @@ interface SidebarProps {
   onToggleAllSounds: () => void;
   onOpenLearn: () => void;
   onOpenEngineManagement: () => void;
+  onOpenGameModeSettings: () => void;
 }
 
-export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllSounds, onOpenLearn, onOpenEngineManagement }: SidebarProps) {
+export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllSounds, onOpenLearn, onOpenEngineManagement, onOpenGameModeSettings }: SidebarProps) {
   const [isLearnWindowOpen, setIsLearnWindowOpen] = useState(false);
 
   useEffect(() => {
@@ -43,8 +44,17 @@ export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllS
 
   return (
     <div className="w-12 h-full bg-background-secondary flex flex-col items-center py-4 shrink-0 border-r border-border">
-      {/* Top section - Learn button */}
+      {/* Top section - Game Mode and Learn buttons */}
       <div className="flex flex-col gap-4">
+        {/* Game Mode Settings Button */}
+        <button
+          onClick={onOpenGameModeSettings}
+          className="w-10 h-10 flex items-center justify-center group transition-colors"
+          title="Game Mode Settings"
+        >
+          <Gamepad2 className="w-6 h-6 text-text-secondary group-hover:text-accent-purple transition-colors" />
+        </button>
+
         <button
           onClick={onOpenLearn}
           className="w-10 h-10 flex items-center justify-center group transition-colors"
