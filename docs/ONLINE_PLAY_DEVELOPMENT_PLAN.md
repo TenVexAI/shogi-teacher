@@ -66,42 +66,42 @@ shogi-teacher/
 
 ## Development Phases
 
-### Phase 1: Connection Server (Backend)
+### Phase 1: Connection Server (Backend) ✅ COMPLETE
 **Estimated: 3-4 days**
 
-#### 1.1 Project Setup
-- [ ] Create `server/` directory structure
-- [ ] Set up FastAPI with WebSocket support
-- [ ] Configure environment variables for OAuth credentials
-- [ ] Create Dockerfile for deployment
-- [ ] Set up basic health check endpoint
+#### 1.1 Project Setup ✅
+- [x] Create `server/` directory structure
+- [x] Set up FastAPI with WebSocket support
+- [x] Configure environment variables for OAuth credentials
+- [x] Create Dockerfile for deployment
+- [x] Set up basic health check endpoint
 
-#### 1.2 OAuth Authentication
-- [ ] Implement Twitch OAuth flow
-- [ ] Implement Discord OAuth flow
-- [ ] Implement GitHub OAuth flow
-- [ ] Token verification and user info retrieval
-- [ ] Session token generation for WebSocket auth
+#### 1.2 OAuth Authentication ✅
+- [x] Implement Twitch OAuth flow
+- [x] Implement Discord OAuth flow
+- [x] Implement GitHub OAuth flow
+- [x] Token verification and user info retrieval
+- [x] Session token generation for WebSocket auth
 
-#### 1.3 Lobby Management
-- [ ] WebSocket connection handling
-- [ ] In-memory user registry (connected users)
-- [ ] Status management (Available, Away, In-Game)
-- [ ] Presence broadcasts to all connected clients
-- [ ] Automatic cleanup on disconnect
+#### 1.3 Lobby Management ✅
+- [x] WebSocket connection handling
+- [x] In-memory user registry (connected users)
+- [x] Status management (Available, Away, In-Game)
+- [x] Presence broadcasts to all connected clients
+- [x] Automatic cleanup on disconnect
 
-#### 1.4 Game Request System
-- [ ] Send game request (with 3 outgoing limit)
-- [ ] Accept/decline game request
-- [ ] Revoke outgoing request
-- [ ] Request expiration handling
-- [ ] Status update on game start
+#### 1.4 Game Request System ✅
+- [x] Send game request (with 3 outgoing limit)
+- [x] Accept/decline game request
+- [x] Revoke outgoing request
+- [x] Request cancellation on disconnect/away (no timeout needed per requirements)
+- [x] Status update on game start
 
-#### 1.5 WebRTC Signaling
-- [ ] SDP offer/answer relay
-- [ ] ICE candidate exchange
-- [ ] Connection state tracking
-- [ ] Graceful disconnect handling
+#### 1.5 WebRTC Signaling ✅
+- [x] SDP offer/answer relay
+- [x] ICE candidate exchange
+- [x] Connection state tracking
+- [x] Graceful disconnect handling
 
 ### Phase 2: Electron Integration
 **Estimated: 2-3 days**
