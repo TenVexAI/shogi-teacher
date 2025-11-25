@@ -233,6 +233,7 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
     }, [lastMoveUsi]);
     
     // Derive lastMovePositions from the parent's lastMoveUsi prop
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization
     const lastMovePositions = useMemo(() => {
         if (!lastMoveUsi) return null;
         

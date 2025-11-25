@@ -689,6 +689,7 @@ export default function Home() {
     }, 500);
     
     return () => clearTimeout(timeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentSession?.mode, gameState?.turn, currentSession?.is_paused, isClockRunning, checkAndTriggerComputerMove]);
 
   // Helper to check if user can interact with pieces
