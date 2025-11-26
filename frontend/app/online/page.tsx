@@ -100,7 +100,7 @@ export default function OnlinePlayPage() {
   const messageHandlerRef = useRef<(message: Record<string, unknown>) => void>(() => {});
   
   // WebRTC handler refs (to avoid declaration order issues)
-  const initializeWebRTCRef = useRef<(isInitiator: boolean) => Promise<void>>(async () => {});
+  const initializeWebRTCRef = useRef<(isInitiator: boolean, opponentId?: string) => Promise<void>>(async () => {});
   const handleWebRTCOfferRef = useRef<(offer: RTCSessionDescriptionInit) => Promise<void>>(async () => {});
   const handleWebRTCAnswerRef = useRef<(answer: RTCSessionDescriptionInit) => Promise<void>>(async () => {});
   const handleWebRTCIceCandidateRef = useRef<(candidate: RTCIceCandidateInit) => Promise<void>>(async () => {});
@@ -114,6 +114,13 @@ export default function OnlinePlayPage() {
         setIsConnected(true);
         setIsConnecting(false);
         setCurrentUser(message.user as User);
+        
+        // Clear stale state from any previous session
+        setIncomingRequests([]);
+        setOutgoingRequests([]);
+        setOpponent(null);
+        setChatMessages([]);
+        setMyStatus('available');
         
         // Start ping interval
         pingIntervalRef.current = setInterval(() => {
@@ -168,11 +175,12 @@ export default function OnlinePlayPage() {
         break;
 
       case 'game_started':
-        setOpponent(message.opponent as User);
+        const opponentUser = message.opponent as User;
+        setOpponent(opponentUser);
         setMyStatus('in_game');
         isInitiatorRef.current = message.is_initiator as boolean;
-        // Initialize WebRTC - initiator creates offer
-        initializeWebRTCRef.current(message.is_initiator as boolean);
+        // Initialize WebRTC - initiator creates offer (pass opponent ID directly)
+        initializeWebRTCRef.current(message.is_initiator as boolean, opponentUser.id);
         break;
 
       case 'opponent_disconnected':
@@ -321,7 +329,7 @@ export default function OnlinePlayPage() {
   }, [opponent?.username, pendingActionRequest]);
 
   // Initialize WebRTC connection
-  const initializeWebRTC = useCallback(async (isInitiator: boolean) => {
+  const initializeWebRTC = useCallback(async (isInitiator: boolean, opponentId?: string) => {
     // Clean up existing connection
     if (webrtcRef.current) {
       webrtcRef.current.close();
@@ -376,12 +384,13 @@ export default function OnlinePlayPage() {
     webrtcRef.current = rtc;
 
     // If initiator, create and send offer
-    if (isInitiator && opponent?.id) {
+    const targetOpponentId = opponentId || opponent?.id;
+    if (isInitiator && targetOpponentId) {
       try {
         const offer = await rtc.createOffer();
         sendMessage({ 
           type: 'rtc_offer', 
-          target_user_id: opponent.id, 
+          target_user_id: targetOpponentId, 
           sdp: offer.sdp 
         });
       } catch (error) {
@@ -938,13 +947,20 @@ export default function OnlinePlayPage() {
                       </div>
                       
                       {user.status === 'available' && myStatus === 'available' && (
-                        <button
-                          onClick={() => handleRequestGame(user.id)}
-                          disabled={outgoingRequests.length >= 3}
-                          className="bg-accent-purple hover:bg-purple-600 disabled:bg-gray-600 disabled:cursor-not-allowed px-3 py-1 rounded text-sm"
-                        >
-                          Challenge
-                        </button>
+                        (() => {
+                          const hasPendingRequest = outgoingRequests.some(req => req.recipient_id === user.id);
+                          return hasPendingRequest ? (
+                            <span className="text-yellow-500 text-sm">Pending...</span>
+                          ) : (
+                            <button
+                              onClick={() => handleRequestGame(user.id)}
+                              disabled={outgoingRequests.length >= 3}
+                              className="bg-accent-purple hover:bg-purple-600 disabled:bg-gray-600 disabled:cursor-not-allowed px-3 py-1 rounded text-sm"
+                            >
+                              Challenge
+                            </button>
+                          );
+                        })()
                       )}
                     </div>
                   ))}
