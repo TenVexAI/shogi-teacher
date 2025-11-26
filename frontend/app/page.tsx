@@ -116,6 +116,10 @@ export default function Home() {
   const handleOpponentMoveRef = useRef<(usi: string) => void>(() => {});
   const handleGameConfigReceivedRef = useRef<(config: { sfen: string; blackName: string; whiteName: string; isClockRunning: boolean; gameTime: number; initiatorColor: 'b' | 'w' }) => void>(() => {});
   const handleClockSyncRef = useRef<(isRunning: boolean, gameTime: number) => void>(() => {});
+  const handleActionResponseRef = useRef<(action: string, accepted: boolean) => void>(() => {});
+  const pendingMoveRef = useRef<string | null>(null);
+  const executeMoveRef = useRef<(move: string) => Promise<void>>(async () => {});
+  const gameTimeRef = useRef<number>(0);
 
   useEffect(() => {
     // Initialize game and load config
@@ -162,12 +166,6 @@ export default function Home() {
     });
   }, []);
 
-  // Pending action response state (set when opponent responds)
-  const [pendingActionResponse, setPendingActionResponse] = useState<{
-    action: string;
-    accepted: boolean;
-    data?: unknown;
-  } | null>(null);
 
   // Listen for messages from online play window
   useEffect(() => {
@@ -208,20 +206,8 @@ export default function Home() {
           const response = msg as { type: string; action: string; accepted: boolean; data?: unknown };
           // Clear pending action state
           setPendingOutgoingAction(null);
-          if (response.accepted) {
-            setPendingActionResponse({
-              action: response.action,
-              accepted: true,
-              data: response.data,
-            });
-          } else {
-            // Request was denied - show notification
-            const actionName = response.action === 'new_game' ? 'New Game' :
-                              response.action === 'pause' ? 'Pause' :
-                              response.action === 'resume' ? 'Resume' :
-                              response.action === 'revert' ? 'Revert' : response.action;
-            addAssistantMessage(`❌ ${onlinePlayState.opponentName || 'Opponent'} declined your ${actionName} request.`, 'system');
-          }
+          // Call the handler directly via ref (avoids stale closure issues)
+          handleActionResponseRef.current(response.action, response.accepted);
           break;
         }
         case 'open_new_game_modal':
@@ -248,70 +234,6 @@ export default function Home() {
 
     return unsubscribe;
   }, []);
-
-  // Execute approved action when response is received
-  useEffect(() => {
-    if (!pendingActionResponse || !pendingActionResponse.accepted) return;
-
-    const { action, data } = pendingActionResponse;
-    console.log('Executing approved action:', action);
-
-    switch (action) {
-      case 'new_game':
-        setIsNewGameModalOpen(true);
-        break;
-      case 'pause':
-        setIsClockRunning(false);
-        audioManager.playUISound('pause');
-        // Send clock sync to opponent
-        if (window.electron && onlinePlayState.isInGame) {
-          window.electron.sendToOnlinePlayWindow({
-            type: 'send_clock_sync',
-            isRunning: false,
-            gameTime,
-          });
-        }
-        break;
-      case 'resume': {
-        setIsClockRunning(true);
-        if (clockStartTimeRef.current === 0) {
-          clockStartTimeRef.current = Date.now();
-          lastMoveTimeRef.current = Date.now();
-        }
-        audioManager.playUISound('start');
-        // Send clock sync to opponent
-        if (window.electron && onlinePlayState.isInGame) {
-          window.electron.sendToOnlinePlayWindow({
-            type: 'send_clock_sync',
-            isRunning: true,
-            gameTime,
-          });
-        }
-        // If there was a pending move, execute it now
-        if (pendingMove) {
-          executeMove(pendingMove).then(() => {
-            setPendingMove(null);
-          });
-        }
-        break;
-      }
-      case 'revert': {
-        // For revert, we need the moveIndex from data
-        const moveData = data as { moveIndex?: number } | undefined;
-        if (moveData?.moveIndex !== undefined) {
-          // Temporarily disable online check, execute revert, then restore
-          setOnlinePlayState({ isInGame: false, isP2PConnected: false, opponentName: null, currentUserName: null, myColor: null });
-          // The revert will be executed by a separate effect after state update
-          console.log('Approved: revert to move', moveData.moveIndex);
-          // Store the moveIndex to execute after state change
-          sessionStorage.setItem('pendingRevertMove', String(moveData.moveIndex));
-        }
-        break;
-      }
-    }
-
-    setPendingActionResponse(null);
-  }, [pendingActionResponse, onlinePlayState]);
 
   // Stop clock when game ends
   useEffect(() => {
@@ -592,6 +514,81 @@ export default function Home() {
       setIsLoading(false);
     }
   };
+
+  // Handle action response directly (called from message handler via ref)
+  const handleActionResponse = (action: string, accepted: boolean) => {
+    console.log('handleActionResponse called:', action, 'accepted:', accepted, 'pendingMove:', pendingMove);
+    
+    if (!accepted) {
+      // Request was denied - show notification
+      const actionName = action === 'new_game' ? 'New Game' :
+                        action === 'pause' ? 'Pause' :
+                        action === 'resume' ? 'Resume' :
+                        action === 'revert' ? 'Revert' : action;
+      addAssistantMessage(`❌ ${onlinePlayState.opponentName || 'Opponent'} declined your ${actionName} request.`, 'system');
+      return;
+    }
+    
+    switch (action) {
+      case 'new_game':
+        setIsNewGameModalOpen(true);
+        break;
+      case 'pause':
+        setIsClockRunning(false);
+        audioManager.playUISound('pause');
+        // Send clock sync to opponent
+        if (window.electron && onlinePlayState.isInGame) {
+          window.electron.sendToOnlinePlayWindow({
+            type: 'send_clock_sync',
+            isRunning: false,
+            gameTime,
+          });
+        }
+        break;
+      case 'resume':
+        setIsClockRunning(true);
+        if (clockStartTimeRef.current === 0) {
+          clockStartTimeRef.current = Date.now();
+          lastMoveTimeRef.current = Date.now();
+        }
+        audioManager.playUISound('start');
+        // Send clock sync to opponent
+        if (window.electron && onlinePlayState.isInGame) {
+          window.electron.sendToOnlinePlayWindow({
+            type: 'send_clock_sync',
+            isRunning: true,
+            gameTime,
+          });
+        }
+        // If there was a pending move, execute it now
+        if (pendingMove) {
+          console.log('Executing pending move:', pendingMove);
+          executeMove(pendingMove).then(() => {
+            setPendingMove(null);
+          });
+        }
+        break;
+    }
+  };
+
+  // Keep refs in sync with current values (for access in effects without stale closures)
+  useEffect(() => {
+    executeMoveRef.current = executeMove;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameState, currentSession, onlinePlayState.isInGame, onlinePlayState.isP2PConnected]);
+  
+  useEffect(() => {
+    pendingMoveRef.current = pendingMove;
+  }, [pendingMove]);
+  
+  useEffect(() => {
+    gameTimeRef.current = gameTime;
+  }, [gameTime]);
+  
+  useEffect(() => {
+    handleActionResponseRef.current = handleActionResponse;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingMove, gameTime, onlinePlayState.isInGame]);
 
   const handleMove = async (move: string) => {
     if (!gameState) return;
