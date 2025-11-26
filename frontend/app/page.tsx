@@ -107,6 +107,9 @@ export default function Home() {
     opponentName: string | null;
     currentUserName: string | null;
   }>({ isInGame: false, isP2PConnected: false, opponentName: null, currentUserName: null });
+  
+  // Ref to hold opponent move handler (to avoid stale closures in useEffect)
+  const handleOpponentMoveRef = useRef<(usi: string) => void>(() => {});
 
   useEffect(() => {
     // Initialize game and load config
@@ -179,11 +182,15 @@ export default function Home() {
           });
           break;
         }
-        case 'move_received':
+        case 'move_received': {
           // Opponent made a move - apply it to the board
           console.log('Opponent move received:', msg);
-          // TODO: Apply the move to the game state
+          const moveMsg = msg as { type: string; usi: string; sfen: string; moveNumber: number };
+          // Apply opponent's move by calling executeMove
+          // We need to use a ref or callback to access executeMove
+          handleOpponentMoveRef.current(moveMsg.usi);
           break;
+        }
         case 'action_request_received':
           // Opponent requested an action - this is handled in online play window
           console.log('Action request received:', msg);
@@ -509,6 +516,16 @@ export default function Home() {
       }
 
       addAssistantMessage(message, 'system');
+
+      // Send move to online opponent if in online game
+      if (onlinePlayState.isInGame && onlinePlayState.isP2PConnected && window.electron) {
+        window.electron.sendToOnlinePlayWindow({
+          type: 'send_move',
+          usi: move,
+          sfen: result.new_sfen,
+          moveNumber: updatedSession.moves.length,
+        });
+      }
     } catch (error) {
       console.error('Failed to make move:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -530,6 +547,65 @@ export default function Home() {
 
     await executeMove(move);
   };
+
+  // Handle moves received from online opponent (no sending back)
+  const handleOpponentMove = async (usi: string) => {
+    if (!gameState || !currentSession) return;
+
+    try {
+      setIsLoading(true);
+
+      // Record move timing
+      const currentTime = Date.now();
+      const timeSinceLastMove = lastMoveTimeRef.current > 0 ? currentTime - lastMoveTimeRef.current : 0;
+      const timeSpent = timeSinceLastMove / 1000;
+      lastMoveTimeRef.current = currentTime;
+
+      // Record the move via session API
+      const result = await recordMove(currentSession.session_id, usi, timeSpent);
+      
+      // Update game state from new SFEN
+      const newState = await getGameState(result.new_sfen);
+      setGameState(newState);
+      
+      // Track the last move for highlighting
+      setLastMoveUsi(usi);
+
+      // Play sound effect
+      audioManager.playPieceSound(gameState.turn === 'b');
+
+      // Refresh session to get updated move history
+      const updatedSession = await getSession(currentSession.session_id);
+      setCurrentSession(updatedSession);
+      
+      // Update move history
+      let cumulativeTime = 0;
+      setMoveHistory(updatedSession.moves.map((m: MoveRecordBackend) => {
+        cumulativeTime += m.time_spent * 1000;
+        return {
+          moveNumber: m.move_number,
+          player: (m.player === 'black' ? 'b' : 'w') as 'b' | 'w',
+          move: m.move_algebraic,
+          timestamp: cumulativeTime,
+          timeSinceLastMove: m.time_spent * 1000,
+          sfen: m.position_after
+        };
+      }));
+
+      // Show move notification
+      const playerName = onlinePlayState.opponentName || 'Opponent';
+      addAssistantMessage(`**${playerName}** played **${result.move_record.move_algebraic}**`, 'system');
+    } catch (error) {
+      console.error('Failed to apply opponent move:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Keep the opponent move handler ref updated
+  useEffect(() => {
+    handleOpponentMoveRef.current = handleOpponentMove;
+  });
 
   const handleSendMessage = async (message: string) => {
     if (!gameState || !currentSession) return;
@@ -1476,23 +1552,6 @@ export default function Home() {
           <div className="flex gap-3 flex-1 p-4">
             {/* Left Column: Move History with Clock */}
             <div className="w-[300px] shrink-0 h-full">
-            {/* Online Mode Indicator */}
-            {onlinePlayState.isInGame && (
-              <div className={`mb-2 px-3 py-2 rounded-lg flex items-center gap-2 text-sm ${
-                onlinePlayState.isP2PConnected 
-                  ? 'bg-[#3cf281]/20 border border-[#3cf281]/50' 
-                  : 'bg-yellow-500/20 border border-yellow-500/50'
-              }`}>
-                <span className={`w-2 h-2 rounded-full ${
-                  onlinePlayState.isP2PConnected ? 'bg-[#3cf281]' : 'bg-yellow-500 animate-pulse'
-                }`} />
-                <span className={onlinePlayState.isP2PConnected ? 'text-[#3cf281]' : 'text-yellow-500'}>
-                  {onlinePlayState.isP2PConnected 
-                    ? `Playing vs ${onlinePlayState.opponentName}` 
-                    : 'Connecting...'}
-                </span>
-              </div>
-            )}
             <MoveHistory 
               moves={moveHistory} 
               currentTurn={(gameState?.turn as 'b' | 'w') || 'b'}
@@ -1523,6 +1582,23 @@ export default function Home() {
                     white: currentSession.white_name || 'White' 
                   } : undefined}
                 />
+                {/* Online Mode Indicator - below board */}
+                {onlinePlayState.isInGame && (
+                  <div className={`mt-2 px-4 py-2 rounded-lg flex items-center gap-2 text-sm ${
+                    onlinePlayState.isP2PConnected 
+                      ? 'bg-[#3cf281]/20 border border-[#3cf281]/50' 
+                      : 'bg-yellow-500/20 border border-yellow-500/50'
+                  }`}>
+                    <span className={`w-2 h-2 rounded-full ${
+                      onlinePlayState.isP2PConnected ? 'bg-[#3cf281]' : 'bg-yellow-500 animate-pulse'
+                    }`} />
+                    <span className={onlinePlayState.isP2PConnected ? 'text-[#3cf281]' : 'text-yellow-500'}>
+                      {onlinePlayState.isP2PConnected 
+                        ? `Playing vs ${onlinePlayState.opponentName}` 
+                        : 'Connecting...'}
+                    </span>
+                  </div>
+                )}
               </>
             ) : (
               <div className="flex items-center justify-center h-96">
