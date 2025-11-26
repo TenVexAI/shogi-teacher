@@ -403,6 +403,7 @@ export default function Home() {
       clockStartTimeRef.current = 0;
       lastMoveTimeRef.current = 0;
       accumulatedTimeRef.current = 0;
+      setPendingMove(null);  // Clear any pending move from previous game
       setMessages([
         {
           role: 'assistant',
@@ -694,9 +695,10 @@ export default function Home() {
       setGameTime(config.gameTime);
       setIsClockRunning(config.isClockRunning);
       
-      // Clear move history for new game
+      // Clear move history and pending state for new game
       setMoveHistory([]);
       setLastMoveUsi(null);
+      setPendingMove(null);  // Clear any pending move from previous game
       
       const myColorName = myColor === 'b' ? 'Black' : 'White';
       addAssistantMessage(`Game started with ${onlinePlayState.opponentName}! You are playing ${myColorName}.`, 'system');

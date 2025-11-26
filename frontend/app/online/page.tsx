@@ -283,7 +283,7 @@ export default function OnlinePlayPage() {
         // Auto-decline after 2 minutes
         actionTimeoutRef.current = setTimeout(() => {
           if (webrtcRef.current?.isConnected()) {
-            webrtcRef.current.sendActionResponse(message.id, false);
+            webrtcRef.current.sendActionResponse(message.id, false, actionPayload.action);
           }
           setPendingActionRequest(null);
         }, 120000); // 2 minutes
@@ -321,7 +321,7 @@ export default function OnlinePlayPage() {
             type: 'action_response_received',
             requestId: responsePayload.requestId,
             accepted: responsePayload.accepted,
-            action: pendingActionRequest?.action || 'pause',
+            action: responsePayload.action,  // Use action from payload instead of guessing
           });
         }
         break;
@@ -631,7 +631,7 @@ export default function OnlinePlayPage() {
     if (!pendingActionRequest || !pendingActionRequest.fromOpponent) return;
     
     if (webrtcRef.current?.isConnected()) {
-      webrtcRef.current.sendActionResponse(pendingActionRequest.id, true);
+      webrtcRef.current.sendActionResponse(pendingActionRequest.id, true, pendingActionRequest.action);
     }
     
     // Clear timeout
@@ -658,7 +658,7 @@ export default function OnlinePlayPage() {
     if (!pendingActionRequest || !pendingActionRequest.fromOpponent) return;
     
     if (webrtcRef.current?.isConnected()) {
-      webrtcRef.current.sendActionResponse(pendingActionRequest.id, false);
+      webrtcRef.current.sendActionResponse(pendingActionRequest.id, false, pendingActionRequest.action);
     }
     
     // Clear timeout

@@ -48,6 +48,7 @@ export interface ActionRequestPayload {
 export interface ActionResponsePayload {
   requestId: string;
   accepted: boolean;
+  action: 'pause' | 'resume' | 'new_game' | 'revert' | 'toggle_teaching';  // Include action type in response
 }
 
 export interface SyncStatePayload {
@@ -446,8 +447,8 @@ export class WebRTCManager {
   /**
    * Send an action response
    */
-  sendActionResponse(requestId: string, accepted: boolean): void {
-    const payload: ActionResponsePayload = { requestId, accepted };
+  sendActionResponse(requestId: string, accepted: boolean, action: 'pause' | 'resume' | 'new_game' | 'revert' | 'toggle_teaching'): void {
+    const payload: ActionResponsePayload = { requestId, accepted, action };
     this.send('action_response', payload);
   }
 
