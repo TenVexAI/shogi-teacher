@@ -9,9 +9,10 @@ interface SidebarProps {
   onOpenEngineManagement: () => void;
   onOpenGameModeSettings: () => void;
   onOpenOnlinePlay: () => void;
+  isOnlineP2PConnected?: boolean;
 }
 
-export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllSounds, onOpenLearn, onOpenEngineManagement, onOpenGameModeSettings, onOpenOnlinePlay }: SidebarProps) {
+export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllSounds, onOpenLearn, onOpenEngineManagement, onOpenGameModeSettings, onOpenOnlinePlay, isOnlineP2PConnected }: SidebarProps) {
   const [isLearnWindowOpen, setIsLearnWindowOpen] = useState(false);
   const [isOnlinePlayWindowOpen, setIsOnlinePlayWindowOpen] = useState(false);
 
@@ -58,11 +59,18 @@ export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllS
       <div className="flex flex-col gap-4">
         {/* Game Mode Settings Button */}
         <button
-          onClick={onOpenGameModeSettings}
-          className="w-10 h-10 flex items-center justify-center group transition-colors"
-          title="Game Mode Settings"
+          onClick={isOnlineP2PConnected ? undefined : onOpenGameModeSettings}
+          disabled={isOnlineP2PConnected}
+          className={`w-10 h-10 flex items-center justify-center group transition-colors ${
+            isOnlineP2PConnected ? 'cursor-not-allowed opacity-40' : ''
+          }`}
+          title={isOnlineP2PConnected ? "Unavailable during online match" : "Game Mode Settings"}
         >
-          <Gamepad2 className="w-6 h-6 text-text-secondary group-hover:text-accent-purple transition-colors" />
+          <Gamepad2 className={`w-6 h-6 transition-colors ${
+            isOnlineP2PConnected 
+              ? 'text-text-secondary/50' 
+              : 'text-text-secondary group-hover:text-accent-purple'
+          }`} />
         </button>
 
         <button

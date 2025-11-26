@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Globe, LogIn, LogOut, Users, Send, Wifi, WifiOff, MessageSquare, Radio } from 'lucide-react';
-import { WebRTCManager, ConnectionState, P2PMessage, ChatPayload } from '@/lib/webrtc';
+import { Globe, LogIn, LogOut, Users, Send, Wifi, WifiOff, MessageSquare, Radio, AlertCircle, Check, X } from 'lucide-react';
+import { WebRTCManager, ConnectionState, P2PMessage, ChatPayload, ActionRequestPayload, ActionResponsePayload } from '@/lib/webrtc';
+import type { ActionType, OnlineStateUpdate, ActionRequest, MainToOnlinePlayMessage } from '@/types/online-play';
 
 // Server URL - will be configurable later
 const SERVER_URL = 'wss://shogi.tenvexai.com/ws';
@@ -83,6 +84,17 @@ export default function OnlinePlayPage() {
   const [p2pState, setP2pState] = useState<ConnectionState>('disconnected');
   const webrtcRef = useRef<WebRTCManager | null>(null);
   const isInitiatorRef = useRef<boolean>(false);
+  
+  // Action request state (for mutual game actions)
+  const [pendingActionRequest, setPendingActionRequest] = useState<{
+    id: string;
+    action: ActionType;
+    fromOpponent: boolean;
+    timestamp: number;
+  } | null>(null);
+  const [actionCountdown, setActionCountdown] = useState(30);
+  const actionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
   // Message handler ref to avoid stale closure issues
   const messageHandlerRef = useRef<(message: Record<string, unknown>) => void>(() => {});
@@ -223,24 +235,90 @@ export default function OnlinePlayPage() {
         }]);
         break;
       }
-      case 'move':
-        // TODO: Handle move in Phase 5
-        console.log('Received move:', message.payload);
+      case 'move': {
+        // Forward move to main window
+        const movePayload = message.payload as { usi: string; sfen: string; moveNumber: number };
+        console.log('Received move:', movePayload);
+        if (window.electron) {
+          window.electron.sendToMainWindow({
+            type: 'move_received',
+            usi: movePayload.usi,
+            sfen: movePayload.sfen,
+            moveNumber: movePayload.moveNumber,
+          });
+        }
         break;
-      case 'action_request':
-        // TODO: Handle action requests in Phase 5
-        console.log('Received action request:', message.payload);
+      }
+      case 'action_request': {
+        // Opponent is requesting a mutual action
+        const actionPayload = message.payload as ActionRequestPayload;
+        console.log('Received action request:', actionPayload);
+        
+        // Clear any existing timeout
+        if (actionTimeoutRef.current) {
+          clearTimeout(actionTimeoutRef.current);
+        }
+        
+        // Set pending request
+        setPendingActionRequest({
+          id: message.id,
+          action: actionPayload.action as ActionType,
+          fromOpponent: true,
+          timestamp: Date.now(),
+        });
+        
+        // Auto-decline after 30 seconds
+        actionTimeoutRef.current = setTimeout(() => {
+          if (webrtcRef.current?.isConnected()) {
+            webrtcRef.current.sendActionResponse(message.id, false);
+          }
+          setPendingActionRequest(null);
+        }, 30000);
+        
+        // Notify main window
+        if (window.electron) {
+          window.electron.sendToMainWindow({
+            type: 'action_request_received',
+            requestId: message.id,
+            action: actionPayload.action,
+            requestedBy: 'opponent',
+          } as ActionRequest);
+        }
         break;
-      case 'action_response':
-        // TODO: Handle action responses in Phase 5
-        console.log('Received action response:', message.payload);
+      }
+      case 'action_response': {
+        // Opponent responded to our action request
+        const responsePayload = message.payload as ActionResponsePayload;
+        console.log('Received action response:', responsePayload);
+        
+        // Clear timeout
+        if (actionTimeoutRef.current) {
+          clearTimeout(actionTimeoutRef.current);
+          actionTimeoutRef.current = null;
+        }
+        
+        // Clear pending request if it matches
+        if (pendingActionRequest?.id === responsePayload.requestId) {
+          setPendingActionRequest(null);
+        }
+        
+        // Notify main window
+        if (window.electron) {
+          window.electron.sendToMainWindow({
+            type: 'action_response_received',
+            requestId: responsePayload.requestId,
+            accepted: responsePayload.accepted,
+            action: pendingActionRequest?.action || 'pause',
+          });
+        }
         break;
+      }
       case 'sync_state':
-        // TODO: Handle state sync in Phase 5
+        // TODO: Handle state sync
         console.log('Received state sync:', message.payload);
         break;
     }
-  }, [opponent?.username]);
+  }, [opponent?.username, pendingActionRequest]);
 
   // Initialize WebRTC connection
   const initializeWebRTC = useCallback(async (isInitiator: boolean) => {
@@ -497,6 +575,50 @@ export default function OnlinePlayPage() {
     }
   };
 
+  // Accept action request from opponent
+  const handleAcceptActionRequest = () => {
+    if (!pendingActionRequest || !pendingActionRequest.fromOpponent) return;
+    
+    if (webrtcRef.current?.isConnected()) {
+      webrtcRef.current.sendActionResponse(pendingActionRequest.id, true);
+    }
+    
+    // Clear timeout
+    if (actionTimeoutRef.current) {
+      clearTimeout(actionTimeoutRef.current);
+      actionTimeoutRef.current = null;
+    }
+    
+    // Notify main window that action was accepted
+    if (window.electron) {
+      window.electron.sendToMainWindow({
+        type: 'action_response_received',
+        requestId: pendingActionRequest.id,
+        accepted: true,
+        action: pendingActionRequest.action,
+      });
+    }
+    
+    setPendingActionRequest(null);
+  };
+
+  // Decline action request from opponent
+  const handleDeclineActionRequest = () => {
+    if (!pendingActionRequest || !pendingActionRequest.fromOpponent) return;
+    
+    if (webrtcRef.current?.isConnected()) {
+      webrtcRef.current.sendActionResponse(pendingActionRequest.id, false);
+    }
+    
+    // Clear timeout
+    if (actionTimeoutRef.current) {
+      clearTimeout(actionTimeoutRef.current);
+      actionTimeoutRef.current = null;
+    }
+    
+    setPendingActionRequest(null);
+  };
+
   // Send chat message
   const handleSendChat = () => {
     if (!chatInput.trim() || !opponent) return;
@@ -527,8 +649,108 @@ export default function OnlinePlayPage() {
       if (pingIntervalRef.current) {
         clearInterval(pingIntervalRef.current);
       }
+      if (actionTimeoutRef.current) {
+        clearTimeout(actionTimeoutRef.current);
+      }
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+      }
     };
   }, []);
+
+  // Action request countdown timer
+  useEffect(() => {
+    if (pendingActionRequest) {
+      setActionCountdown(30);
+      countdownIntervalRef.current = setInterval(() => {
+        setActionCountdown(prev => Math.max(0, prev - 1));
+      }, 1000);
+    } else {
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+      setActionCountdown(30);
+    }
+    
+    return () => {
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+      }
+    };
+  }, [pendingActionRequest]);
+
+  // Send online state updates to main window
+  useEffect(() => {
+    if (window.electron) {
+      const stateUpdate: OnlineStateUpdate = {
+        type: 'online_state_update',
+        isInGame: opponent !== null,
+        isP2PConnected: p2pState === 'connected',
+        opponentName: opponent?.username || null,
+        currentUserName: currentUser?.username || null,
+      };
+      window.electron.sendToMainWindow(stateUpdate);
+    }
+  }, [opponent, p2pState, currentUser]);
+
+  // Listen for messages from main window
+  useEffect(() => {
+    if (!window.electron) return;
+
+    const unsubscribe = window.electron.onMainWindowMessage((message) => {
+      const msg = message as MainToOnlinePlayMessage;
+      console.log('Message from main window:', msg);
+
+      switch (msg.type) {
+        case 'request_action':
+          // Main window wants to request an action
+          if (webrtcRef.current?.isConnected() && !pendingActionRequest) {
+            const requestId = webrtcRef.current.sendActionRequest(msg.action, msg.data);
+            setPendingActionRequest({
+              id: requestId,
+              action: msg.action,
+              fromOpponent: false,
+              timestamp: Date.now(),
+            });
+            
+            // Auto-cancel after 30 seconds
+            actionTimeoutRef.current = setTimeout(() => {
+              setPendingActionRequest(null);
+              if (window.electron) {
+                window.electron.sendToMainWindow({
+                  type: 'action_response_received',
+                  requestId,
+                  accepted: false,
+                  action: msg.action,
+                });
+              }
+            }, 30000);
+          }
+          break;
+
+        case 'send_move':
+          // Main window wants to send a move
+          if (webrtcRef.current?.isConnected()) {
+            webrtcRef.current.sendMove(msg.usi, msg.sfen, msg.moveNumber, 0);
+          }
+          break;
+
+        case 'cancel_action_request':
+          // Main window wants to cancel a pending action request
+          if (pendingActionRequest?.id === msg.requestId) {
+            if (actionTimeoutRef.current) {
+              clearTimeout(actionTimeoutRef.current);
+              actionTimeoutRef.current = null;
+            }
+            setPendingActionRequest(null);
+          }
+          break;
+      }
+    });
+
+    return unsubscribe;
+  }, [pendingActionRequest]);
 
   // Check for token in URL (OAuth callback)
   useEffect(() => {
@@ -765,6 +987,64 @@ export default function OnlinePlayPage() {
               End Game
             </button>
           </div>
+
+          {/* Pending Action Request */}
+          {pendingActionRequest && (
+            <div className={`rounded p-3 ${
+              pendingActionRequest.fromOpponent 
+                ? 'bg-yellow-900/30 border border-yellow-600' 
+                : 'bg-blue-900/30 border border-blue-600'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className={`w-5 h-5 ${
+                    pendingActionRequest.fromOpponent ? 'text-yellow-500' : 'text-blue-400'
+                  }`} />
+                  <div>
+                    <div className="font-medium">
+                      {pendingActionRequest.fromOpponent 
+                        ? `${opponent.username} requests: ` 
+                        : 'Waiting for approval: '}
+                      <span className="text-accent-cyan">
+                        {pendingActionRequest.action === 'pause' ? 'Pause Game' :
+                         pendingActionRequest.action === 'resume' ? 'Resume Game' :
+                         pendingActionRequest.action === 'new_game' ? 'New Game' :
+                         pendingActionRequest.action === 'revert' ? 'Revert Move' :
+                         pendingActionRequest.action === 'toggle_teaching' ? 'Toggle Teaching Assistant' :
+                         pendingActionRequest.action}
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      {actionCountdown}s remaining
+                    </div>
+                  </div>
+                </div>
+                
+                {pendingActionRequest.fromOpponent ? (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleAcceptActionRequest}
+                      className="bg-[#3cf281] hover:bg-[#2bd96f] text-black p-2 rounded"
+                      title="Accept"
+                    >
+                      <Check className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={handleDeclineActionRequest}
+                      className="bg-red-600 hover:bg-red-700 p-2 rounded"
+                      title="Decline"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-400 animate-pulse">
+                    Waiting...
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Chat */}
           <div className="flex-1 bg-[#1a1a1a] rounded p-3 flex flex-col">

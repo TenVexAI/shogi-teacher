@@ -1,12 +1,19 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { X, Upload, Users, Monitor, Bot, Settings } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { X, Upload, Users, Monitor, Bot, Settings, ArrowLeftRight, Globe } from 'lucide-react';
 import { GameMode } from '@/types/game';
 
 interface EngineConfig {
     black: { engineId: string | null; engineName: string };
     white: { engineId: string | null; engineName: string };
+}
+
+interface OnlinePlayState {
+    isInGame: boolean;
+    isP2PConnected: boolean;
+    opponentName: string | null;
+    currentUserName?: string | null;
 }
 
 interface NewGameModalProps {
@@ -16,6 +23,7 @@ interface NewGameModalProps {
     onImportGame: (content: string, format?: string) => void;
     currentEngineConfig: EngineConfig | null;
     onOpenEngineManagement: () => void;
+    onlinePlayState?: OnlinePlayState;
 }
 
 export interface GameConfig {
@@ -55,15 +63,44 @@ export default function NewGameModal({
     onImportGame,
     currentEngineConfig,
     onOpenEngineManagement,
+    onlinePlayState,
 }: NewGameModalProps) {
+    // Check if we're in online P2P mode
+    const isOnlineP2P = onlinePlayState?.isInGame && onlinePlayState?.isP2PConnected;
+
+    // Initialize state with online mode values if applicable
+    const getInitialBlackName = () => isOnlineP2P ? (onlinePlayState?.currentUserName || '') : '';
+    const getInitialWhiteName = () => isOnlineP2P ? (onlinePlayState?.opponentName || '') : '';
+    
     const [selectedMode, setSelectedMode] = useState<GameMode>('human_vs_human');
     const [humanPlaysAs, setHumanPlaysAs] = useState<'black' | 'white'>('black');
-    const [blackName, setBlackName] = useState('');
-    const [whiteName, setWhiteName] = useState('');
+    const [blackName, setBlackName] = useState(getInitialBlackName);
+    const [whiteName, setWhiteName] = useState(getInitialWhiteName);
     const [showImport, setShowImport] = useState(false);
     const [importContent, setImportContent] = useState('');
     const [importFormat, setImportFormat] = useState<string>('');
     const fileInputRef = useRef<HTMLInputElement>(null);
+    
+    // Track previous online state to detect changes
+    const prevIsOnlineP2P = useRef(isOnlineP2P);
+    
+    // Update names when online state changes (e.g., modal reopened while in game)
+    useEffect(() => {
+        if (isOnlineP2P && !prevIsOnlineP2P.current) {
+            // Just transitioned to online mode
+            setBlackName(onlinePlayState?.currentUserName || '');
+            setWhiteName(onlinePlayState?.opponentName || '');
+            setSelectedMode('human_vs_human');
+        }
+        prevIsOnlineP2P.current = isOnlineP2P;
+    }, [isOnlineP2P, onlinePlayState]);
+
+    // Swap player names (black <-> white)
+    const handleSwapPlayers = () => {
+        const tempBlack = blackName;
+        setBlackName(whiteName);
+        setWhiteName(tempBlack);
+    };
 
     // Get engine info from current config
     const blackEngineName = currentEngineConfig?.black.engineName || 'Not configured';
@@ -132,30 +169,29 @@ export default function NewGameModal({
                 </div>
 
                 <div className="p-6">
-                    {/* Tab buttons */}
-                    <div className="flex gap-2 mb-6">
-                        <button
-                            onClick={() => setShowImport(false)}
-                            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                                !showImport
-                                    ? 'bg-accent-purple text-white'
-                                    : 'bg-background-primary text-text-secondary hover:text-text-primary'
-                            }`}
-                        >
-                            New Game
-                        </button>
-                        <button
-                            onClick={() => setShowImport(true)}
-                            className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
-                                showImport
-                                    ? 'bg-accent-purple text-white'
-                                    : 'bg-background-primary text-text-secondary hover:text-text-primary'
-                            }`}
-                        >
-                            <Upload className="w-4 h-4" />
-                            Import Game
-                        </button>
-                    </div>
+                    {/* Import Game button - only shown when not importing */}
+                    {!showImport && (
+                        <div className="flex gap-2 mb-6">
+                            <button
+                                onClick={() => setShowImport(true)}
+                                className="px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 bg-background-primary text-text-secondary hover:text-text-primary hover:bg-background-secondary"
+                            >
+                                <Upload className="w-4 h-4" />
+                                Import Game Instead
+                            </button>
+                        </div>
+                    )}
+                    {/* Back button when importing */}
+                    {showImport && (
+                        <div className="flex gap-2 mb-6">
+                            <button
+                                onClick={() => setShowImport(false)}
+                                className="px-4 py-2 rounded-lg font-medium transition-colors bg-background-primary text-text-secondary hover:text-text-primary hover:bg-background-secondary"
+                            >
+                                ← Back to New Game
+                            </button>
+                        </div>
+                    )}
 
                     {showImport ? (
                         /* Import section */
@@ -233,25 +269,56 @@ export default function NewGameModal({
                                     Game Mode
                                 </label>
                                 <div className="grid grid-cols-1 gap-3">
-                                    {GAME_MODES.map((mode) => (
-                                        <button
-                                            key={mode.id}
-                                            onClick={() => setSelectedMode(mode.id)}
-                                            className={`flex items-center gap-4 p-4 rounded-lg border-2 transition-all ${
-                                                selectedMode === mode.id
-                                                    ? 'border-accent-purple bg-accent-purple/10'
-                                                    : 'border-border hover:border-text-secondary'
-                                            }`}
-                                        >
-                                            <mode.icon className={`w-8 h-8 ${
-                                                selectedMode === mode.id ? 'text-accent-purple' : 'text-text-secondary'
-                                            }`} />
-                                            <div className="text-left">
-                                                <div className="font-medium text-text-primary">{mode.name}</div>
-                                                <div className="text-sm text-text-secondary">{mode.description}</div>
-                                            </div>
-                                        </button>
-                                    ))}
+                                    {GAME_MODES.map((mode) => {
+                                        // Determine if this mode should be disabled in online mode
+                                        const isDisabled = isOnlineP2P && mode.id !== 'human_vs_human';
+                                        const isOnlineMatch = isOnlineP2P && mode.id === 'human_vs_human';
+                                        
+                                        return (
+                                            <button
+                                                key={mode.id}
+                                                onClick={() => !isDisabled && setSelectedMode(mode.id)}
+                                                disabled={isDisabled}
+                                                className={`flex items-center gap-4 p-4 rounded-lg border-2 transition-all ${
+                                                    isDisabled
+                                                        ? 'border-border opacity-40 cursor-not-allowed'
+                                                        : selectedMode === mode.id
+                                                            ? 'border-accent-purple bg-accent-purple/10'
+                                                            : 'border-border hover:border-text-secondary'
+                                                } ${isOnlineMatch ? 'border-[#3cf281] bg-[#3cf281]/10' : ''}`}
+                                            >
+                                                {isOnlineMatch ? (
+                                                    <Globe className="w-8 h-8 text-[#3cf281]" />
+                                                ) : (
+                                                    <mode.icon className={`w-8 h-8 ${
+                                                        isDisabled
+                                                            ? 'text-text-secondary/50'
+                                                            : selectedMode === mode.id 
+                                                                ? 'text-accent-purple' 
+                                                                : 'text-text-secondary'
+                                                    }`} />
+                                                )}
+                                                <div className="text-left flex-1">
+                                                    <div className={`font-medium ${isDisabled ? 'text-text-secondary/50' : 'text-text-primary'}`}>
+                                                        {isOnlineMatch ? 'Online Match' : mode.name}
+                                                    </div>
+                                                    <div className={`text-sm ${isDisabled ? 'text-text-secondary/50' : 'text-text-secondary'}`}>
+                                                        {isOnlineMatch 
+                                                            ? `Playing online vs ${onlinePlayState?.opponentName}`
+                                                            : isDisabled
+                                                                ? 'Unavailable during online match'
+                                                                : mode.description
+                                                        }
+                                                    </div>
+                                                </div>
+                                                {isOnlineMatch && (
+                                                    <span className="px-2 py-1 bg-[#3cf281]/20 text-[#3cf281] text-xs rounded font-medium">
+                                                        Connected
+                                                    </span>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                             </div>
 
@@ -339,9 +406,21 @@ export default function NewGameModal({
 
                             {/* Player names */}
                             <div className="space-y-4">
-                                <label className="block text-sm font-medium text-text-primary">
-                                    Player Names (optional)
-                                </label>
+                                <div className="flex items-center justify-between">
+                                    <label className="block text-sm font-medium text-text-primary">
+                                        {isOnlineP2P ? 'Player Names' : 'Player Names (optional)'}
+                                    </label>
+                                    {isOnlineP2P && (
+                                        <button
+                                            onClick={handleSwapPlayers}
+                                            className="flex items-center gap-2 px-3 py-1.5 text-sm bg-background-primary border border-border rounded-lg text-text-secondary hover:text-text-primary hover:border-accent-purple transition-colors"
+                                            title="Swap black and white players"
+                                        >
+                                            <ArrowLeftRight className="w-4 h-4" />
+                                            Swap Colors
+                                        </button>
+                                    )}
+                                </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-xs text-text-secondary mb-1">
@@ -358,7 +437,9 @@ export default function NewGameModal({
                                                     ? blackEngineName
                                                     : 'Guest'
                                             }
-                                            className="w-full px-3 py-2 bg-background-primary border border-border rounded-lg text-text-primary placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-accent-purple"
+                                            className={`w-full px-3 py-2 bg-background-primary border rounded-lg text-text-primary placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-accent-purple ${
+                                                isOnlineP2P ? 'border-[#3cf281]/50' : 'border-border'
+                                            }`}
                                         />
                                     </div>
                                     <div>
@@ -376,10 +457,17 @@ export default function NewGameModal({
                                                     ? whiteEngineName
                                                     : 'Guest'
                                             }
-                                            className="w-full px-3 py-2 bg-background-primary border border-border rounded-lg text-text-primary placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-accent-purple"
+                                            className={`w-full px-3 py-2 bg-background-primary border rounded-lg text-text-primary placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-accent-purple ${
+                                                isOnlineP2P ? 'border-[#3cf281]/50' : 'border-border'
+                                            }`}
                                         />
                                     </div>
                                 </div>
+                                {isOnlineP2P && (
+                                    <p className="text-xs text-[#3cf281]/70">
+                                        Use &quot;Swap Colors&quot; to change who plays Black (first move) vs White
+                                    </p>
+                                )}
                             </div>
 
                             <button

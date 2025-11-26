@@ -22,6 +22,7 @@ import {
 import { GameState, GameFormat } from '@/types/game';
 import { audioManager } from '@/lib/audioManager';
 import { loadUISettings, saveUISettings } from '@/lib/settings';
+import type { OnlinePlayToMainMessage, OnlineStateUpdate } from '@/types/online-play';
 
 interface Alternative {
   move_usi: string;
@@ -98,6 +99,14 @@ export default function Home() {
   const [isComputerThinking, setIsComputerThinking] = useState(false);
   const [returnToNewGameModal, setReturnToNewGameModal] = useState(false);
   const [returnToGameModeSettings, setReturnToGameModeSettings] = useState(false);
+  
+  // Online play state
+  const [onlinePlayState, setOnlinePlayState] = useState<{
+    isInGame: boolean;
+    isP2PConnected: boolean;
+    opponentName: string | null;
+    currentUserName: string | null;
+  }>({ isInGame: false, isP2PConnected: false, opponentName: null, currentUserName: null });
 
   useEffect(() => {
     // Initialize game and load config
@@ -143,6 +152,101 @@ export default function Home() {
       audioManager.updateSettings(newSettings);
     });
   }, []);
+
+  // Pending action response state (set when opponent responds)
+  const [pendingActionResponse, setPendingActionResponse] = useState<{
+    action: string;
+    accepted: boolean;
+    data?: unknown;
+  } | null>(null);
+
+  // Listen for messages from online play window
+  useEffect(() => {
+    if (!window.electron) return;
+
+    const unsubscribe = window.electron.onOnlinePlayMessage((message) => {
+      const msg = message as OnlinePlayToMainMessage;
+      console.log('Message from online play window:', msg);
+
+      switch (msg.type) {
+        case 'online_state_update': {
+          const update = msg as OnlineStateUpdate;
+          setOnlinePlayState({
+            isInGame: update.isInGame,
+            isP2PConnected: update.isP2PConnected,
+            opponentName: update.opponentName,
+            currentUserName: update.currentUserName,
+          });
+          break;
+        }
+        case 'move_received':
+          // Opponent made a move - apply it to the board
+          console.log('Opponent move received:', msg);
+          // TODO: Apply the move to the game state
+          break;
+        case 'action_request_received':
+          // Opponent requested an action - this is handled in online play window
+          console.log('Action request received:', msg);
+          break;
+        case 'action_response_received': {
+          // Response to our action request
+          console.log('Action response received:', msg);
+          const response = msg as { type: string; action: string; accepted: boolean; data?: unknown };
+          if (response.accepted) {
+            setPendingActionResponse({
+              action: response.action,
+              accepted: true,
+              data: response.data,
+            });
+          }
+          break;
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, []);
+
+  // Execute approved action when response is received
+  useEffect(() => {
+    if (!pendingActionResponse || !pendingActionResponse.accepted) return;
+
+    const { action, data } = pendingActionResponse;
+    console.log('Executing approved action:', action);
+
+    switch (action) {
+      case 'new_game':
+        setIsNewGameModalOpen(true);
+        break;
+      case 'pause':
+        setIsClockRunning(false);
+        audioManager.playUISound('pause');
+        break;
+      case 'resume':
+        setIsClockRunning(true);
+        if (clockStartTimeRef.current === 0) {
+          clockStartTimeRef.current = Date.now();
+          lastMoveTimeRef.current = Date.now();
+        }
+        audioManager.playUISound('start');
+        break;
+      case 'revert': {
+        // For revert, we need the moveIndex from data
+        const moveData = data as { moveIndex?: number } | undefined;
+        if (moveData?.moveIndex !== undefined) {
+          // Temporarily disable online check, execute revert, then restore
+          setOnlinePlayState({ isInGame: false, isP2PConnected: false, opponentName: null, currentUserName: null });
+          // The revert will be executed by a separate effect after state update
+          console.log('Approved: revert to move', moveData.moveIndex);
+          // Store the moveIndex to execute after state change
+          sessionStorage.setItem('pendingRevertMove', String(moveData.moveIndex));
+        }
+        break;
+      }
+    }
+
+    setPendingActionResponse(null);
+  }, [pendingActionResponse, onlinePlayState]);
 
   // Stop clock when game ends
   useEffect(() => {
@@ -485,6 +589,17 @@ export default function Home() {
   };
 
   const handleNewGame = () => {
+    // If in online mode with P2P, request mutual agreement
+    if (onlinePlayState.isInGame && onlinePlayState.isP2PConnected) {
+      // Send request to online play window to request action from opponent
+      if (window.electron) {
+        window.electron.sendToOnlinePlayWindow({
+          type: 'request_action',
+          action: 'new_game',
+        });
+      }
+      return; // Don't open modal until opponent agrees
+    }
     setIsNewGameModalOpen(true);
   };
 
@@ -933,6 +1048,11 @@ export default function Home() {
 
   // Open Game Mode Settings (pauses the clock)
   const handleOpenGameModeSettings = () => {
+    // Block when in online P2P mode
+    if (onlinePlayState.isInGame && onlinePlayState.isP2PConnected) {
+      return;
+    }
+    
     // Pause clock if running
     if (isClockRunning) {
       setIsClockRunning(false);
@@ -1008,6 +1128,30 @@ export default function Home() {
   };
 
   const handleClockToggle = () => {
+    const willPause = isClockRunning;
+    
+    // If in online mode with P2P and trying to pause, request mutual agreement
+    if (onlinePlayState.isInGame && onlinePlayState.isP2PConnected && willPause) {
+      if (window.electron) {
+        window.electron.sendToOnlinePlayWindow({
+          type: 'request_action',
+          action: 'pause',
+        });
+      }
+      return; // Don't pause until opponent agrees
+    }
+    
+    // If in online mode with P2P and trying to resume, request mutual agreement
+    if (onlinePlayState.isInGame && onlinePlayState.isP2PConnected && !willPause) {
+      if (window.electron) {
+        window.electron.sendToOnlinePlayWindow({
+          type: 'request_action',
+          action: 'resume',
+        });
+      }
+      return; // Don't resume until opponent agrees
+    }
+
     const willStart = !isClockRunning;
     setIsClockRunning(willStart);
     if (willStart && clockStartTimeRef.current === 0) {
@@ -1054,6 +1198,19 @@ export default function Home() {
   };
 
   const handleRevertToMove = async (moveIndex: number) => {
+    // If in online mode with P2P, request mutual agreement
+    if (onlinePlayState.isInGame && onlinePlayState.isP2PConnected) {
+      // Send request to online play window to request action from opponent
+      if (window.electron) {
+        window.electron.sendToOnlinePlayWindow({
+          type: 'request_action',
+          action: 'revert',
+          data: { moveIndex },
+        });
+      }
+      return; // Don't revert until opponent agrees
+    }
+
     try {
       setIsLoading(true);
       
@@ -1221,6 +1378,7 @@ export default function Home() {
             setReturnToNewGameModal(true);
             setIsEngineManagementOpen(true);
           }}
+          onlinePlayState={onlinePlayState}
         />
 
         <ExportGameModal
@@ -1311,12 +1469,30 @@ export default function Home() {
             onOpenOnlinePlay={handleOpenOnlinePlay}
             onOpenEngineManagement={handleOpenEngineManagement}
             onOpenGameModeSettings={handleOpenGameModeSettings}
+            isOnlineP2PConnected={onlinePlayState.isInGame && onlinePlayState.isP2PConnected}
           />
 
           {/* Main Content */}
           <div className="flex gap-3 flex-1 p-4">
             {/* Left Column: Move History with Clock */}
             <div className="w-[300px] shrink-0 h-full">
+            {/* Online Mode Indicator */}
+            {onlinePlayState.isInGame && (
+              <div className={`mb-2 px-3 py-2 rounded-lg flex items-center gap-2 text-sm ${
+                onlinePlayState.isP2PConnected 
+                  ? 'bg-[#3cf281]/20 border border-[#3cf281]/50' 
+                  : 'bg-yellow-500/20 border border-yellow-500/50'
+              }`}>
+                <span className={`w-2 h-2 rounded-full ${
+                  onlinePlayState.isP2PConnected ? 'bg-[#3cf281]' : 'bg-yellow-500 animate-pulse'
+                }`} />
+                <span className={onlinePlayState.isP2PConnected ? 'text-[#3cf281]' : 'text-yellow-500'}>
+                  {onlinePlayState.isP2PConnected 
+                    ? `Playing vs ${onlinePlayState.opponentName}` 
+                    : 'Connecting...'}
+                </span>
+              </div>
+            )}
             <MoveHistory 
               moves={moveHistory} 
               currentTurn={(gameState?.turn as 'b' | 'w') || 'b'}

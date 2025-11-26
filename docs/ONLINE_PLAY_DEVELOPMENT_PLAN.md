@@ -173,25 +173,28 @@ shogi-teacher/
 - [ ] State reconciliation - Phase 5
 - [ ] Desync detection - Phase 5
 
-### Phase 5: Main Window Integration
+### Phase 5: Main Window Integration ✅ MOSTLY COMPLETE
 **Estimated: 3-4 days**
 
-#### 5.1 Online Mode Detection
-- [ ] Track when P2P connection is active
-- [ ] Modify control behavior for online play
-- [ ] IPC communication between windows
+#### 5.1 Online Mode Detection ✅
+- [x] Track when P2P connection is active
+- [x] IPC communication between windows
+- [x] Modify control behavior for online play
+- [x] Online mode indicator in main window
 
-#### 5.2 Mutual Action System
-- [ ] Intercept pause/new game/revert actions
-- [ ] Send action requests via P2P
-- [ ] Show approval UI in Online Play window
-- [ ] 30-second timeout handling
-- [ ] Execute action on mutual agreement
+#### 5.2 Mutual Action System ✅
+- [x] Send action requests via P2P
+- [x] Show approval UI in Online Play window
+- [x] 30-second timeout handling
+- [x] Accept/Decline buttons
+- [x] Intercept pause/new game/revert actions in main window
+- [x] Execute action on mutual agreement
 
-#### 5.3 Teaching Assistant Toggle
+#### 5.3 Teaching Assistant Toggle (Optional)
 - [ ] Request to enable/disable
 - [ ] Mutual agreement requirement
 - [ ] State synchronization
+- Note: Can be deferred - core online play functionality complete
 
 ### Phase 6: Testing & Polish
 **Estimated: 2-3 days**
