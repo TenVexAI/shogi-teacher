@@ -12,7 +12,7 @@ from fastapi import WebSocket
 from models import (
     User, UserPublic, UserStatus, GameRequest,
     LobbyUpdateMessage, UserJoinedMessage, UserLeftMessage,
-    UserStatusChangedMessage, RequestReceivedMessage,
+    UserStatusChangedMessage, RequestSentMessage, RequestReceivedMessage,
     RequestAcceptedMessage, RequestDeclinedMessage, RequestRevokedMessage,
     RequestCanceledMessage, GameStartedMessage, OpponentDisconnectedMessage,
     ErrorMessage, OAuthProvider
@@ -190,6 +190,9 @@ class LobbyManager:
             )
             
             self._requests[request.id] = request
+            
+            # Notify sender (confirmation)
+            await self._send_to_user(sender_id, RequestSentMessage(request=request))
             
             # Notify recipient
             await self._send_to_user(recipient_id, RequestReceivedMessage(request=request))

@@ -157,6 +157,11 @@ export default function OnlinePlayPage() {
         ));
         break;
 
+      case 'request_sent':
+        // Our request was successfully sent - add to outgoing requests
+        setOutgoingRequests(prev => [...prev, message.request as GameRequest]);
+        break;
+
       case 'request_received':
         setIncomingRequests(prev => [...prev, message.request as GameRequest]);
         break;
@@ -348,10 +353,10 @@ export default function OnlinePlayPage() {
     });
 
     // Set up signaling - send to opponent via server relay
+    // Use the opponentId passed to this function, not the closure's opponent state
+    const targetId = opponentId || opponent?.id;
     rtc.onSendSignal = (type, data) => {
-      // Get opponent ID from the ref (opponent state may be stale in closure)
-      const opponentId = opponent?.id;
-      if (!opponentId) {
+      if (!targetId) {
         console.error('No opponent ID for signaling');
         return;
       }
@@ -360,21 +365,21 @@ export default function OnlinePlayPage() {
         case 'offer':
           sendMessage({ 
             type: 'rtc_offer', 
-            target_user_id: opponentId, 
+            target_user_id: targetId, 
             sdp: (data as RTCSessionDescriptionInit).sdp 
           });
           break;
         case 'answer':
           sendMessage({ 
             type: 'rtc_answer', 
-            target_user_id: opponentId, 
+            target_user_id: targetId, 
             sdp: (data as RTCSessionDescriptionInit).sdp 
           });
           break;
         case 'ice_candidate':
           sendMessage({ 
             type: 'rtc_ice', 
-            target_user_id: opponentId, 
+            target_user_id: targetId, 
             candidate: data 
           });
           break;
@@ -403,16 +408,23 @@ export default function OnlinePlayPage() {
   const handleWebRTCOffer = useCallback(async (offer: RTCSessionDescriptionInit) => {
     if (!webrtcRef.current) {
       // Initialize WebRTC if not already done (receiver side)
-      await initializeWebRTC(false);
+      await initializeWebRTC(false, opponent?.id);
     }
     
     try {
       const answer = await webrtcRef.current!.handleOffer(offer);
-      sendMessage({ type: 'webrtc_answer', answer });
+      // Send answer back through server signaling
+      if (opponent?.id) {
+        sendMessage({ 
+          type: 'rtc_answer', 
+          target_user_id: opponent.id, 
+          sdp: answer.sdp 
+        });
+      }
     } catch (error) {
       console.error('Failed to handle offer:', error);
     }
-  }, [initializeWebRTC, sendMessage]);
+  }, [initializeWebRTC, sendMessage, opponent?.id]);
 
   // Handle incoming WebRTC answer
   const handleWebRTCAnswer = useCallback(async (answer: RTCSessionDescriptionInit) => {

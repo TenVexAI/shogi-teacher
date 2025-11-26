@@ -47,6 +47,7 @@ class MessageType(str, Enum):
     USER_JOINED = "user_joined"
     USER_LEFT = "user_left"
     USER_STATUS_CHANGED = "user_status_changed"
+    REQUEST_SENT = "request_sent"
     REQUEST_RECEIVED = "request_received"
     REQUEST_ACCEPTED = "request_accepted"
     REQUEST_DECLINED = "request_declined"
@@ -215,6 +216,12 @@ class UserStatusChangedMessage(BaseModel):
     type: str = MessageType.USER_STATUS_CHANGED
     user_id: str
     status: UserStatus
+
+
+class RequestSentMessage(BaseModel):
+    """Outgoing game request confirmation."""
+    type: str = MessageType.REQUEST_SENT
+    request: GameRequest
 
 
 class RequestReceivedMessage(BaseModel):
