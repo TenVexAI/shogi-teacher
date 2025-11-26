@@ -278,12 +278,13 @@ export default function OnlinePlayPage() {
           clearTimeout(actionTimeoutRef.current);
         }
         
-        // Set pending request
+        // Set pending request (include data for actions like revert that need it)
         setPendingActionRequest({
           id: message.id,
           action: actionPayload.action as ActionType,
           fromOpponent: true,
           timestamp: Date.now(),
+          data: actionPayload.data,  // Store the request data (e.g., moveIndex for revert)
         });
         
         // Auto-decline after 2 minutes
@@ -650,13 +651,14 @@ export default function OnlinePlayPage() {
       actionTimeoutRef.current = null;
     }
     
-    // Notify main window that action was accepted
+    // Notify main window that action was accepted (include data for actions like revert)
     if (window.electron) {
       window.electron.sendToMainWindow({
         type: 'action_response_received',
         requestId: pendingActionRequest.id,
         accepted: true,
         action: pendingActionRequest.action,
+        data: pendingActionRequest.data,  // Include data so main window can execute the action
       });
     }
     
