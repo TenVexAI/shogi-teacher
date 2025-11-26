@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Globe, LogIn, LogOut, Users, Send, Wifi, WifiOff, MessageSquare } from 'lucide-react';
+import { Globe, LogIn, LogOut, Users, Send, Wifi, WifiOff, MessageSquare, Radio } from 'lucide-react';
+import { WebRTCManager, ConnectionState, P2PMessage, ChatPayload } from '@/lib/webrtc';
 
 // Server URL - will be configurable later
 const SERVER_URL = 'wss://shogi.tenvexai.com/ws';
@@ -78,8 +79,19 @@ export default function OnlinePlayPage() {
   const pingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastPingTimeRef = useRef<number>(0);
   
+  // WebRTC P2P state
+  const [p2pState, setP2pState] = useState<ConnectionState>('disconnected');
+  const webrtcRef = useRef<WebRTCManager | null>(null);
+  const isInitiatorRef = useRef<boolean>(false);
+  
   // Message handler ref to avoid stale closure issues
   const messageHandlerRef = useRef<(message: Record<string, unknown>) => void>(() => {});
+  
+  // WebRTC handler refs (to avoid declaration order issues)
+  const initializeWebRTCRef = useRef<(isInitiator: boolean) => Promise<void>>(async () => {});
+  const handleWebRTCOfferRef = useRef<(offer: RTCSessionDescriptionInit) => Promise<void>>(async () => {});
+  const handleWebRTCAnswerRef = useRef<(answer: RTCSessionDescriptionInit) => Promise<void>>(async () => {});
+  const handleWebRTCIceCandidateRef = useRef<(candidate: RTCIceCandidateInit) => Promise<void>>(async () => {});
 
   // Handle server messages - defined first so it can be referenced
   const handleServerMessage = useCallback((message: Record<string, unknown>) => {
@@ -146,12 +158,32 @@ export default function OnlinePlayPage() {
       case 'game_started':
         setOpponent(message.opponent as User);
         setMyStatus('in_game');
+        isInitiatorRef.current = message.is_initiator as boolean;
+        // Initialize WebRTC - initiator creates offer
+        initializeWebRTCRef.current(message.is_initiator as boolean);
         break;
 
       case 'opponent_disconnected':
         setOpponent(null);
         setMyStatus('available');
         setChatMessages([]);
+        // Close WebRTC connection
+        webrtcRef.current?.close();
+        webrtcRef.current = null;
+        setP2pState('disconnected');
+        break;
+
+      // WebRTC Signaling (relayed from opponent)
+      case 'rtc_offer':
+        handleWebRTCOfferRef.current({ type: 'offer', sdp: message.sdp as string });
+        break;
+
+      case 'rtc_answer':
+        handleWebRTCAnswerRef.current({ type: 'answer', sdp: message.sdp as string });
+        break;
+
+      case 'rtc_ice':
+        handleWebRTCIceCandidateRef.current(message.candidate as RTCIceCandidateInit);
         break;
 
       case 'pong':
@@ -173,10 +205,162 @@ export default function OnlinePlayPage() {
     }
   }, []);
 
+  // Handle P2P messages from WebRTC
+  const handleP2PMessage = useCallback((message: P2PMessage) => {
+    console.log('P2P message:', message.type, message);
+
+    switch (message.type) {
+      case 'chat':
+      case 'quick_phrase': {
+        const payload = message.payload as ChatPayload;
+        setChatMessages(prev => [...prev, {
+          id: message.id,
+          sender: opponent?.username || 'Opponent',
+          japanese: payload.japanese,
+          english: payload.text,
+          isQuickPhrase: message.type === 'quick_phrase',
+          timestamp: new Date(message.timestamp),
+        }]);
+        break;
+      }
+      case 'move':
+        // TODO: Handle move in Phase 5
+        console.log('Received move:', message.payload);
+        break;
+      case 'action_request':
+        // TODO: Handle action requests in Phase 5
+        console.log('Received action request:', message.payload);
+        break;
+      case 'action_response':
+        // TODO: Handle action responses in Phase 5
+        console.log('Received action response:', message.payload);
+        break;
+      case 'sync_state':
+        // TODO: Handle state sync in Phase 5
+        console.log('Received state sync:', message.payload);
+        break;
+    }
+  }, [opponent?.username]);
+
+  // Initialize WebRTC connection
+  const initializeWebRTC = useCallback(async (isInitiator: boolean) => {
+    // Clean up existing connection
+    if (webrtcRef.current) {
+      webrtcRef.current.close();
+    }
+
+    // Create new WebRTC manager
+    const rtc = new WebRTCManager({
+      onConnectionStateChange: (state) => {
+        console.log('P2P connection state:', state);
+        setP2pState(state);
+      },
+      onMessage: handleP2PMessage,
+      onError: (error) => {
+        console.error('P2P error:', error);
+      },
+    });
+
+    // Set up signaling - send to opponent via server relay
+    rtc.onSendSignal = (type, data) => {
+      // Get opponent ID from the ref (opponent state may be stale in closure)
+      const opponentId = opponent?.id;
+      if (!opponentId) {
+        console.error('No opponent ID for signaling');
+        return;
+      }
+
+      switch (type) {
+        case 'offer':
+          sendMessage({ 
+            type: 'rtc_offer', 
+            target_user_id: opponentId, 
+            sdp: (data as RTCSessionDescriptionInit).sdp 
+          });
+          break;
+        case 'answer':
+          sendMessage({ 
+            type: 'rtc_answer', 
+            target_user_id: opponentId, 
+            sdp: (data as RTCSessionDescriptionInit).sdp 
+          });
+          break;
+        case 'ice_candidate':
+          sendMessage({ 
+            type: 'rtc_ice', 
+            target_user_id: opponentId, 
+            candidate: data 
+          });
+          break;
+      }
+    };
+
+    webrtcRef.current = rtc;
+
+    // If initiator, create and send offer
+    if (isInitiator && opponent?.id) {
+      try {
+        const offer = await rtc.createOffer();
+        sendMessage({ 
+          type: 'rtc_offer', 
+          target_user_id: opponent.id, 
+          sdp: offer.sdp 
+        });
+      } catch (error) {
+        console.error('Failed to create offer:', error);
+      }
+    }
+  }, [handleP2PMessage, sendMessage, opponent?.id]);
+
+  // Handle incoming WebRTC offer
+  const handleWebRTCOffer = useCallback(async (offer: RTCSessionDescriptionInit) => {
+    if (!webrtcRef.current) {
+      // Initialize WebRTC if not already done (receiver side)
+      await initializeWebRTC(false);
+    }
+    
+    try {
+      const answer = await webrtcRef.current!.handleOffer(offer);
+      sendMessage({ type: 'webrtc_answer', answer });
+    } catch (error) {
+      console.error('Failed to handle offer:', error);
+    }
+  }, [initializeWebRTC, sendMessage]);
+
+  // Handle incoming WebRTC answer
+  const handleWebRTCAnswer = useCallback(async (answer: RTCSessionDescriptionInit) => {
+    if (!webrtcRef.current) return;
+    
+    try {
+      await webrtcRef.current.handleAnswer(answer);
+    } catch (error) {
+      console.error('Failed to handle answer:', error);
+    }
+  }, []);
+
+  // Handle incoming ICE candidate
+  const handleWebRTCIceCandidate = useCallback(async (candidate: RTCIceCandidateInit) => {
+    if (!webrtcRef.current) return;
+    
+    try {
+      await webrtcRef.current.handleIceCandidate(candidate);
+    } catch (error) {
+      console.error('Failed to handle ICE candidate:', error);
+    }
+  }, []);
+
   // Keep message handler ref updated
   useEffect(() => {
     messageHandlerRef.current = handleServerMessage;
   }, [handleServerMessage]);
+
+  // Keep WebRTC handler refs updated
+  useEffect(() => {
+    initializeWebRTCRef.current = initializeWebRTC;
+    handleWebRTCOfferRef.current = handleWebRTCOffer;
+    handleWebRTCAnswerRef.current = handleWebRTCAnswer;
+    handleWebRTCIceCandidateRef.current = handleWebRTCIceCandidate;
+  }, [initializeWebRTC, handleWebRTCOffer, handleWebRTCAnswer, handleWebRTCIceCandidate]);
 
   // Connect to server
   const connectToServer = useCallback((token: string) => {
@@ -307,17 +491,21 @@ export default function OnlinePlayPage() {
     
     setChatMessages(prev => [...prev, message]);
     
-    // TODO: Send via P2P when WebRTC is implemented
+    // Send via P2P
+    if (webrtcRef.current?.isConnected()) {
+      webrtcRef.current.sendChat(phrase.english, phrase.japanese);
+    }
   };
 
   // Send chat message
   const handleSendChat = () => {
     if (!chatInput.trim() || !opponent) return;
     
+    const text = chatInput.trim();
     const message: ChatMessage = {
       id: crypto.randomUUID(),
       sender: currentUser?.username || 'You',
-      english: chatInput.trim(),
+      english: text,
       isQuickPhrase: false,
       timestamp: new Date(),
     };
@@ -325,13 +513,17 @@ export default function OnlinePlayPage() {
     setChatMessages(prev => [...prev, message]);
     setChatInput('');
     
-    // TODO: Send via P2P when WebRTC is implemented
+    // Send via P2P
+    if (webrtcRef.current?.isConnected()) {
+      webrtcRef.current.sendChat(text);
+    }
   };
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       wsRef.current?.close();
+      webrtcRef.current?.close();
       if (pingIntervalRef.current) {
         clearInterval(pingIntervalRef.current);
       }
@@ -548,6 +740,22 @@ export default function OnlinePlayPage() {
             <div className="flex items-center gap-2">
               <span className="text-[#3cf281]">●</span>
               <span className="font-medium">Playing with {opponent.username}</span>
+              {/* P2P Status */}
+              <div className="flex items-center gap-1 ml-2">
+                <Radio className={`w-3 h-3 ${
+                  p2pState === 'connected' ? 'text-[#3cf281]' :
+                  p2pState === 'connecting' ? 'text-yellow-500 animate-pulse' :
+                  'text-gray-500'
+                }`} />
+                <span className={`text-xs ${
+                  p2pState === 'connected' ? 'text-[#3cf281]' :
+                  p2pState === 'connecting' ? 'text-yellow-500' :
+                  'text-gray-500'
+                }`}>
+                  {p2pState === 'connected' ? 'P2P' : 
+                   p2pState === 'connecting' ? 'Connecting...' : 'No P2P'}
+                </span>
+              </div>
             </div>
             
             <button

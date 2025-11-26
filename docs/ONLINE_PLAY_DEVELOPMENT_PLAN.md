@@ -149,29 +149,29 @@ shogi-teacher/
 - [x] Quick phrase buttons (Japanese with translations)
 - [x] Freeform text input
 - [x] Message history display
-- [ ] P2P message sending (Phase 4)
+- [x] P2P message sending
 
-### Phase 4: WebRTC P2P Layer
+### Phase 4: WebRTC P2P Layer ✅ COMPLETE
 **Estimated: 3-4 days**
 
-#### 4.1 Connection Management
-- [ ] RTCPeerConnection setup
-- [ ] ICE candidate handling
-- [ ] Data channel creation
-- [ ] Connection state monitoring
-- [ ] Automatic reconnection attempt
+#### 4.1 Connection Management ✅
+- [x] RTCPeerConnection setup
+- [x] ICE candidate handling
+- [x] Data channel creation
+- [x] Connection state monitoring
+- [x] Automatic reconnection attempt
 
-#### 4.2 P2P Message Protocol
-- [ ] Define message types (move, chat, action-request, etc.)
-- [ ] Serialization/deserialization
-- [ ] Message acknowledgment system
-- [ ] Heartbeat/keepalive
+#### 4.2 P2P Message Protocol ✅
+- [x] Define message types (move, chat, action-request, etc.)
+- [x] Serialization/deserialization
+- [x] Message acknowledgment system
+- [x] Heartbeat/keepalive
 
-#### 4.3 Game Synchronization
-- [ ] Move transmission
-- [ ] Move validation (local python-shogi)
-- [ ] State reconciliation
-- [ ] Desync detection
+#### 4.3 Game Synchronization (Partial - Phase 5)
+- [x] Move transmission (protocol defined)
+- [ ] Move validation (local python-shogi) - Phase 5
+- [ ] State reconciliation - Phase 5
+- [ ] Desync detection - Phase 5
 
 ### Phase 5: Main Window Integration
 **Estimated: 3-4 days**
