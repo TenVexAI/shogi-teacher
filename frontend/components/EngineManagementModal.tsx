@@ -82,7 +82,10 @@ export default function EngineManagementModal({ isOpen, onClose }: EngineManagem
   const [advancedSettingsOpen, setAdvancedSettingsOpen] = useState(false);
   const [advancedSettingsRole, setAdvancedSettingsRole] = useState<'black' | 'white' | 'analysis'>('black');
   const [cudaStatus, setCudaStatus] = useState<CudaStatus | null>(null);
-  const [systemInfo, setSystemInfo] = useState<SystemInfo>({ cpuCores: navigator.hardwareConcurrency || 4, totalMemoryGB: 8 });
+  const [systemInfo, setSystemInfo] = useState<SystemInfo>({ 
+    cpuCores: typeof navigator !== 'undefined' ? (navigator.hardwareConcurrency || 4) : 4, 
+    totalMemoryGB: 8 
+  });
   const previouslyFocusedElement = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -104,13 +107,13 @@ export default function EngineManagementModal({ isOpen, onClose }: EngineManagem
       const response = await fetch('http://127.0.0.1:8000/system/info');
       const data = await response.json();
       setSystemInfo({
-        cpuCores: data.cpu_cores || navigator.hardwareConcurrency || 4,
+        cpuCores: data.cpu_cores || (typeof navigator !== 'undefined' ? navigator.hardwareConcurrency : null) || 4,
         totalMemoryGB: data.total_memory_gb || 8
       });
     } catch {
       // Fallback to browser API if backend endpoint doesn't exist
       setSystemInfo({
-        cpuCores: navigator.hardwareConcurrency || 4,
+        cpuCores: typeof navigator !== 'undefined' ? (navigator.hardwareConcurrency || 4) : 4,
         totalMemoryGB: 8 // Conservative estimate
       });
     }
