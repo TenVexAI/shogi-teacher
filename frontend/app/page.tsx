@@ -109,6 +109,9 @@ export default function Home() {
     myColor: 'b' | 'w' | null; // Which side the local player is playing
   }>({ isInGame: false, isP2PConnected: false, opponentName: null, currentUserName: null, myColor: null });
   
+  // Track pending outgoing action requests (for button loading states)
+  const [pendingOutgoingAction, setPendingOutgoingAction] = useState<'new_game' | 'pause' | 'resume' | null>(null);
+  
   // Refs to hold handlers (to avoid stale closures in useEffect)
   const handleOpponentMoveRef = useRef<(usi: string) => void>(() => {});
   const handleGameConfigReceivedRef = useRef<(config: { sfen: string; blackName: string; whiteName: string; isClockRunning: boolean; gameTime: number; initiatorColor: 'b' | 'w' }) => void>(() => {});
@@ -203,6 +206,8 @@ export default function Home() {
           // Response to our action request
           console.log('Action response received:', msg);
           const response = msg as { type: string; action: string; accepted: boolean; data?: unknown };
+          // Clear pending action state
+          setPendingOutgoingAction(null);
           if (response.accepted) {
             setPendingActionResponse({
               action: response.action,
@@ -258,15 +263,38 @@ export default function Home() {
       case 'pause':
         setIsClockRunning(false);
         audioManager.playUISound('pause');
+        // Send clock sync to opponent
+        if (window.electron && onlinePlayState.isInGame) {
+          window.electron.sendToOnlinePlayWindow({
+            type: 'send_clock_sync',
+            isRunning: false,
+            gameTime,
+          });
+        }
         break;
-      case 'resume':
+      case 'resume': {
         setIsClockRunning(true);
         if (clockStartTimeRef.current === 0) {
           clockStartTimeRef.current = Date.now();
           lastMoveTimeRef.current = Date.now();
         }
         audioManager.playUISound('start');
+        // Send clock sync to opponent
+        if (window.electron && onlinePlayState.isInGame) {
+          window.electron.sendToOnlinePlayWindow({
+            type: 'send_clock_sync',
+            isRunning: true,
+            gameTime,
+          });
+        }
+        // If there was a pending move, execute it now
+        if (pendingMove) {
+          executeMove(pendingMove).then(() => {
+            setPendingMove(null);
+          });
+        }
         break;
+      }
       case 'revert': {
         // For revert, we need the moveIndex from data
         const moveData = data as { moveIndex?: number } | undefined;
@@ -649,25 +677,20 @@ export default function Home() {
       
       // Create a new session with the provided config
       const session = await createSession({ gameMode: 'human_vs_human', startingSfen: config.sfen });
-      setCurrentSession(session);
       
       // Load the game state from the SFEN
       const newState = await getGameState(config.sfen);
       setGameState(newState);
       
-      // Update player names
+      // Update session with player names directly in state
+      // This ensures the UI shows the correct names without relying on backend API
       if (session) {
-        await fetch(`http://localhost:8000/api/session/${session.session_id}/update`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            black_name: config.blackName,
-            white_name: config.whiteName,
-          }),
-        });
-        // Refresh session
-        const updated = await getSession(session.session_id);
-        setCurrentSession(updated);
+        const updatedSession = {
+          ...session,
+          black_name: config.blackName,
+          white_name: config.whiteName,
+        };
+        setCurrentSession(updatedSession);
       }
       
       // Sync clock state
@@ -760,6 +783,7 @@ export default function Home() {
     if (onlinePlayState.isInGame && onlinePlayState.isP2PConnected) {
       // Send request to online play window to request action from opponent
       if (window.electron) {
+        setPendingOutgoingAction('new_game');
         window.electron.sendToOnlinePlayWindow({
           type: 'request_action',
           action: 'new_game',
@@ -1325,6 +1349,7 @@ export default function Home() {
     // If in online mode with P2P and trying to pause, request mutual agreement
     if (onlinePlayState.isInGame && onlinePlayState.isP2PConnected && willPause) {
       if (window.electron) {
+        setPendingOutgoingAction('pause');
         window.electron.sendToOnlinePlayWindow({
           type: 'request_action',
           action: 'pause',
@@ -1336,6 +1361,7 @@ export default function Home() {
     // If in online mode with P2P and trying to resume, request mutual agreement
     if (onlinePlayState.isInGame && onlinePlayState.isP2PConnected && !willPause) {
       if (window.electron) {
+        setPendingOutgoingAction('resume');
         window.electron.sendToOnlinePlayWindow({
           type: 'request_action',
           action: 'resume',
@@ -1481,6 +1507,21 @@ export default function Home() {
 
   const handleStartClockAndMove = async () => {
     setShowClockStartModal(false);
+    
+    // If in online mode, request mutual agreement to start clock
+    if (onlinePlayState.isInGame && onlinePlayState.isP2PConnected) {
+      if (window.electron) {
+        setPendingOutgoingAction('resume');
+        window.electron.sendToOnlinePlayWindow({
+          type: 'request_action',
+          action: 'resume',
+        });
+      }
+      // Don't start clock or execute move until opponent agrees
+      // The move will be stored in pendingMove and executed after approval
+      return;
+    }
+    
     setIsClockRunning(true);
     clockStartTimeRef.current = Date.now();
     lastMoveTimeRef.current = Date.now();
@@ -1677,6 +1718,7 @@ export default function Home() {
               onNewGame={handleNewGame}
               isGameOver={gameState?.is_game_over || false}
               onRevertToMove={handleRevertToMove}
+              pendingOutgoingAction={pendingOutgoingAction}
             />
           </div>
 

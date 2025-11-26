@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Play, Pause } from 'lucide-react';
+import { Play, Pause, Loader2 } from 'lucide-react';
 
 export interface MoveRecord {
     moveNumber: number;
@@ -24,9 +24,10 @@ interface MoveHistoryPropsExtended extends MoveHistoryProps {
     onNewGame?: () => void;
     isGameOver?: boolean;
     onRevertToMove?: (moveIndex: number) => void;
+    pendingOutgoingAction?: 'new_game' | 'pause' | 'resume' | null;
 }
 
-export default function MoveHistory({ moves, currentTurn, isClockRunning = false, onClockToggle, gameTime = 0, onNewGame, isGameOver = false, onRevertToMove }: MoveHistoryPropsExtended) {
+export default function MoveHistory({ moves, currentTurn, isClockRunning = false, onClockToggle, gameTime = 0, onNewGame, isGameOver = false, onRevertToMove, pendingOutgoingAction }: MoveHistoryPropsExtended) {
     const bottomRef = useRef<HTMLDivElement>(null);
     const [showNewGameModal, setShowNewGameModal] = useState(false);
     const [showRevertModal, setShowRevertModal] = useState(false);
@@ -149,20 +150,32 @@ export default function MoveHistory({ moves, currentTurn, isClockRunning = false
                         <div className="flex gap-2">
                             <button
                                 onClick={() => setShowNewGameModal(true)}
-                                className="px-4 py-2 rounded-lg font-semibold text-sm transition-colors bg-accent-cyan hover:bg-[#0fc9ad] text-white font-pixel drop-shadow-lg"
+                                disabled={pendingOutgoingAction === 'new_game'}
+                                className={`px-4 py-2 rounded-lg font-semibold text-sm transition-colors font-pixel drop-shadow-lg flex items-center justify-center gap-2 ${
+                                    pendingOutgoingAction === 'new_game'
+                                        ? 'bg-accent-cyan/70 cursor-wait'
+                                        : 'bg-accent-cyan hover:bg-[#0fc9ad]'
+                                } text-white`}
                             >
+                                {pendingOutgoingAction === 'new_game' && (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                )}
                                 New Game
                             </button>
                             <button
                                 onClick={onClockToggle}
-                                disabled={isGameOver}
+                                disabled={isGameOver || pendingOutgoingAction === 'pause' || pendingOutgoingAction === 'resume'}
                                 className={`w-12 h-10 rounded-lg font-semibold text-lg transition-colors drop-shadow-lg font-pixel flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed ${
-                                    isClockRunning
-                                        ? 'bg-red-500 hover:bg-red-600 text-white'
-                                        : 'bg-accent-purple hover:bg-[#8a6fd1] text-white'
+                                    (pendingOutgoingAction === 'pause' || pendingOutgoingAction === 'resume')
+                                        ? 'bg-gray-500 cursor-wait'
+                                        : isClockRunning
+                                            ? 'bg-red-500 hover:bg-red-600 text-white'
+                                            : 'bg-accent-purple hover:bg-[#8a6fd1] text-white'
                                 }`}
                             >
-                                {isClockRunning ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+                                {(pendingOutgoingAction === 'pause' || pendingOutgoingAction === 'resume')
+                                    ? <Loader2 className="w-5 h-5 animate-spin" />
+                                    : isClockRunning ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
                             </button>
                         </div>
                         
