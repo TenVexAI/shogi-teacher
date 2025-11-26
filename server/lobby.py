@@ -476,7 +476,7 @@ class LobbyManager:
         ws = self._connections.get(user_id)
         if ws:
             try:
-                await ws.send_json(message.model_dump())
+                await ws.send_json(message.model_dump(mode='json'))
             except:
                 pass
     
@@ -486,7 +486,7 @@ class LobbyManager:
             if user_id == exclude_user:
                 continue
             try:
-                await ws.send_json(message.model_dump())
+                await ws.send_json(message.model_dump(mode='json'))
             except:
                 pass
     

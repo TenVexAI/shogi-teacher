@@ -264,7 +264,7 @@ async def handle_message(user_id: str, message: dict, websocket: WebSocket):
     msg_type = message.get("type")
     
     if msg_type == MessageType.PING:
-        await websocket.send_json(PongMessage().model_dump())
+        await websocket.send_json(PongMessage().model_dump(mode='json'))
     
     elif msg_type == MessageType.SET_STATUS:
         status_str = message.get("status")
