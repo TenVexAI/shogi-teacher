@@ -116,7 +116,7 @@ export default function Home() {
   const handleOpponentMoveRef = useRef<(usi: string) => void>(() => {});
   const handleGameConfigReceivedRef = useRef<(config: { sfen: string; blackName: string; whiteName: string; isClockRunning: boolean; gameTime: number; initiatorColor: 'b' | 'w' }) => void>(() => {});
   const handleClockSyncRef = useRef<(isRunning: boolean, gameTime: number) => void>(() => {});
-  const handleActionResponseRef = useRef<(action: string, accepted: boolean) => void>(() => {});
+  const handleActionResponseRef = useRef<(action: string, accepted: boolean, data?: unknown) => void>(() => {});
   const pendingMoveRef = useRef<string | null>(null);
   const executeMoveRef = useRef<(move: string) => Promise<void>>(async () => {});
   const gameTimeRef = useRef<number>(0);
@@ -207,7 +207,7 @@ export default function Home() {
           // Clear pending action state
           setPendingOutgoingAction(null);
           // Call the handler directly via ref (avoids stale closure issues)
-          handleActionResponseRef.current(response.action, response.accepted);
+          handleActionResponseRef.current(response.action, response.accepted, response.data);
           break;
         }
         case 'open_new_game_modal':
@@ -516,9 +516,87 @@ export default function Home() {
     }
   };
 
+  // Execute revert to move (extracted for reuse in online mode approval)
+  const executeRevertToMove = async (moveIndex: number) => {
+    try {
+      setIsLoading(true);
+      
+      // Get the target move info BEFORE any operations
+      const targetMove = moveHistory[moveIndex];
+      if (!targetMove || !currentSession) return;
+      
+      const targetMoveNumber = targetMove.moveNumber;
+      const targetMoveName = targetMove.move;
+      const oldMoveCount = moveHistory.length;
+      
+      // Step 1: Delete moves after the target move from database
+      await fetch(`http://localhost:8000/session/${currentSession.session_id}/moves/${targetMoveNumber}`, {
+        method: 'DELETE'
+      });
+      
+      // Step 2: Refresh session to get clean data
+      const updatedSession = await getSession(currentSession.session_id);
+      setCurrentSession(updatedSession);
+      
+      // Step 3: Get the SFEN from the REFRESHED session's last move
+      const lastMove = updatedSession.moves[updatedSession.moves.length - 1];
+      const targetSfen = lastMove ? lastMove.position_after : 'lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1';
+      
+      // Step 4: Update session's current_sfen to match
+      const updateResponse = await fetch(`http://localhost:8000/session/${currentSession.session_id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ current_sfen: targetSfen })
+      });
+      
+      // Wait for the response to ensure the update is committed
+      await updateResponse.json();
+      
+      // Small delay to ensure database transaction is fully committed
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      const state = await getGameState(targetSfen);
+      setGameState(state);
+      
+      // Calculate cumulative timestamps for move history
+      let cumulativeTime = 0;
+      setMoveHistory(updatedSession.moves.map((m: MoveRecordBackend) => {
+        cumulativeTime += m.time_spent * 1000; // Convert to ms and accumulate
+        return {
+          moveNumber: m.move_number,
+          player: (m.player === 'black' ? 'b' : 'w') as 'b' | 'w',
+          move: m.move_algebraic,
+          timestamp: cumulativeTime,
+          timeSinceLastMove: m.time_spent * 1000,
+          sfen: m.position_after
+        };
+      }));
+      
+      // Set last move highlight to the move we reverted to (or null if at start)
+      const lastMoveRecord = updatedSession.moves[updatedSession.moves.length - 1];
+      setLastMoveUsi(lastMoveRecord ? lastMoveRecord.move_usi : null);
+      
+      const removedCount = oldMoveCount - targetMoveNumber;
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `🔄 **Reverted to move ${targetMoveNumber}** (${targetMoveName})\n\n${removedCount > 0 ? `Moves ${targetMoveNumber + 1}-${oldMoveCount} removed from board.\n` : ''}Analysis for reverted moves preserved above for review.`,
+        messageType: 'system'
+      }]);
+    } catch (error) {
+      console.error('Failed to revert to move:', error);
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: 'Failed to revert to the selected move. Please try again.',
+        messageType: 'system'
+      }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Handle action response directly (called from message handler via ref)
-  const handleActionResponse = (action: string, accepted: boolean) => {
-    console.log('handleActionResponse called:', action, 'accepted:', accepted, 'pendingMove:', pendingMove);
+  const handleActionResponse = (action: string, accepted: boolean, data?: unknown) => {
+    console.log('handleActionResponse called:', action, 'accepted:', accepted, 'data:', data, 'pendingMove:', pendingMove);
     
     if (!accepted) {
       // Request was denied - show notification
@@ -569,6 +647,16 @@ export default function Home() {
           });
         }
         break;
+      case 'revert': {
+        // Execute the revert with the moveIndex from data
+        const revertData = data as { moveIndex?: number } | undefined;
+        if (revertData?.moveIndex !== undefined) {
+          console.log('Executing revert to move:', revertData.moveIndex);
+          // Call the revert function directly (bypassing the online check since we already have approval)
+          executeRevertToMove(revertData.moveIndex);
+        }
+        break;
+      }
     }
   };
 
@@ -1435,80 +1523,8 @@ export default function Home() {
       return; // Don't revert until opponent agrees
     }
 
-    try {
-      setIsLoading(true);
-      
-      // Get the target move info BEFORE any operations
-      const targetMove = moveHistory[moveIndex];
-      if (!targetMove || !currentSession) return;
-      
-      const targetMoveNumber = targetMove.moveNumber;
-      const targetMoveName = targetMove.move;
-      const oldMoveCount = moveHistory.length;
-      
-      // Step 1: Delete moves after the target move from database
-      await fetch(`http://localhost:8000/session/${currentSession.session_id}/moves/${targetMoveNumber}`, {
-        method: 'DELETE'
-      });
-      
-      // Step 2: Refresh session to get clean data
-      const updatedSession = await getSession(currentSession.session_id);
-      setCurrentSession(updatedSession);
-      
-      // Step 3: Get the SFEN from the REFRESHED session's last move
-      const lastMove = updatedSession.moves[updatedSession.moves.length - 1];
-      const targetSfen = lastMove ? lastMove.position_after : 'lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1';
-      
-      // Step 4: Update session's current_sfen to match
-      const updateResponse = await fetch(`http://localhost:8000/session/${currentSession.session_id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ current_sfen: targetSfen })
-      });
-      
-      // Wait for the response to ensure the update is committed
-      await updateResponse.json();
-      
-      // Small delay to ensure database transaction is fully committed
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      const state = await getGameState(targetSfen);
-      setGameState(state);
-      
-      // Calculate cumulative timestamps for move history
-      let cumulativeTime = 0;
-      setMoveHistory(updatedSession.moves.map((m: MoveRecordBackend) => {
-        cumulativeTime += m.time_spent * 1000; // Convert to ms and accumulate
-        return {
-          moveNumber: m.move_number,
-          player: (m.player === 'black' ? 'b' : 'w') as 'b' | 'w',
-          move: m.move_algebraic,
-          timestamp: cumulativeTime,
-          timeSinceLastMove: m.time_spent * 1000,
-          sfen: m.position_after
-        };
-      }));
-      
-      // Set last move highlight to the move we reverted to (or null if at start)
-      const lastMoveRecord = updatedSession.moves[updatedSession.moves.length - 1];
-      setLastMoveUsi(lastMoveRecord ? lastMoveRecord.move_usi : null);
-      
-      const removedCount = oldMoveCount - targetMoveNumber;
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: `🔄 **Reverted to move ${targetMoveNumber}** (${targetMoveName})\n\n${removedCount > 0 ? `Moves ${targetMoveNumber + 1}-${oldMoveCount} removed from board.\n` : ''}Analysis for reverted moves preserved above for review.`,
-        messageType: 'system'
-      }]);
-    } catch (error) {
-      console.error('Failed to revert to move:', error);
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: 'Failed to revert to the selected move. Please try again.',
-        messageType: 'system'
-      }]);
-    } finally {
-      setIsLoading(false);
-    }
+    // For local games, execute immediately
+    await executeRevertToMove(moveIndex);
   };
 
   const handleStartClockAndMove = async () => {

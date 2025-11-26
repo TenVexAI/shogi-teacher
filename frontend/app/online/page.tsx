@@ -91,10 +91,13 @@ export default function OnlinePlayPage() {
     action: ActionType;
     fromOpponent: boolean;
     timestamp: number;
+    data?: unknown;  // Store request data (e.g., moveIndex for revert)
   } | null>(null);
   const [actionCountdown, setActionCountdown] = useState(30);
   const actionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Ref to track pending action request data (avoids stale closure issues)
+  const pendingActionRequestRef = useRef<{ action: ActionType; data?: unknown } | null>(null);
   
   // Message handler ref to avoid stale closure issues
   const messageHandlerRef = useRef<(message: Record<string, unknown>) => void>(() => {});
@@ -313,17 +316,22 @@ export default function OnlinePlayPage() {
           actionTimeoutRef.current = null;
         }
         
+        // Capture the request data from ref before clearing
+        const requestData = pendingActionRequestRef.current?.data;
+        pendingActionRequestRef.current = null;
+        
         // Always clear pending request when we receive a response
         // (we can only have one pending request at a time, so any response clears it)
         setPendingActionRequest(null);
         
-        // Notify main window
+        // Notify main window (include data for actions like revert that need it)
         if (window.electron) {
           window.electron.sendToMainWindow({
             type: 'action_response_received',
             requestId: responsePayload.requestId,
             accepted: responsePayload.accepted,
-            action: responsePayload.action,  // Use action from payload instead of guessing
+            action: responsePayload.action,
+            data: requestData,  // Include original request data
           });
         }
         break;
@@ -769,11 +777,14 @@ export default function OnlinePlayPage() {
           // Main window wants to request an action
           if (webrtcRef.current?.isConnected() && !pendingActionRequest) {
             const requestId = webrtcRef.current.sendActionRequest(msg.action, msg.data);
+            // Store in ref for use in response handler (avoids stale closure)
+            pendingActionRequestRef.current = { action: msg.action, data: msg.data };
             setPendingActionRequest({
               id: requestId,
               action: msg.action,
               fromOpponent: false,
               timestamp: Date.now(),
+              data: msg.data,  // Store the data for when response comes back
             });
             
             // Auto-cancel after 30 seconds
