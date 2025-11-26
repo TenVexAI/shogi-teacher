@@ -105,6 +105,7 @@ export interface GameConfigMessage {
   whiteName: string;
   isClockRunning: boolean;
   gameTime: number;
+  initiatorColor: 'b' | 'w'; // Which side the initiator (sender) is playing
 }
 
 export interface ClockSyncMessage {

@@ -106,11 +106,12 @@ export default function Home() {
     isP2PConnected: boolean;
     opponentName: string | null;
     currentUserName: string | null;
-  }>({ isInGame: false, isP2PConnected: false, opponentName: null, currentUserName: null });
+    myColor: 'b' | 'w' | null; // Which side the local player is playing
+  }>({ isInGame: false, isP2PConnected: false, opponentName: null, currentUserName: null, myColor: null });
   
   // Refs to hold handlers (to avoid stale closures in useEffect)
   const handleOpponentMoveRef = useRef<(usi: string) => void>(() => {});
-  const handleGameConfigReceivedRef = useRef<(config: { sfen: string; blackName: string; whiteName: string; isClockRunning: boolean; gameTime: number }) => void>(() => {});
+  const handleGameConfigReceivedRef = useRef<(config: { sfen: string; blackName: string; whiteName: string; isClockRunning: boolean; gameTime: number; initiatorColor: 'b' | 'w' }) => void>(() => {});
   const handleClockSyncRef = useRef<(isRunning: boolean, gameTime: number) => void>(() => {});
 
   useEffect(() => {
@@ -176,12 +177,13 @@ export default function Home() {
       switch (msg.type) {
         case 'online_state_update': {
           const update = msg as OnlineStateUpdate;
-          setOnlinePlayState({
+          setOnlinePlayState(prev => ({
+            ...prev,
             isInGame: update.isInGame,
             isP2PConnected: update.isP2PConnected,
             opponentName: update.opponentName,
             currentUserName: update.currentUserName,
-          });
+          }));
           break;
         }
         case 'move_received': {
@@ -207,6 +209,13 @@ export default function Home() {
               accepted: true,
               data: response.data,
             });
+          } else {
+            // Request was denied - show notification
+            const actionName = response.action === 'new_game' ? 'New Game' :
+                              response.action === 'pause' ? 'Pause' :
+                              response.action === 'resume' ? 'Resume' :
+                              response.action === 'revert' ? 'Revert' : response.action;
+            addAssistantMessage(`❌ ${onlinePlayState.opponentName || 'Opponent'} declined your ${actionName} request.`, 'system');
           }
           break;
         }
@@ -217,7 +226,7 @@ export default function Home() {
           break;
         case 'game_config_received': {
           // Accepter received game config from initiator - apply it
-          const config = msg as { type: string; sfen: string; blackName: string; whiteName: string; isClockRunning: boolean; gameTime: number };
+          const config = msg as { type: string; sfen: string; blackName: string; whiteName: string; isClockRunning: boolean; gameTime: number; initiatorColor: 'b' | 'w' };
           console.log('Received game config:', config);
           handleGameConfigReceivedRef.current(config);
           break;
@@ -263,7 +272,7 @@ export default function Home() {
         const moveData = data as { moveIndex?: number } | undefined;
         if (moveData?.moveIndex !== undefined) {
           // Temporarily disable online check, execute revert, then restore
-          setOnlinePlayState({ isInGame: false, isP2PConnected: false, opponentName: null, currentUserName: null });
+          setOnlinePlayState({ isInGame: false, isP2PConnected: false, opponentName: null, currentUserName: null, myColor: null });
           // The revert will be executed by a separate effect after state update
           console.log('Approved: revert to move', moveData.moveIndex);
           // Store the moveIndex to execute after state change
@@ -559,6 +568,14 @@ export default function Home() {
   const handleMove = async (move: string) => {
     if (!gameState) return;
 
+    // In online mode, only allow moves when it's your turn
+    if (onlinePlayState.isInGame && onlinePlayState.isP2PConnected && onlinePlayState.myColor) {
+      if (gameState.turn !== onlinePlayState.myColor) {
+        console.log('Not your turn! You are', onlinePlayState.myColor, 'but it is', gameState.turn, "'s turn");
+        return; // Silently ignore - it's not your turn
+      }
+    }
+
     // Show modal if clock is not running
     if (!isClockRunning) {
       setPendingMove(move);
@@ -624,8 +641,12 @@ export default function Home() {
   };
 
   // Handle game config received from initiator (for accepter)
-  const handleGameConfigReceived = async (config: { sfen: string; blackName: string; whiteName: string; isClockRunning: boolean; gameTime: number }) => {
+  const handleGameConfigReceived = async (config: { sfen: string; blackName: string; whiteName: string; isClockRunning: boolean; gameTime: number; initiatorColor: 'b' | 'w' }) => {
     try {
+      // Accepter plays the opposite color of the initiator
+      const myColor: 'b' | 'w' = config.initiatorColor === 'b' ? 'w' : 'b';
+      setOnlinePlayState(prev => ({ ...prev, myColor }));
+      
       // Create a new session with the provided config
       const session = await createSession({ gameMode: 'human_vs_human', startingSfen: config.sfen });
       setCurrentSession(session);
@@ -657,7 +678,8 @@ export default function Home() {
       setMoveHistory([]);
       setLastMoveUsi(null);
       
-      addAssistantMessage(`Game started with ${onlinePlayState.opponentName}! ${config.blackName} plays Black, ${config.whiteName} plays White.`, 'system');
+      const myColorName = myColor === 'b' ? 'Black' : 'White';
+      addAssistantMessage(`Game started with ${onlinePlayState.opponentName}! You are playing ${myColorName}.`, 'system');
     } catch (error) {
       console.error('Failed to apply game config:', error);
     }
@@ -758,6 +780,14 @@ export default function Home() {
       const blackName = config.blackName || currentSession.black_name || 'Black';
       const whiteName = config.whiteName || currentSession.white_name || 'White';
       
+      // Determine which color the initiator (local player) is playing
+      // Check if their username matches the black or white name
+      const myName = onlinePlayState.currentUserName || '';
+      const initiatorColor: 'b' | 'w' = blackName.toLowerCase().includes(myName.toLowerCase()) ? 'b' : 'w';
+      
+      // Set local player's color
+      setOnlinePlayState(prev => ({ ...prev, myColor: initiatorColor }));
+      
       window.electron.sendToOnlinePlayWindow({
         type: 'send_game_config',
         sfen: gameState?.sfen || 'lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1',
@@ -765,6 +795,7 @@ export default function Home() {
         whiteName,
         isClockRunning,
         gameTime,
+        initiatorColor,
       });
     }
   };

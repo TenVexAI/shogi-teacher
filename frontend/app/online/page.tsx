@@ -332,7 +332,7 @@ export default function OnlinePlayPage() {
         break;
       case 'game_config': {
         // Initiator sent game configuration - forward to main window (accepter)
-        const configPayload = message.payload as { sfen: string; blackName: string; whiteName: string; isClockRunning: boolean; gameTime: number };
+        const configPayload = message.payload as { sfen: string; blackName: string; whiteName: string; isClockRunning: boolean; gameTime: number; initiatorColor: 'b' | 'w' };
         console.log('Received game config:', configPayload);
         if (window.electron) {
           window.electron.sendToMainWindow({
@@ -342,6 +342,7 @@ export default function OnlinePlayPage() {
             whiteName: configPayload.whiteName,
             isClockRunning: configPayload.isClockRunning,
             gameTime: configPayload.gameTime,
+            initiatorColor: configPayload.initiatorColor,
           });
         }
         break;
@@ -808,14 +809,15 @@ export default function OnlinePlayPage() {
 
         case 'send_game_config': {
           // Main window (initiator) wants to send game config to opponent
-          const configMsg = msg as { type: string; sfen: string; blackName: string; whiteName: string; isClockRunning: boolean; gameTime: number };
+          const configMsg = msg as { type: string; sfen: string; blackName: string; whiteName: string; isClockRunning: boolean; gameTime: number; initiatorColor: 'b' | 'w' };
           if (webrtcRef.current?.isConnected()) {
             webrtcRef.current.sendGameConfig(
               configMsg.sfen,
               configMsg.blackName,
               configMsg.whiteName,
               configMsg.isClockRunning,
-              configMsg.gameTime
+              configMsg.gameTime,
+              configMsg.initiatorColor
             );
           }
           break;

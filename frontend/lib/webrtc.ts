@@ -62,6 +62,7 @@ export interface GameConfigPayload {
   whiteName: string;
   isClockRunning: boolean;
   gameTime: number;                // Current game time in ms
+  initiatorColor: 'b' | 'w';       // Which side the initiator is playing
 }
 
 export interface ClockSyncPayload {
@@ -461,8 +462,8 @@ export class WebRTCManager {
   /**
    * Send game configuration (initiator -> accepter when starting game)
    */
-  sendGameConfig(sfen: string, blackName: string, whiteName: string, isClockRunning: boolean, gameTime: number): void {
-    const payload: GameConfigPayload = { sfen, blackName, whiteName, isClockRunning, gameTime };
+  sendGameConfig(sfen: string, blackName: string, whiteName: string, isClockRunning: boolean, gameTime: number, initiatorColor: 'b' | 'w'): void {
+    const payload: GameConfigPayload = { sfen, blackName, whiteName, isClockRunning, gameTime, initiatorColor };
     this.send('game_config', payload, true);
   }
 
