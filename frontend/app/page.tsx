@@ -1056,6 +1056,13 @@ export default function Home() {
       return false; // No hints in computer vs computer
     }
     
+    // In online mode, only allow using hint/best move on your own turn
+    if (onlinePlayState.isInGame && onlinePlayState.isP2PConnected && onlinePlayState.myColor) {
+      if (gameState.turn !== onlinePlayState.myColor) {
+        return false; // Not your turn in online game
+      }
+    }
+    
     return canUserInteract();
   };
 
@@ -1770,7 +1777,7 @@ export default function Home() {
               messages={messages}
               onSendMessage={handleSendMessage}
               isLoading={isLoading}
-              onGetHint={handleGetHint}
+              onGetHint={canUseHintButtons() ? handleGetHint : undefined}
             />
           </div>
           </div>

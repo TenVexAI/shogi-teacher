@@ -184,6 +184,9 @@ export default function OnlinePlayPage() {
         setOpponent(opponentUser);
         setMyStatus('in_game');
         isInitiatorRef.current = message.is_initiator as boolean;
+        // Clear any pending game requests since we're now in a game
+        setIncomingRequests([]);
+        setOutgoingRequests([]);
         // Initialize WebRTC - initiator creates offer (pass opponent ID directly)
         initializeWebRTCRef.current(message.is_initiator as boolean, opponentUser.id);
         break;
@@ -310,10 +313,9 @@ export default function OnlinePlayPage() {
           actionTimeoutRef.current = null;
         }
         
-        // Clear pending request if it matches
-        if (pendingActionRequest?.id === responsePayload.requestId) {
-          setPendingActionRequest(null);
-        }
+        // Always clear pending request when we receive a response
+        // (we can only have one pending request at a time, so any response clears it)
+        setPendingActionRequest(null);
         
         // Notify main window
         if (window.electron) {
@@ -361,7 +363,7 @@ export default function OnlinePlayPage() {
         break;
       }
     }
-  }, [opponent?.username, pendingActionRequest]);
+  }, [opponent?.username]);
 
   // Initialize WebRTC connection
   const initializeWebRTC = useCallback(async (isInitiator: boolean, opponentId?: string) => {
@@ -1024,9 +1026,12 @@ export default function OnlinePlayPage() {
                       
                       {user.status === 'available' && myStatus === 'available' && (
                         (() => {
-                          const hasPendingRequest = outgoingRequests.some(req => req.recipient_id === user.id);
-                          return hasPendingRequest ? (
+                          const hasPendingOutgoing = outgoingRequests.some(req => req.recipient_id === user.id);
+                          const hasPendingIncoming = incomingRequests.some(req => req.sender_id === user.id);
+                          return hasPendingOutgoing ? (
                             <span className="text-yellow-500 text-sm">Pending...</span>
+                          ) : hasPendingIncoming ? (
+                            <span className="text-[#3cf281] text-sm">Accept above ↑</span>
                           ) : (
                             <button
                               onClick={() => handleRequestGame(user.id)}
