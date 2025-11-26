@@ -476,8 +476,11 @@ class LobbyManager:
         ws = self._connections.get(user_id)
         if ws:
             try:
-                await ws.send_json(message.model_dump(mode='json'))
-            except:
+                import json
+                # Use model_dump_json() to properly serialize datetime fields
+                await ws.send_text(message.model_dump_json())
+            except Exception as e:
+                print(f"[!] Error sending message: {e}")
                 pass
     
     async def _broadcast(self, message, exclude_user: Optional[str] = None):
@@ -486,8 +489,9 @@ class LobbyManager:
             if user_id == exclude_user:
                 continue
             try:
-                await ws.send_json(message.model_dump(mode='json'))
-            except:
+                await ws.send_text(message.model_dump_json())
+            except Exception as e:
+                print(f"[!] Error broadcasting message: {e}")
                 pass
     
     async def _broadcast_status_change(self, user_id: str, status: UserStatus):

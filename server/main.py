@@ -217,14 +217,14 @@ async def websocket_endpoint(websocket: WebSocket):
         user_id = user.id
         
         # Send auth success
-        await websocket.send_json(AuthSuccessMessage(
+        await websocket.send_text(AuthSuccessMessage(
             user=UserPublic(
                 id=user.id,
                 username=user.username,
                 provider=user.provider,
                 status=user.status
             )
-        ).model_dump())
+        ).model_dump_json())
         
         # Send current lobby state
         await lobby.send_lobby_state(user_id)
@@ -264,7 +264,7 @@ async def handle_message(user_id: str, message: dict, websocket: WebSocket):
     msg_type = message.get("type")
     
     if msg_type == MessageType.PING:
-        await websocket.send_json(PongMessage().model_dump(mode='json'))
+        await websocket.send_text(PongMessage().model_dump_json())
     
     elif msg_type == MessageType.SET_STATUS:
         status_str = message.get("status")
