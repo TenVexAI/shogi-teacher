@@ -15,6 +15,8 @@ export type P2PMessageType =
   | 'quick_phrase'   // Quick phrase (Japanese)
   | 'action_request' // Request for mutual action (pause, new game, revert)
   | 'action_response'// Response to action request
+  | 'game_config'    // Game configuration from initiator
+  | 'clock_sync'     // Clock synchronization
   | 'sync_state'     // State synchronization
   | 'heartbeat'      // Keepalive ping
   | 'ack';           // Message acknowledgment
@@ -52,6 +54,20 @@ export interface SyncStatePayload {
   sfen: string;
   moveHistory: string[];  // List of USI moves
   currentMoveNumber: number;
+}
+
+export interface GameConfigPayload {
+  sfen: string;                    // Starting position
+  blackName: string;
+  whiteName: string;
+  isClockRunning: boolean;
+  gameTime: number;                // Current game time in ms
+}
+
+export interface ClockSyncPayload {
+  isRunning: boolean;
+  gameTime: number;                // Current game time in ms
+  lastUpdateTime: number;          // Timestamp of last update
 }
 
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'failed';
@@ -440,5 +456,21 @@ export class WebRTCManager {
   sendStateSync(sfen: string, moveHistory: string[], currentMoveNumber: number): void {
     const payload: SyncStatePayload = { sfen, moveHistory, currentMoveNumber };
     this.send('sync_state', payload, true);
+  }
+
+  /**
+   * Send game configuration (initiator -> accepter when starting game)
+   */
+  sendGameConfig(sfen: string, blackName: string, whiteName: string, isClockRunning: boolean, gameTime: number): void {
+    const payload: GameConfigPayload = { sfen, blackName, whiteName, isClockRunning, gameTime };
+    this.send('game_config', payload, true);
+  }
+
+  /**
+   * Send clock synchronization
+   */
+  sendClockSync(isRunning: boolean, gameTime: number): void {
+    const payload: ClockSyncPayload = { isRunning, gameTime, lastUpdateTime: Date.now() };
+    this.send('clock_sync', payload);
   }
 }

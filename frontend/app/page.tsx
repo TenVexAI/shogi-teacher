@@ -108,8 +108,10 @@ export default function Home() {
     currentUserName: string | null;
   }>({ isInGame: false, isP2PConnected: false, opponentName: null, currentUserName: null });
   
-  // Ref to hold opponent move handler (to avoid stale closures in useEffect)
+  // Refs to hold handlers (to avoid stale closures in useEffect)
   const handleOpponentMoveRef = useRef<(usi: string) => void>(() => {});
+  const handleGameConfigReceivedRef = useRef<(config: { sfen: string; blackName: string; whiteName: string; isClockRunning: boolean; gameTime: number }) => void>(() => {});
+  const handleClockSyncRef = useRef<(isRunning: boolean, gameTime: number) => void>(() => {});
 
   useEffect(() => {
     // Initialize game and load config
@@ -206,6 +208,25 @@ export default function Home() {
               data: response.data,
             });
           }
+          break;
+        }
+        case 'open_new_game_modal':
+          // Initiator should open new game modal when P2P connects
+          console.log('Opening new game modal for online play');
+          setIsNewGameModalOpen(true);
+          break;
+        case 'game_config_received': {
+          // Accepter received game config from initiator - apply it
+          const config = msg as { type: string; sfen: string; blackName: string; whiteName: string; isClockRunning: boolean; gameTime: number };
+          console.log('Received game config:', config);
+          handleGameConfigReceivedRef.current(config);
+          break;
+        }
+        case 'clock_sync_received': {
+          // Received clock sync from opponent
+          const clockSync = msg as { type: string; isRunning: boolean; gameTime: number };
+          console.log('Received clock sync:', clockSync);
+          handleClockSyncRef.current(clockSync.isRunning, clockSync.gameTime);
           break;
         }
       }
@@ -602,9 +623,57 @@ export default function Home() {
     }
   };
 
-  // Keep the opponent move handler ref updated
+  // Handle game config received from initiator (for accepter)
+  const handleGameConfigReceived = async (config: { sfen: string; blackName: string; whiteName: string; isClockRunning: boolean; gameTime: number }) => {
+    try {
+      // Create a new session with the provided config
+      const session = await createSession({ gameMode: 'human_vs_human', startingSfen: config.sfen });
+      setCurrentSession(session);
+      
+      // Load the game state from the SFEN
+      const newState = await getGameState(config.sfen);
+      setGameState(newState);
+      
+      // Update player names
+      if (session) {
+        await fetch(`http://localhost:8000/api/session/${session.session_id}/update`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            black_name: config.blackName,
+            white_name: config.whiteName,
+          }),
+        });
+        // Refresh session
+        const updated = await getSession(session.session_id);
+        setCurrentSession(updated);
+      }
+      
+      // Sync clock state
+      setGameTime(config.gameTime);
+      setIsClockRunning(config.isClockRunning);
+      
+      // Clear move history for new game
+      setMoveHistory([]);
+      setLastMoveUsi(null);
+      
+      addAssistantMessage(`Game started with ${onlinePlayState.opponentName}! ${config.blackName} plays Black, ${config.whiteName} plays White.`, 'system');
+    } catch (error) {
+      console.error('Failed to apply game config:', error);
+    }
+  };
+
+  // Handle clock sync from opponent
+  const handleClockSync = (isRunning: boolean, newGameTime: number) => {
+    setIsClockRunning(isRunning);
+    setGameTime(newGameTime);
+  };
+
+  // Keep handler refs updated
   useEffect(() => {
     handleOpponentMoveRef.current = handleOpponentMove;
+    handleGameConfigReceivedRef.current = handleGameConfigReceived;
+    handleClockSyncRef.current = handleClockSync;
   });
 
   const handleSendMessage = async (message: string) => {
@@ -679,9 +748,25 @@ export default function Home() {
     setIsNewGameModalOpen(true);
   };
 
-  const handleStartNewGame = (config: GameConfig) => {
-    loadInitialGame(config);
+  const handleStartNewGame = async (config: GameConfig) => {
+    await loadInitialGame(config);
     audioManager.playUISound('new_game');
+    
+    // If in online mode, send game config to opponent
+    if (onlinePlayState.isInGame && onlinePlayState.isP2PConnected && window.electron && currentSession) {
+      // Use player names from config
+      const blackName = config.blackName || currentSession.black_name || 'Black';
+      const whiteName = config.whiteName || currentSession.white_name || 'White';
+      
+      window.electron.sendToOnlinePlayWindow({
+        type: 'send_game_config',
+        sfen: gameState?.sfen || 'lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1',
+        blackName,
+        whiteName,
+        isClockRunning,
+        gameTime,
+      });
+    }
   };
 
   const handleImportGame = async (content: string, format?: string) => {

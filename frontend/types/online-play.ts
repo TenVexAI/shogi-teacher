@@ -13,10 +13,15 @@ export type OnlinePlayMessageType =
   | 'action_request_received'  // Opponent sent an action request
   | 'action_response_received' // Opponent responded to our action request
   | 'move_received'            // Opponent made a move
+  | 'open_new_game_modal'      // Initiator should open new game modal
+  | 'game_config_received'     // Accepter received game config from initiator
+  | 'clock_sync_received'      // Clock sync received from opponent
   
   // From Main window to Online Play window
   | 'request_action'           // Request mutual action (pause, new game, etc.)
   | 'send_move'                // Send our move to opponent
+  | 'send_game_config'         // Initiator sends game config to opponent
+  | 'send_clock_sync'          // Send clock sync to opponent
   | 'cancel_action_request';   // Cancel pending action request
 
 // =============================================================================
@@ -29,6 +34,7 @@ export interface OnlineStateUpdate {
   isP2PConnected: boolean;
   opponentName: string | null;
   currentUserName: string | null;
+  isInitiator?: boolean;
 }
 
 // =============================================================================
@@ -84,6 +90,30 @@ export interface CancelActionMessage {
 }
 
 // =============================================================================
+// Game Config Messages
+// =============================================================================
+
+export interface OpenNewGameModalMessage {
+  type: 'open_new_game_modal';
+  opponentName: string;
+}
+
+export interface GameConfigMessage {
+  type: 'send_game_config' | 'game_config_received';
+  sfen: string;
+  blackName: string;
+  whiteName: string;
+  isClockRunning: boolean;
+  gameTime: number;
+}
+
+export interface ClockSyncMessage {
+  type: 'send_clock_sync' | 'clock_sync_received';
+  isRunning: boolean;
+  gameTime: number;
+}
+
+// =============================================================================
 // Union Types
 // =============================================================================
 
@@ -91,9 +121,14 @@ export type OnlinePlayToMainMessage =
   | OnlineStateUpdate
   | ActionRequest
   | ActionResponse
-  | MoveMessage;
+  | MoveMessage
+  | OpenNewGameModalMessage
+  | GameConfigMessage
+  | ClockSyncMessage;
 
 export type MainToOnlinePlayMessage =
   | RequestActionMessage
   | CancelActionMessage
-  | MoveMessage;
+  | MoveMessage
+  | GameConfigMessage
+  | ClockSyncMessage;

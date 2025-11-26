@@ -280,13 +280,13 @@ export default function OnlinePlayPage() {
           timestamp: Date.now(),
         });
         
-        // Auto-decline after 30 seconds
+        // Auto-decline after 2 minutes
         actionTimeoutRef.current = setTimeout(() => {
           if (webrtcRef.current?.isConnected()) {
             webrtcRef.current.sendActionResponse(message.id, false);
           }
           setPendingActionRequest(null);
-        }, 30000);
+        }, 120000); // 2 minutes
         
         // Notify main window
         if (window.electron) {
@@ -330,6 +330,35 @@ export default function OnlinePlayPage() {
         // TODO: Handle state sync
         console.log('Received state sync:', message.payload);
         break;
+      case 'game_config': {
+        // Initiator sent game configuration - forward to main window (accepter)
+        const configPayload = message.payload as { sfen: string; blackName: string; whiteName: string; isClockRunning: boolean; gameTime: number };
+        console.log('Received game config:', configPayload);
+        if (window.electron) {
+          window.electron.sendToMainWindow({
+            type: 'game_config_received',
+            sfen: configPayload.sfen,
+            blackName: configPayload.blackName,
+            whiteName: configPayload.whiteName,
+            isClockRunning: configPayload.isClockRunning,
+            gameTime: configPayload.gameTime,
+          });
+        }
+        break;
+      }
+      case 'clock_sync': {
+        // Opponent sent clock sync - forward to main window
+        const clockPayload = message.payload as { isRunning: boolean; gameTime: number };
+        console.log('Received clock sync:', clockPayload);
+        if (window.electron) {
+          window.electron.sendToMainWindow({
+            type: 'clock_sync_received',
+            isRunning: clockPayload.isRunning,
+            gameTime: clockPayload.gameTime,
+          });
+        }
+        break;
+      }
     }
   }, [opponent?.username, pendingActionRequest]);
 
@@ -682,7 +711,7 @@ export default function OnlinePlayPage() {
   // Action request countdown timer
   useEffect(() => {
     if (pendingActionRequest) {
-      setActionCountdown(30);
+      setActionCountdown(120); // 2 minutes
       countdownIntervalRef.current = setInterval(() => {
         setActionCountdown(prev => Math.max(0, prev - 1));
       }, 1000);
@@ -691,7 +720,7 @@ export default function OnlinePlayPage() {
         clearInterval(countdownIntervalRef.current);
         countdownIntervalRef.current = null;
       }
-      setActionCountdown(30);
+      setActionCountdown(120);
     }
     
     return () => {
@@ -710,8 +739,17 @@ export default function OnlinePlayPage() {
         isP2PConnected: p2pState === 'connected',
         opponentName: opponent?.username || null,
         currentUserName: currentUser?.username || null,
+        isInitiator: isInitiatorRef.current,
       };
       window.electron.sendToMainWindow(stateUpdate);
+      
+      // When P2P connects and user is initiator, tell main window to open new game modal
+      if (p2pState === 'connected' && isInitiatorRef.current && opponent) {
+        window.electron.sendToMainWindow({
+          type: 'open_new_game_modal',
+          opponentName: opponent.username,
+        });
+      }
     }
   }, [opponent, p2pState, currentUser]);
 
@@ -746,7 +784,7 @@ export default function OnlinePlayPage() {
                   action: msg.action,
                 });
               }
-            }, 30000);
+            }, 120000); // 2 minutes
           }
           break;
 
@@ -767,6 +805,30 @@ export default function OnlinePlayPage() {
             setPendingActionRequest(null);
           }
           break;
+
+        case 'send_game_config': {
+          // Main window (initiator) wants to send game config to opponent
+          const configMsg = msg as { type: string; sfen: string; blackName: string; whiteName: string; isClockRunning: boolean; gameTime: number };
+          if (webrtcRef.current?.isConnected()) {
+            webrtcRef.current.sendGameConfig(
+              configMsg.sfen,
+              configMsg.blackName,
+              configMsg.whiteName,
+              configMsg.isClockRunning,
+              configMsg.gameTime
+            );
+          }
+          break;
+        }
+
+        case 'send_clock_sync': {
+          // Main window wants to sync clock with opponent
+          const clockMsg = msg as { type: string; isRunning: boolean; gameTime: number };
+          if (webrtcRef.current?.isConnected()) {
+            webrtcRef.current.sendClockSync(clockMsg.isRunning, clockMsg.gameTime);
+          }
+          break;
+        }
       }
     });
 
