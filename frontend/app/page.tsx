@@ -884,6 +884,22 @@ export default function Home() {
     }
   };
 
+  const handleOpenOnlinePlay = async () => {
+    // Check if running in Electron
+    if (typeof window !== 'undefined' && window.electron) {
+      // In Electron, toggle online play window via IPC
+      const isOpen = await window.electron.isOnlinePlayWindowOpen();
+      if (isOpen) {
+        await window.electron.closeOnlinePlayWindow();
+      } else {
+        await window.electron.openOnlinePlayWindow();
+      }
+    } else {
+      // In browser, open in new tab
+      window.open('/online', '_blank');
+    }
+  };
+
   const handleOpenEngineManagement = () => {
     // Auto-pause clock when opening engine management
     if (isClockRunning) {
@@ -1292,6 +1308,7 @@ export default function Home() {
             allSoundsEnabled={!allSoundsMuted}
             onToggleAllSounds={handleToggleAllSounds}
             onOpenLearn={handleOpenLearn}
+            onOpenOnlinePlay={handleOpenOnlinePlay}
             onOpenEngineManagement={handleOpenEngineManagement}
             onOpenGameModeSettings={handleOpenGameModeSettings}
           />

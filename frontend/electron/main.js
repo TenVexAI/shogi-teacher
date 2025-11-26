@@ -7,6 +7,7 @@ const isDev = process.env.NODE_ENV === 'development';
 
 let mainWindow;
 let learnWindow = null;
+let onlinePlayWindow = null;
 let backendProcess = null;
 const BACKEND_PORT = 8000;
 const BACKEND_URL = `http://localhost:${BACKEND_PORT}`;
@@ -187,6 +188,84 @@ ipcMain.handle('close-learn-window', () => {
 
 ipcMain.handle('is-learn-window-open', () => {
   return learnWindow !== null;
+});
+
+// Create online play window
+function createOnlinePlayWindow() {
+  if (onlinePlayWindow) {
+    onlinePlayWindow.focus();
+    return;
+  }
+
+  onlinePlayWindow = new BrowserWindow({
+    width: 500,
+    height: 700,
+    minWidth: 400,
+    minHeight: 600,
+    icon: path.join(__dirname, '../public/icon.png'),
+    title: 'Online Play',
+    autoHideMenuBar: true,
+    backgroundColor: '#141414',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js')
+    }
+  });
+
+  const onlineUrl = isDev ? 'http://localhost:3000/online' : path.join(__dirname, '../out/online/index.html');
+  
+  if (isDev) {
+    onlinePlayWindow.loadURL(onlineUrl);
+  } else {
+    onlinePlayWindow.loadFile(onlineUrl);
+  }
+
+  onlinePlayWindow.on('closed', () => {
+    onlinePlayWindow = null;
+    // Notify main window that online play window closed
+    if (mainWindow) {
+      mainWindow.webContents.send('online-play-window-state-changed', false);
+    }
+  });
+
+  // Notify main window that online play window opened
+  if (mainWindow) {
+    mainWindow.webContents.send('online-play-window-state-changed', true);
+  }
+}
+
+// Online Play IPC Handlers
+ipcMain.handle('open-online-play-window', () => {
+  createOnlinePlayWindow();
+});
+
+ipcMain.handle('close-online-play-window', () => {
+  if (onlinePlayWindow) {
+    onlinePlayWindow.close();
+  }
+});
+
+ipcMain.handle('is-online-play-window-open', () => {
+  return onlinePlayWindow !== null;
+});
+
+// Send message to online play window
+ipcMain.handle('send-to-online-play-window', (event, message) => {
+  if (onlinePlayWindow) {
+    onlinePlayWindow.webContents.send('main-window-message', message);
+    return true;
+  }
+  return false;
+});
+
+// Send message to main window from online play window
+ipcMain.handle('send-to-main-window', (event, message) => {
+  if (mainWindow) {
+    mainWindow.webContents.send('online-play-message', message);
+    return true;
+  }
+  return false;
 });
 
 app.whenReady().then(() => {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Power, Volume2, VolumeX, BookOpen, Cpu, Gamepad2 } from 'lucide-react';
+import { Settings, Power, Volume2, VolumeX, BookOpen, Cpu, Gamepad2, Globe } from 'lucide-react';
 
 interface SidebarProps {
   onOpenSettings: () => void;
@@ -8,23 +8,33 @@ interface SidebarProps {
   onOpenLearn: () => void;
   onOpenEngineManagement: () => void;
   onOpenGameModeSettings: () => void;
+  onOpenOnlinePlay: () => void;
 }
 
-export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllSounds, onOpenLearn, onOpenEngineManagement, onOpenGameModeSettings }: SidebarProps) {
+export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllSounds, onOpenLearn, onOpenEngineManagement, onOpenGameModeSettings, onOpenOnlinePlay }: SidebarProps) {
   const [isLearnWindowOpen, setIsLearnWindowOpen] = useState(false);
+  const [isOnlinePlayWindowOpen, setIsOnlinePlayWindowOpen] = useState(false);
 
   useEffect(() => {
     // Check if running in Electron
     if (typeof window !== 'undefined' && window.electron) {
       // Check initial state
       window.electron.isLearnWindowOpen().then(setIsLearnWindowOpen);
+      window.electron.isOnlinePlayWindowOpen().then(setIsOnlinePlayWindowOpen);
       
       // Listen for state changes
-      const cleanup = window.electron.onLearnWindowStateChange((isOpen: boolean) => {
+      const cleanupLearn = window.electron.onLearnWindowStateChange((isOpen: boolean) => {
         setIsLearnWindowOpen(isOpen);
       });
       
-      return cleanup;
+      const cleanupOnline = window.electron.onOnlinePlayWindowStateChange((isOpen: boolean) => {
+        setIsOnlinePlayWindowOpen(isOpen);
+      });
+      
+      return () => {
+        cleanupLearn();
+        cleanupOnline();
+      };
     }
   }, []);
   const handleShutdown = () => {
@@ -62,6 +72,19 @@ export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllS
         >
           <BookOpen className={`w-6 h-6 transition-colors ${
             isLearnWindowOpen 
+              ? 'sound-active group-hover:text-red-500!' 
+              : 'text-text-secondary group-hover:text-accent-cyan'
+          }`} />
+        </button>
+
+        {/* Online Play Button */}
+        <button
+          onClick={onOpenOnlinePlay}
+          className="w-10 h-10 flex items-center justify-center group transition-colors"
+          title={isOnlinePlayWindowOpen ? "Close Online Play" : "Online Play"}
+        >
+          <Globe className={`w-6 h-6 transition-colors ${
+            isOnlinePlayWindowOpen 
               ? 'sound-active group-hover:text-red-500!' 
               : 'text-text-secondary group-hover:text-accent-cyan'
           }`} />

@@ -103,53 +103,53 @@ shogi-teacher/
 - [x] Connection state tracking
 - [x] Graceful disconnect handling
 
-### Phase 2: Electron Integration
+### Phase 2: Electron Integration ✅ COMPLETE
 **Estimated: 2-3 days**
 
-#### 2.1 Online Play Window
-- [ ] Create new Electron child window (like Learn window)
-- [ ] Add IPC handlers for window management
-- [ ] Window state synchronization with main window
-- [ ] Add "Online Play" button to Sidebar
+#### 2.1 Online Play Window ✅
+- [x] Create new Electron child window (like Learn window)
+- [x] Add IPC handlers for window management
+- [x] Window state synchronization with main window
+- [x] Add "Online Play" button to Sidebar
 
-#### 2.2 Preload Script Extensions
-- [ ] Add online play window management APIs
-- [ ] Add P2P communication bridge
-- [ ] Add OAuth popup handling
+#### 2.2 Preload Script Extensions ✅
+- [x] Add online play window management APIs
+- [x] Add inter-window communication APIs
+- [ ] Add P2P communication bridge (Phase 4)
 
-### Phase 3: Online Play UI (Frontend)
+### Phase 3: Online Play UI (Frontend) - IN PROGRESS
 **Estimated: 4-5 days**
 
-#### 3.1 Authentication UI
-- [ ] OAuth provider selection buttons
-- [ ] Login state display
-- [ ] Logout functionality
-- [ ] Error handling for auth failures
+#### 3.1 Authentication UI ✅
+- [x] OAuth provider selection buttons
+- [x] Login state display
+- [x] Logout functionality
+- [x] Error handling for auth failures
 
-#### 3.2 Lobby UI
-- [ ] Status dropdown (Available/Away)
-- [ ] Connected players list with status indicators
-- [ ] "Request Game" buttons
-- [ ] Player count display
+#### 3.2 Lobby UI ✅
+- [x] Status dropdown (Available/Away)
+- [x] Connected players list with status indicators
+- [x] "Request Game" buttons
+- [x] Player count display
 
-#### 3.3 Request Management UI
-- [ ] Outgoing requests panel (max 3)
-- [ ] Revoke request buttons
-- [ ] Incoming request notifications
-- [ ] Accept/Decline buttons
-- [ ] Countdown timers
+#### 3.3 Request Management UI ✅
+- [x] Outgoing requests panel (max 3)
+- [x] Revoke request buttons
+- [x] Incoming request notifications
+- [x] Accept/Decline buttons
+- [ ] Countdown timers (not needed per requirements)
 
-#### 3.4 Connection Panel UI
-- [ ] Connected opponent display
+#### 3.4 Connection Panel UI ✅
+- [x] Connected opponent display
 - [ ] Connection duration timer
-- [ ] Connection quality indicator
-- [ ] Disconnect button
+- [x] Connection quality indicator (latency display)
+- [x] Disconnect button
 
-#### 3.5 Chat Interface
-- [ ] Quick phrase buttons (Japanese with translations)
-- [ ] Freeform text input
-- [ ] Message history display
-- [ ] P2P message sending
+#### 3.5 Chat Interface ✅
+- [x] Quick phrase buttons (Japanese with translations)
+- [x] Freeform text input
+- [x] Message history display
+- [ ] P2P message sending (Phase 4)
 
 ### Phase 4: WebRTC P2P Layer
 **Estimated: 3-4 days**
