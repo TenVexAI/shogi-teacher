@@ -122,22 +122,53 @@ export default function NewGameModal({
         onClose();
     };
 
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const content = event.target?.result as string;
-            setImportContent(content);
-            
-            // Try to detect format from extension
-            const ext = file.name.split('.').pop()?.toLowerCase();
-            if (['kif', 'csa', 'ki2', 'psn'].includes(ext || '')) {
-                setImportFormat(ext || '');
+        // Try to detect format from extension
+        const ext = file.name.split('.').pop()?.toLowerCase();
+        if (['kif', 'csa', 'ki2', 'psn'].includes(ext || '')) {
+            setImportFormat(ext || '');
+        }
+
+        // For KIF and KI2 files, try Shift_JIS encoding first (common for Japanese game records)
+        // If that fails or produces garbled text, fall back to UTF-8
+        const isJapaneseFormat = ext === 'kif' || ext === 'ki2';
+        
+        if (isJapaneseFormat) {
+            try {
+                // Try Shift_JIS first
+                const arrayBuffer = await file.arrayBuffer();
+                const decoder = new TextDecoder('shift_jis');
+                const shiftJisContent = decoder.decode(arrayBuffer);
+                
+                // Check if it looks like valid Japanese (contains Japanese move markers)
+                if (shiftJisContent.includes('▲') || shiftJisContent.includes('△') || 
+                    shiftJisContent.includes('先手') || shiftJisContent.includes('後手')) {
+                    setImportContent(shiftJisContent);
+                    return;
+                }
+                
+                // Fall back to UTF-8
+                const utf8Decoder = new TextDecoder('utf-8');
+                setImportContent(utf8Decoder.decode(arrayBuffer));
+            } catch {
+                // If decoding fails, read as UTF-8
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    setImportContent(event.target?.result as string);
+                };
+                reader.readAsText(file, 'UTF-8');
             }
-        };
-        reader.readAsText(file);
+        } else {
+            // For CSA and PSN, use UTF-8
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                setImportContent(event.target?.result as string);
+            };
+            reader.readAsText(file, 'UTF-8');
+        }
     };
 
     const handleImport = () => {

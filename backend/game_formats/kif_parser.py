@@ -14,14 +14,28 @@ from .base import BaseParser, GameRecord, GameMetadata, ParsedMove
 class KIFParser(BaseParser):
     """Parser for KIF format game records"""
     
-    # Patterns for parsing
+    # Full-width to half-width number mapping
+    FULLWIDTH_NUMBERS = '０１２３４５６７８９'
+    HALFWIDTH_NUMBERS = '0123456789'
+    
+    # Patterns for parsing - supports both half-width and full-width numbers
+    # File can be: 1-9 or １-９
+    # Rank can be: 一-九
+    # Note: \s* after 同 handles full-width spaces like "同　歩"
     MOVE_PATTERN = re.compile(
-        r'^\s*(\d+)\s+([▲△])?\s*(\d)?([一二三四五六七八九])?(同)?'
+        r'^\s*(\d+)\s+([▲△])?\s*([１２３４５６７８９1-9])?([一二三四五六七八九])?(同)?\s*'
         r'(歩|香|桂|銀|金|角|飛|玉|王|と|杏|成香|圭|成桂|全|成銀|馬|龍|竜)'
-        r'(打|成|不成)?'
+        r'(打|成|不成|直|右|左|上|寄|引)?'
         r'(?:\((\d)(\d)\))?'
         r'(?:\s*\(\s*(\d+):(\d+)(?:/.*?)?\))?'
     )
+    
+    @classmethod
+    def normalize_number(cls, char: str) -> str:
+        """Convert full-width number to half-width"""
+        if char in cls.FULLWIDTH_NUMBERS:
+            return cls.HALFWIDTH_NUMBERS[cls.FULLWIDTH_NUMBERS.index(char)]
+        return char
     
     # Header patterns
     HEADER_PATTERNS = {
@@ -61,9 +75,20 @@ class KIFParser(BaseParser):
                 comments.append(line[1:].strip())
                 continue
             
-            # Parse headers
-            if ':' in line and not in_moves:
-                key, _, value = line.partition(':')
+            # Parse headers - check for both half-width (:) and full-width (：) colons
+            # Only treat as header if the colon appears early in the line (not in time format)
+            colon_pos = line.find('：')  # Full-width colon
+            if colon_pos == -1:
+                colon_pos = line.find(':')  # Half-width colon
+            
+            # Header lines have colon early in the line and before any parentheses
+            paren_pos = line.find('(')
+            if colon_pos > 0 and colon_pos < 20 and (paren_pos == -1 or colon_pos < paren_pos) and not in_moves:
+                # Use the appropriate colon type
+                if '：' in line:
+                    key, _, value = line.partition('：')
+                else:
+                    key, _, value = line.partition(':')
                 key = key.strip()
                 value = value.strip()
                 
@@ -115,15 +140,18 @@ class KIFParser(BaseParser):
         
         move_num = int(groups[0])
         player_marker = groups[1]  # ▲ or △
-        dest_file = groups[2]  # Destination file (1-9)
+        dest_file_raw = groups[2]  # Destination file (1-9 or １-９)
         dest_rank = groups[3]  # Destination rank (一-九)
         is_same = groups[4]  # 同 (same square as last move)
         piece = groups[5]  # Piece name
-        modifier = groups[6]  # 打/成/不成
+        modifier = groups[6]  # 打/成/不成/直/右/左/上/寄/引
         src_file = groups[7]  # Source file
         src_rank = groups[8]  # Source rank
         time_min = groups[9]
         time_sec = groups[10]
+        
+        # Normalize full-width numbers to half-width
+        dest_file = self.normalize_number(dest_file_raw) if dest_file_raw else None
         
         # Determine player
         player = "black" if player_marker == '▲' or (move_num % 2 == 1 and not player_marker) else "white"

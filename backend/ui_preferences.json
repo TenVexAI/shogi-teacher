@@ -2,7 +2,7 @@
   "useLLM": true,
   "showBestMove": true,
   "showBoardOptionsPanel": true,
-  "showMovementOverlay": true,
+  "showMovementOverlay": false,
   "useWesternNotation": false,
   "useJapaneseCoords": false,
   "allSoundsEnabled": true,

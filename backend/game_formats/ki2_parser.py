@@ -15,14 +15,26 @@ from .base import BaseParser, GameRecord, GameMetadata, ParsedMove
 class KI2Parser(BaseParser):
     """Parser for KI2 format game records"""
     
-    # Pattern for a single KI2 move
+    # Full-width to half-width number mapping
+    FULLWIDTH_NUMBERS = '０１２３４５６７８９'
+    HALFWIDTH_NUMBERS = '0123456789'
+    
+    # Pattern for a single KI2 move - supports both half-width and full-width numbers
+    # Note: \s* after 同 handles full-width spaces like "同　歩"
     MOVE_PATTERN = re.compile(
         r'([▲△])'  # Player marker
-        r'(\d)?([一二三四五六七八九])?(同)?'  # Destination
+        r'([１２３４５６７８９1-9])?([一二三四五六七八九])?(同)?\s*'  # Destination (full-width or half-width file)
         r'(歩|香|桂|銀|金|角|飛|玉|王|と|杏|成香|圭|成桂|全|成銀|馬|龍|竜)'  # Piece
         r'([上下右左直寄引])*'  # Movement direction disambiguation
         r'(打|成|不成)?'  # Modifier
     )
+    
+    @classmethod
+    def normalize_number(cls, char: str) -> str:
+        """Convert full-width number to half-width"""
+        if char in cls.FULLWIDTH_NUMBERS:
+            return cls.HALFWIDTH_NUMBERS[cls.FULLWIDTH_NUMBERS.index(char)]
+        return char
     
     # Header patterns (same as KIF)
     HEADER_PATTERNS = {
@@ -61,9 +73,16 @@ class KI2Parser(BaseParser):
                 comments.append(line[1:].strip())
                 continue
             
-            # Parse headers
-            if ':' in line and not in_moves:
-                key, _, value = line.partition(':')
+            # Parse headers - check for both half-width (:) and full-width (：) colons
+            has_fullwidth_colon = '：' in line
+            has_halfwidth_colon = ':' in line
+            
+            if (has_fullwidth_colon or has_halfwidth_colon) and not in_moves:
+                # Use the appropriate colon type
+                if has_fullwidth_colon:
+                    key, _, value = line.partition('：')
+                else:
+                    key, _, value = line.partition(':')
                 key = key.strip()
                 value = value.strip()
                 
@@ -115,12 +134,15 @@ class KI2Parser(BaseParser):
         groups = match.groups()
         
         player_marker = groups[0]  # ▲ or △
-        dest_file = groups[1]  # Destination file (1-9)
+        dest_file_raw = groups[1]  # Destination file (1-9 or １-９)
         dest_rank = groups[2]  # Destination rank (一-九)
         is_same = groups[3]  # 同 (same square)
         piece = groups[4]  # Piece name
         disambiguation = groups[5]  # Direction disambiguation
         modifier = groups[6]  # 打/成/不成
+        
+        # Normalize full-width numbers to half-width
+        dest_file = self.normalize_number(dest_file_raw) if dest_file_raw else None
         
         player = "black" if player_marker == '▲' else "white"
         usi_piece = self.piece_to_usi(piece)
@@ -134,9 +156,12 @@ class KI2Parser(BaseParser):
             return None
         
         # Determine source/drop
+        # For drops, piece case depends on player: uppercase for Black, lowercase for White
+        drop_piece = usi_piece[0].upper() if player == "black" else usi_piece[0].lower()
+        
         if modifier == '打':
-            # Drop move
-            move_usi = f"{usi_piece[0]}*{to_square}"
+            # Explicit drop move
+            move_usi = f"{drop_piece}*{to_square}"
         else:
             # Find source from legal moves with disambiguation
             move_usi = self._find_source_with_disambiguation(
@@ -144,7 +169,17 @@ class KI2Parser(BaseParser):
                 modifier == '成', disambiguation
             )
             if not move_usi:
-                return None
+                # No source found - check if this could be an implicit drop
+                # In KI2, drops are sometimes written without 打 suffix
+                drop_usi = f"{drop_piece}*{to_square}"
+                try:
+                    drop_move = shogi.Move.from_usi(drop_usi)
+                    if drop_move in board.legal_moves:
+                        move_usi = drop_usi
+                    else:
+                        return None
+                except:
+                    return None
         
         # Build Japanese notation
         japanese = f"{player_marker}{dest_file or ''}{dest_rank or ''}{is_same or ''}{piece}{disambiguation or ''}{modifier or ''}"
@@ -165,6 +200,9 @@ class KI2Parser(BaseParser):
         candidates = []
         for move in board.legal_moves:
             if move.to_square == to_idx:
+                # Skip drop moves (from_square is None for drops)
+                if move.from_square is None:
+                    continue
                 from_piece = board.piece_at(move.from_square)
                 if from_piece:
                     piece_char = from_piece.symbol().upper()
