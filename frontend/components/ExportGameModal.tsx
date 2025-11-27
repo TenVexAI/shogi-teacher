@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { X, Download, Copy, Check } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Download, Copy, Check, Save } from 'lucide-react';
 import { GameFormat } from '@/types/game';
 
 interface ExportGameModalProps {
@@ -34,6 +34,19 @@ export default function ExportGameModal({
     const [exportedFilename, setExportedFilename] = useState('');
     const [isExporting, setIsExporting] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [isElectron, setIsElectron] = useState(false);
+
+    useEffect(() => {
+        setIsElectron(typeof window !== 'undefined' && !!window.electron?.saveFile);
+    }, []);
+
+    // Sync player names when modal opens
+    useEffect(() => {
+        if (isOpen) {
+            setWhiteName(currentWhiteName);
+            setBlackName(currentBlackName);
+        }
+    }, [isOpen, currentWhiteName, currentBlackName]);
 
     if (!isOpen) return null;
 
@@ -55,9 +68,30 @@ export default function ExportGameModal({
         }
     };
 
-    const handleDownload = () => {
+    const handleDownload = async () => {
         if (!exportedContent) return;
 
+        // Use native save dialog in Electron
+        if (typeof window !== 'undefined' && window.electron?.saveFile) {
+            const extension = exportedFilename.split('.').pop() || 'kif';
+            const filters = [
+                { name: `${extension.toUpperCase()} Files`, extensions: [extension] },
+                { name: 'All Files', extensions: ['*'] }
+            ];
+            
+            const result = await window.electron.saveFile(exportedContent, exportedFilename, filters);
+            
+            if (result.success) {
+                // File saved successfully, close modal
+                handleClose();
+            } else if (result.error) {
+                console.error('Failed to save file:', result.error);
+            }
+            // If canceled, just do nothing
+            return;
+        }
+
+        // Fallback for browser
         const blob = new Blob([exportedContent], { type: 'text/plain;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -128,8 +162,17 @@ export default function ExportGameModal({
                                         onClick={handleDownload}
                                         className="flex items-center gap-2 px-3 py-2 bg-accent-purple text-white rounded-lg hover:bg-[#8a6fd1] transition-colors"
                                     >
-                                        <Download className="w-4 h-4" />
-                                        Download
+                                        {isElectron ? (
+                                            <>
+                                                <Save className="w-4 h-4" />
+                                                Save As...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Download className="w-4 h-4" />
+                                                Download
+                                            </>
+                                        )}
                                     </button>
                                 </div>
                             </div>

@@ -33,7 +33,105 @@ export interface GameConfig {
     whiteEngine: string;
     blackName: string;
     whiteName: string;
+    handicap?: string | null;  // Handicap ID or null for no handicap
 }
+
+// Handicap definitions with SFEN starting positions
+// In handicap games, White (gote) has pieces removed and moves first
+// Note: "Left" from White's perspective = file 1 side (right side from Black's view)
+export const HANDICAPS = [
+    {
+        id: 'sente',
+        nameEn: 'Black',
+        nameJp: '先手 (sente)',
+        description: 'Standard position, White moves first',
+        sfen: 'lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1',
+    },
+    {
+        id: 'lance',
+        nameEn: 'Lance',
+        nameJp: '香落ち (kyō ochi)',
+        description: 'Left lance removed',
+        sfen: 'lnsgkgsn1/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1',
+    },
+    {
+        id: 'bishop',
+        nameEn: 'Bishop',
+        nameJp: '角落ち (kaku ochi)',
+        description: 'Bishop removed',
+        sfen: 'lnsgkgsnl/1r7/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1',
+    },
+    {
+        id: 'rook',
+        nameEn: 'Rook',
+        nameJp: '飛車落ち (hisha ochi)',
+        description: 'Rook removed',
+        sfen: 'lnsgkgsnl/7b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1',
+    },
+    {
+        id: 'rook-lance',
+        nameEn: 'Rook–Lance',
+        nameJp: '飛香落ち (hi-kyō ochi)',
+        description: 'Rook, left lance removed',
+        sfen: 'lnsgkgsn1/7b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1',
+    },
+    {
+        id: '2-piece',
+        nameEn: '2-Piece',
+        nameJp: '二枚落ち (ni-mai ochi)',
+        description: 'Rook, bishop removed',
+        sfen: 'lnsgkgsnl/9/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1',
+    },
+    {
+        id: '4-piece',
+        nameEn: '4-Piece',
+        nameJp: '四枚落ち (yon-mai ochi)',
+        description: 'Rook, bishop, both lances removed',
+        sfen: '1nsgkgsn1/9/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1',
+    },
+    {
+        id: '6-piece',
+        nameEn: '6-Piece',
+        nameJp: '六枚落ち (roku-mai ochi)',
+        description: 'Rook, bishop, lances, knights removed',
+        sfen: '2sgkgs2/9/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1',
+    },
+    {
+        id: '8-piece',
+        nameEn: '8-Piece',
+        nameJp: '八枚落ち (hachi-mai ochi)',
+        description: 'Rook, bishop, lances, knights, silvers removed',
+        sfen: '3gkg3/9/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1',
+    },
+    {
+        id: '9-piece',
+        nameEn: '9-Piece',
+        nameJp: '九枚落ち (kyū-mai ochi)',
+        description: 'Left gold also removed',
+        sfen: '3gk4/9/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1',
+    },
+    {
+        id: '10-piece',
+        nameEn: '10-Piece',
+        nameJp: '十枚落ち (jū-mai ochi)',
+        description: 'Both golds also removed',
+        sfen: '4k4/9/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1',
+    },
+    {
+        id: '3-pawns',
+        nameEn: 'Three Pawns',
+        nameJp: '歩三兵 (fu sanbyō)',
+        description: 'Only king remains, 3 pawns in hand',
+        sfen: '4k4/9/9/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w 3p 1',
+    },
+    {
+        id: 'naked-king',
+        nameEn: 'Naked King',
+        nameJp: '裸玉 (hadaka gyoku)',
+        description: 'Only king remains',
+        sfen: '4k4/9/9/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1',
+    },
+];
 
 const GAME_MODES = [
     {
@@ -79,6 +177,8 @@ export default function NewGameModal({
     const [showImport, setShowImport] = useState(false);
     const [importContent, setImportContent] = useState('');
     const [importFormat, setImportFormat] = useState<string>('');
+    const [handicapEnabled, setHandicapEnabled] = useState(false);
+    const [selectedHandicap, setSelectedHandicap] = useState<string>('2-piece');
     const fileInputRef = useRef<HTMLInputElement>(null);
     
     // Track previous online state to detect changes
@@ -94,6 +194,13 @@ export default function NewGameModal({
         }
         prevIsOnlineP2P.current = isOnlineP2P;
     }, [isOnlineP2P, onlinePlayState]);
+
+    // Reset to main view when modal opens
+    useEffect(() => {
+        if (isOpen) {
+            setShowImport(false);
+        }
+    }, [isOpen]);
 
     // Swap player names (black <-> white)
     const handleSwapPlayers = () => {
@@ -118,6 +225,7 @@ export default function NewGameModal({
             whiteEngine: whiteEngineId,
             blackName: blackName || '',
             whiteName: whiteName || '',
+            handicap: handicapEnabled ? selectedHandicap : null,
         });
         onClose();
     };
@@ -498,6 +606,49 @@ export default function NewGameModal({
                                     <p className="text-xs text-[#3cf281]/70">
                                         Use &quot;Swap Colors&quot; to change who plays Black (first move) vs White
                                     </p>
+                                )}
+                            </div>
+
+                            {/* Handicap selection */}
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <label className="block text-sm font-medium text-text-primary">
+                                        Handicap
+                                    </label>
+                                    <button
+                                        onClick={() => setHandicapEnabled(!handicapEnabled)}
+                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                            handicapEnabled ? 'bg-accent-purple' : 'bg-background-primary border border-border'
+                                        }`}
+                                    >
+                                        <span
+                                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                                handicapEnabled ? 'translate-x-6' : 'translate-x-1'
+                                            }`}
+                                        />
+                                    </button>
+                                </div>
+                                
+                                {handicapEnabled && (
+                                    <div className="space-y-2">
+                                        <p className="text-xs text-text-secondary">
+                                            White (Gote) starts with fewer pieces and moves first
+                                        </p>
+                                        <select
+                                            value={selectedHandicap}
+                                            onChange={(e) => setSelectedHandicap(e.target.value)}
+                                            className="w-full px-3 py-2 bg-background-primary border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-purple"
+                                        >
+                                            {HANDICAPS.map((h) => (
+                                                <option key={h.id} value={h.id}>
+                                                    {h.nameEn} — {h.nameJp}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <p className="text-xs text-text-secondary italic">
+                                            {HANDICAPS.find(h => h.id === selectedHandicap)?.description}
+                                        </p>
+                                    </div>
                                 )}
                             </div>
 

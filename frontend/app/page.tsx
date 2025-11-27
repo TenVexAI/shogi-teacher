@@ -10,7 +10,7 @@ import MoveHistory, { MoveRecord } from '@/components/MoveHistory';
 import Sidebar from '@/components/Sidebar';
 import ResourcesWindow from '@/components/ResourcesWindow';
 import ResumeSessionModal from '@/components/ResumeSessionModal';
-import NewGameModal, { GameConfig } from '@/components/NewGameModal';
+import NewGameModal, { GameConfig, HANDICAPS } from '@/components/NewGameModal';
 import ExportGameModal from '@/components/ExportGameModal';
 import GameModeSettingsModal, { GameModeSettings } from '@/components/GameModeSettingsModal';
 import { 
@@ -363,6 +363,15 @@ export default function Home() {
 
   const loadInitialGame = async (config?: GameConfig) => {
     try {
+      // Get handicap SFEN if enabled
+      let startingSfen: string | undefined;
+      if (config?.handicap) {
+        const handicap = HANDICAPS.find(h => h.id === config.handicap);
+        if (handicap) {
+          startingSfen = handicap.sfen;
+        }
+      }
+      
       // Build session options from config
       const options: CreateSessionOptions = {
         gameMode: config?.mode || 'human_vs_human',
@@ -372,6 +381,7 @@ export default function Home() {
         blackName: config?.blackName,
         whiteEngine: config?.whiteEngine || 'yaneuraou',
         blackEngine: config?.blackEngine || 'yaneuraou',
+        startingSfen,
       };
       
       // Configure for human vs computer
@@ -899,12 +909,18 @@ export default function Home() {
       // Set local player's color
       setOnlinePlayState(prev => ({ ...prev, myColor: initiatorColor }));
       
-      // For new games, always use initial SFEN (gameState not yet updated at this point)
-      const initialSfen = 'lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1';
+      // Use handicap SFEN if enabled, otherwise standard starting position
+      let startingSfen = 'lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1';
+      if (config.handicap) {
+        const handicap = HANDICAPS.find(h => h.id === config.handicap);
+        if (handicap) {
+          startingSfen = handicap.sfen;
+        }
+      }
       
       window.electron.sendToOnlinePlayWindow({
         type: 'send_game_config',
-        sfen: initialSfen,
+        sfen: startingSfen,
         blackName,
         whiteName,
         isClockRunning: false,  // New game always starts with clock stopped
@@ -1752,6 +1768,7 @@ export default function Home() {
             onOpenOnlinePlay={handleOpenOnlinePlay}
             onOpenEngineManagement={handleOpenEngineManagement}
             onOpenGameModeSettings={handleOpenGameModeSettings}
+            onOpenExport={() => setIsExportModalOpen(true)}
             isOnlineP2PConnected={onlinePlayState.isInGame && onlinePlayState.isP2PConnected}
           />
 

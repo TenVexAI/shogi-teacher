@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
-const { app, BrowserWindow, session, ipcMain } = require('electron');
+const { app, BrowserWindow, session, ipcMain, dialog } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { spawn } = require('child_process');
 const axios = require('axios');
 const isDev = process.env.NODE_ENV === 'development';
@@ -100,6 +101,7 @@ function createWindow() {
     icon: path.join(__dirname, '../public/icon.png'),
     title: 'Shogi Teacher',
     backgroundColor: '#141414',
+    autoHideMenuBar: true, // Hide menu bar, press Alt to show, keeps shortcuts like F11 working
     show: false // Don't show until backend is ready
   });
 
@@ -266,6 +268,29 @@ ipcMain.handle('send-to-main-window', (event, message) => {
     return true;
   }
   return false;
+});
+
+// Save file with dialog
+ipcMain.handle('save-file', async (event, { content, defaultFilename, filters }) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  
+  const result = await dialog.showSaveDialog(win, {
+    defaultPath: defaultFilename,
+    filters: filters || [
+      { name: 'All Files', extensions: ['*'] }
+    ]
+  });
+  
+  if (result.canceled || !result.filePath) {
+    return { success: false, canceled: true };
+  }
+  
+  try {
+    fs.writeFileSync(result.filePath, content, 'utf-8');
+    return { success: true, filePath: result.filePath };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
 });
 
 app.whenReady().then(() => {

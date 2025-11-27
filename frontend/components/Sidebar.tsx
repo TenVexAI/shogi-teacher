@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Power, Volume2, VolumeX, BookOpen, Cpu, Gamepad2, Globe } from 'lucide-react';
+import { Settings, Power, Volume2, VolumeX, BookOpen, Cpu, Gamepad2, Globe, Save } from 'lucide-react';
 
 interface SidebarProps {
   onOpenSettings: () => void;
@@ -9,10 +9,11 @@ interface SidebarProps {
   onOpenEngineManagement: () => void;
   onOpenGameModeSettings: () => void;
   onOpenOnlinePlay: () => void;
+  onOpenExport: () => void;
   isOnlineP2PConnected?: boolean;
 }
 
-export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllSounds, onOpenLearn, onOpenEngineManagement, onOpenGameModeSettings, onOpenOnlinePlay, isOnlineP2PConnected }: SidebarProps) {
+export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllSounds, onOpenLearn, onOpenEngineManagement, onOpenGameModeSettings, onOpenOnlinePlay, onOpenExport, isOnlineP2PConnected }: SidebarProps) {
   const [isLearnWindowOpen, setIsLearnWindowOpen] = useState(false);
   const [isOnlinePlayWindowOpen, setIsOnlinePlayWindowOpen] = useState(false);
 
@@ -96,6 +97,15 @@ export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllS
               ? 'sound-active group-hover:text-red-500!' 
               : 'text-text-secondary group-hover:text-accent-cyan'
           }`} />
+        </button>
+
+        {/* Export/Save Game Button */}
+        <button
+          onClick={onOpenExport}
+          className="w-10 h-10 flex items-center justify-center group transition-colors"
+          title="Save/Export Game"
+        >
+          <Save className="w-6 h-6 text-text-secondary group-hover:text-accent-green transition-colors" />
         </button>
       </div>
 

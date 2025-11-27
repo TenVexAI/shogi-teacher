@@ -21,6 +21,13 @@ interface ElectronAPI {
   sendToMainWindow: (message: unknown) => Promise<boolean>;
   onMainWindowMessage: (callback: (message: unknown) => void) => () => void;
   onOnlinePlayMessage: (callback: (message: unknown) => void) => () => void;
+  
+  // File operations
+  saveFile: (
+    content: string, 
+    defaultFilename: string, 
+    filters?: { name: string; extensions: string[] }[]
+  ) => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
 }
 
 interface Window {

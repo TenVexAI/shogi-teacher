@@ -39,5 +39,8 @@ contextBridge.exposeInMainWorld('electron', {
   onOnlinePlayMessage: (callback) => {
     ipcRenderer.on('online-play-message', (event, message) => callback(message));
     return () => ipcRenderer.removeAllListeners('online-play-message');
-  }
+  },
+  
+  // File save with dialog
+  saveFile: (content, defaultFilename, filters) => ipcRenderer.invoke('save-file', { content, defaultFilename, filters })
 });

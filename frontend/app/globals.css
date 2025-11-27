@@ -6,6 +6,7 @@
   --bg-secondary: #313131;
   --accent-purple: #a287f4;
   --accent-cyan: #12e6c8;
+  --accent-green: #3cf281;
   --text-primary: #e0e0e0;
   --text-secondary: #a0a0a0;
   --border: #2a5a5e;
@@ -16,6 +17,7 @@
   --color-background-secondary: var(--bg-secondary);
   --color-accent-purple: var(--accent-purple);
   --color-accent-cyan: var(--accent-cyan);
+  --color-accent-green: var(--accent-green);
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
   --color-border: var(--border);
