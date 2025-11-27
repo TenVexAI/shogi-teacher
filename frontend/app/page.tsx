@@ -886,10 +886,10 @@ export default function Home() {
     audioManager.playUISound('new_game');
     
     // If in online mode, send game config to opponent
-    if (onlinePlayState.isInGame && onlinePlayState.isP2PConnected && window.electron && currentSession) {
+    if (onlinePlayState.isInGame && onlinePlayState.isP2PConnected && window.electron) {
       // Use player names from config
-      const blackName = config.blackName || currentSession.black_name || 'Black';
-      const whiteName = config.whiteName || currentSession.white_name || 'White';
+      const blackName = config.blackName || 'Black';
+      const whiteName = config.whiteName || 'White';
       
       // Determine which color the initiator (local player) is playing
       // Check if their username matches the black or white name
@@ -899,13 +899,16 @@ export default function Home() {
       // Set local player's color
       setOnlinePlayState(prev => ({ ...prev, myColor: initiatorColor }));
       
+      // For new games, always use initial SFEN (gameState not yet updated at this point)
+      const initialSfen = 'lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1';
+      
       window.electron.sendToOnlinePlayWindow({
         type: 'send_game_config',
-        sfen: gameState?.sfen || 'lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1',
+        sfen: initialSfen,
         blackName,
         whiteName,
-        isClockRunning,
-        gameTime,
+        isClockRunning: false,  // New game always starts with clock stopped
+        gameTime: 0,
         initiatorColor,
       });
     }
@@ -941,6 +944,31 @@ export default function Home() {
         // Set last move highlight
         const lastMoveRecord = session.moves[session.moves.length - 1];
         setLastMoveUsi(lastMoveRecord ? lastMoveRecord.move_usi : null);
+        
+        // If in online mode, send game config to opponent
+        // Use actual online player names instead of file names
+        if (onlinePlayState.isInGame && onlinePlayState.isP2PConnected && window.electron) {
+          // Player who imports becomes Black (first to move), opponent becomes White
+          const blackName = onlinePlayState.currentUserName || 'Black';
+          const whiteName = onlinePlayState.opponentName || 'White';
+          const initiatorColor: 'b' | 'w' = 'b';  // Importer plays Black
+          
+          // Update local session with online player names
+          setCurrentSession(prev => prev ? { ...prev, black_name: blackName, white_name: whiteName } : prev);
+          
+          // Set local player's color
+          setOnlinePlayState(prev => ({ ...prev, myColor: initiatorColor }));
+          
+          window.electron.sendToOnlinePlayWindow({
+            type: 'send_game_config',
+            sfen: session.current_sfen,
+            blackName,
+            whiteName,
+            isClockRunning: false,
+            gameTime: 0,
+            initiatorColor,
+          });
+        }
         
         addAssistantMessage(
           `**Game Imported**\n\n${result.message}\n\nFormat: ${result.detected_format?.toUpperCase() || 'Auto-detected'}`,
