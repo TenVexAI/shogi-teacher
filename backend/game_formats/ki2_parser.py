@@ -166,7 +166,8 @@ class KI2Parser(BaseParser):
             # Find source from legal moves with disambiguation
             move_usi = self._find_source_with_disambiguation(
                 board, usi_piece, to_square, 
-                modifier == '成', disambiguation
+                modifier == '成', disambiguation,
+                is_white=(player == "white")
             )
             if not move_usi:
                 # No source found - check if this could be an implicit drop
@@ -191,7 +192,7 @@ class KI2Parser(BaseParser):
             move_japanese=japanese,
         ), to_square
     
-    def _find_source_with_disambiguation(self, board: shogi.Board, piece: str, to_square: str, promotes: bool, disambiguation: Optional[str]) -> Optional[str]:
+    def _find_source_with_disambiguation(self, board: shogi.Board, piece: str, to_square: str, promotes: bool, disambiguation: Optional[str], is_white: bool = False) -> Optional[str]:
         """Find source square considering disambiguation hints"""
         to_idx = self._square_to_index(to_square)
         if to_idx is None:
@@ -206,8 +207,7 @@ class KI2Parser(BaseParser):
                 from_piece = board.piece_at(move.from_square)
                 if from_piece:
                     piece_char = from_piece.symbol().upper()
-                    if '+' in piece:
-                        piece_char = '+' + piece_char
+                    # Compare with the target piece (already includes + for promoted)
                     if piece_char == piece or piece_char == piece.upper():
                         candidates.append(move)
         
@@ -231,20 +231,37 @@ class KI2Parser(BaseParser):
                 
                 match = True
                 for d in disambiguation if disambiguation else []:
-                    if d == '上':  # Moving up (decreasing rank for black)
-                        match = match and from_rank > to_rank
-                    elif d == '下':  # Moving down
-                        match = match and from_rank < to_rank
+                    # Disambiguation is from the moving player's perspective
+                    # For White, left/right and up/down are reversed
+                    if d == '上':  # Moving up (toward opponent)
+                        if is_white:
+                            match = match and from_rank < to_rank
+                        else:
+                            match = match and from_rank > to_rank
+                    elif d == '下':  # Moving down (toward self)
+                        if is_white:
+                            match = match and from_rank > to_rank
+                        else:
+                            match = match and from_rank < to_rank
                     elif d == '右':  # From right
-                        match = match and from_file < to_file
+                        if is_white:
+                            match = match and from_file > to_file
+                        else:
+                            match = match and from_file < to_file
                     elif d == '左':  # From left
-                        match = match and from_file > to_file
+                        if is_white:
+                            match = match and from_file < to_file
+                        else:
+                            match = match and from_file > to_file
                     elif d == '直':  # Straight (same file)
                         match = match and from_file == to_file
                     elif d == '寄':  # Horizontal move
                         match = match and from_rank == to_rank
-                    elif d == '引':  # Pulling back
-                        match = match and from_rank < to_rank
+                    elif d == '引':  # Pulling back (toward self)
+                        if is_white:
+                            match = match and from_rank > to_rank
+                        else:
+                            match = match and from_rank < to_rank
                 
                 if match:
                     promotion = '+' if promotes or move.promotion else ''
