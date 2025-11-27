@@ -651,8 +651,9 @@ export default function OnlinePlayPage() {
       actionTimeoutRef.current = null;
     }
     
-    // Notify main window that action was accepted (include data for actions like revert)
-    if (window.electron) {
+    // For most actions, notify main window to execute the action locally too
+    // Exception: 'new_game' - accepter just waits for game config from requester
+    if (window.electron && pendingActionRequest.action !== 'new_game') {
       window.electron.sendToMainWindow({
         type: 'action_response_received',
         requestId: pendingActionRequest.id,

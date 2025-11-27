@@ -11,5 +11,5 @@
   "musicSoundEnabled": true,
   "highlightLastMove": true,
   "boardFlipped": false,
-  "allSoundsMuted": false
+  "allSoundsMuted": true
 }
