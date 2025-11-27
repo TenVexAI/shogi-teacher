@@ -16,7 +16,7 @@ import GameModeSettingsModal, { GameModeSettings } from '@/components/GameModeSe
 import { 
   getGameState, analyzePosition, explainPosition, updateConfig, getConfig,
   createSession, getSession, getHint, recordMove, listSessions,
-  importGame, exportGame, requestComputerMove,
+  importGame, exportGame, requestComputerMove, checkLLMConfigured,
   GameSession, HintResponse, MoveRecordBackend, CreateSessionOptions
 } from '@/lib/api';
 import { GameState, GameFormat } from '@/types/game';
@@ -99,6 +99,7 @@ export default function Home() {
   const [isComputerThinking, setIsComputerThinking] = useState(false);
   const [returnToNewGameModal, setReturnToNewGameModal] = useState(false);
   const [returnToGameModeSettings, setReturnToGameModeSettings] = useState(false);
+  const [hasLLMConfigured, setHasLLMConfigured] = useState(false);
   
   // Online play state
   const [onlinePlayState, setOnlinePlayState] = useState<{
@@ -164,6 +165,9 @@ export default function Home() {
       setSoundSettings(newSettings);
       audioManager.updateSettings(newSettings);
     });
+    
+    // Check if LLM is configured
+    checkLLMConfigured().then(setHasLLMConfigured);
   }, []);
 
 
@@ -1002,6 +1006,39 @@ export default function Home() {
     }
   };
 
+  const handleLoadFromSfen = async (sfen: string) => {
+    try {
+      setIsLoading(true);
+      
+      // Create a new session with the given SFEN
+      const session = await createSession({ startingSfen: sfen });
+      setCurrentSession(session);
+      
+      // Load game state
+      const state = await getGameState(sfen);
+      setGameState(state);
+      setMoveHistory([]);
+      setLastMoveUsi(null);
+      setIsClockRunning(false);
+      setGameTime(0);
+      clockStartTimeRef.current = 0;
+      lastMoveTimeRef.current = 0;
+      accumulatedTimeRef.current = 0;
+      setPendingMove(null);
+      
+      addAssistantMessage(
+        `**Position Loaded from Image**\n\nThe board has been set up from the analyzed image. ${state.turn === 'b' ? 'Black' : 'White'} to move.`,
+        'system'
+      );
+      audioManager.playUISound('new_game');
+    } catch (error) {
+      console.error('Failed to load position:', error);
+      addAssistantMessage('❌ Failed to load position. Please try again.', 'system');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleExportGame = async (
     format: GameFormat, 
     whiteName?: string, 
@@ -1663,6 +1700,7 @@ export default function Home() {
           onClose={() => setIsNewGameModalOpen(false)}
           onStartGame={handleStartNewGame}
           onImportGame={handleImportGame}
+          onLoadFromSfen={handleLoadFromSfen}
           currentEngineConfig={engineConfig ? {
             black: { 
               engineId: engineConfig.black.engineId, 
@@ -1678,6 +1716,7 @@ export default function Home() {
             setIsEngineManagementOpen(true);
           }}
           onlinePlayState={onlinePlayState}
+          hasLLMConfigured={hasLLMConfigured}
         />
 
         <ExportGameModal

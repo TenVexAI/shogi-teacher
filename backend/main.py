@@ -48,7 +48,8 @@ from models import (
     ReferenceFileCreate, ReferenceFile, SessionReferenceToggle,
     GameImportRequest, GameImportResponse,
     GameExportRequest, GameExportResponse,
-    ComputerMoveRequest, ComputerMoveResponse
+    ComputerMoveRequest, ComputerMoveResponse,
+    ImageAnalysisRequest, ImageAnalysisResponse
 )
 
 # Fix for Windows asyncio subprocess support
@@ -1740,4 +1741,49 @@ async def resume_session(session_id: str):
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     return {"success": True, "is_paused": False}
+
+
+@app.post("/game/analyze-image", response_model=ImageAnalysisResponse)
+async def analyze_board_image(request: ImageAnalysisRequest):
+    """
+    Analyze a shogi board image and return the position in SFEN format.
+    
+    Uses the user's configured LLM to analyze the image and extract the board position.
+    Requires a vision-capable LLM (Claude, GPT-4o, or Gemini).
+    """
+    try:
+        # Check if LLM is properly configured
+        if not teacher.get_active_client():
+            raise HTTPException(
+                status_code=400, 
+                detail="No LLM configured. Please set up an API key in Settings → LLM Settings and Resources."
+            )
+        
+        # Analyze the image
+        result = teacher.analyze_board_image(request.image)
+        
+        # Validate the SFEN by trying to create a board
+        try:
+            shogi.Board(result['sfen'])
+            # If it works, the SFEN is valid
+        except Exception as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid SFEN detected: {result['sfen']}. Error: {str(e)}"
+            )
+        
+        return ImageAnalysisResponse(
+            sfen=result['sfen'],
+            confidence=result.get('confidence', 'medium'),
+            notes=result.get('notes')
+        )
+        
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Image analysis failed: {str(e)}")
 

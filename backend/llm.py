@@ -2,6 +2,9 @@ from anthropic import Anthropic
 from typing import Dict, Any, Optional, List
 from config_handler import get_llm_config
 import os
+import json
+import re
+import base64
 
 class ClaudeTeacher:
     def __init__(self):
@@ -459,3 +462,217 @@ Use proper shogi terminology throughout. Use simple language suitable for interm
             
             # Return a safe error message
             return f"Error generating explanation: {error_msg}"
+    
+    def analyze_board_image(self, image_base64: str) -> dict:
+        """
+        Analyze a shogi board image and return SFEN notation.
+        
+        Args:
+            image_base64: Base64 encoded image (data URL format: data:image/...;base64,...)
+        
+        Returns:
+            dict with 'sfen', 'confidence', and 'notes' keys
+        """
+        self.reload_config()
+        
+        # Extract the base64 data from data URL if present
+        if image_base64.startswith('data:'):
+            # Format: data:image/jpeg;base64,/9j/4AAQ...
+            parts = image_base64.split(',', 1)
+            if len(parts) == 2:
+                image_data = parts[1]
+                media_type = parts[0].split(':')[1].split(';')[0]
+            else:
+                raise ValueError("Invalid image data URL format")
+        else:
+            image_data = image_base64
+            media_type = "image/jpeg"
+        
+        prompt = """Analyze this shogi board image and output the position in SFEN notation.
+
+CRITICAL: A standard shogi game has EXACTLY 40 pieces total. You MUST account for ALL pieces:
+- 2 Kings (1 each side) - K/k
+- 2 Rooks (1 each, may be captured/promoted) - R/r or +R/+r
+- 2 Bishops (1 each, may be captured/promoted) - B/b or +B/+b
+- 4 Golds (2 each side) - G/g
+- 4 Silvers (2 each, may be promoted) - S/s or +S/+s
+- 4 Knights (2 each, may be promoted) - N/n or +N/+n
+- 4 Lances (2 each, may be promoted) - L/l or +L/+l
+- 18 Pawns (9 each, may be promoted) - P/p or +P/+p
+
+RULES FOR ANALYSIS:
+1. White (Gote, 後手) is at the TOP of the board, Black (Sente, 先手) is at the BOTTOM
+2. Pieces pointing UPWARD belong to White (gote) - use lowercase letters
+3. Pieces pointing DOWNWARD belong to Black (sente) - use UPPERCASE letters
+4. The board is 9x9, files are numbered 9-1 from left to right, ranks are a-i from top to bottom
+5. If a piece is NOT visible on the board, it MUST be in someone's hand (captured)
+6. Check the piece stands (komadai) on the sides of the board for captured pieces
+
+PIECE NOTATION:
+- K/k = King (玉/王)
+- R/r = Rook (飛)
+- B/b = Bishop (角)
+- G/g = Gold (金)
+- S/s = Silver (銀)
+- N/n = Knight (桂)
+- L/l = Lance (香)
+- P/p = Pawn (歩)
+- For promoted pieces, prefix with '+': +R/+r (dragon), +B/+b (horse), +S/+s, +N/+n, +L/+l, +P/+p (tokin)
+
+SFEN FORMAT - CRITICAL RULES:
+- Each rank MUST sum to EXACTLY 9 (pieces + empty squares)
+- Each piece counts as 1, each number represents that many empty squares
+- Promoted pieces (+P, +R, etc.) count as 1
+- Describe each rank from rank 'a' (top) to rank 'i' (bottom)
+- Within each rank, describe from file 9 (left) to file 1 (right)
+- Use numbers to indicate consecutive empty squares (e.g., '4' for 4 empty squares)
+- Separate ranks with '/'
+- After the board, add: [space][turn][space][pieces in hand][space][move count]
+  - turn: 'b' for Black to move, 'w' for White to move
+  - pieces in hand: Black's pieces first (UPPERCASE), then White's (lowercase)
+    - Format: count before piece if >1, e.g., 'R2B3P' = Rook, 2 Bishops, 3 Pawns for Black
+    - Use '-' only if NEITHER player has pieces in hand
+  - move count: typically '1' for a position from an image
+
+ROW COUNTING EXAMPLES:
+- "lnsgkgsnl" = 9 pieces = 9 ✓
+- "1r5b1" = 1 + r + 5 + b + 1 = 1+1+5+1+1 = 9 ✓
+- "ppppppppp" = 9 pieces = 9 ✓
+- "9" = 9 empty squares = 9 ✓
+- "4P4" = 4 + P + 4 = 4+1+4 = 9 ✓
+- "1r1g1g2" = 1+1+1+1+1+1+2 = 8 ✗ WRONG - missing 1!
+- "1r1g1g3" = 1+1+1+1+1+1+3 = 9 ✓ CORRECT
+
+EXAMPLE SFEN (standard starting position):
+lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1
+
+EXAMPLE with pieces in hand:
+lnsgkgsnl/1r5b1/pppp1pppp/9/9/4P4/PPPP1PPPP/1B5R1/LNSGKGSNL w p 1
+(White has 1 pawn in hand)
+
+Look carefully at:
+1. Each piece's orientation (which way it points)
+2. Whether pieces are promoted (usually shown with red/different color kanji, or flipped)
+3. The piece stands (komadai) on the sides showing captured pieces
+4. Count all pieces - if any are missing from the board, they should be in hand
+
+OUTPUT FORMAT (JSON):
+{
+    "sfen": "<the SFEN string>",
+    "confidence": "<high|medium|low>",
+    "notes": "<describe any missing/uncertain pieces, whose hand they might be in>"
+}
+
+Only output the JSON, nothing else."""
+
+        try:
+            if self.provider == "claude":
+                if not self.claude_client:
+                    raise ValueError("Claude API key not configured")
+                
+                response = self.claude_client.messages.create(
+                    model=self.model or "claude-sonnet-4-20250514",
+                    max_tokens=1024,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "image",
+                                    "source": {
+                                        "type": "base64",
+                                        "media_type": media_type,
+                                        "data": image_data,
+                                    }
+                                },
+                                {
+                                    "type": "text",
+                                    "text": prompt
+                                }
+                            ]
+                        }
+                    ]
+                )
+                result_text = response.content[0].text
+                
+            elif self.provider == "openai":
+                if not self.openai_client:
+                    raise ValueError("OpenAI API key not configured")
+                
+                # Use max_completion_tokens for newer models (gpt-5+), max_tokens for older
+                model_name = self.model or "gpt-4o"
+                is_new_model = model_name.startswith("gpt-5") or model_name.startswith("o1") or model_name.startswith("o3")
+                token_param = {"max_completion_tokens": 1024} if is_new_model else {"max_tokens": 1024}
+                
+                response = self.openai_client.chat.completions.create(
+                    model=model_name,
+                    **token_param,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:{media_type};base64,{image_data}"
+                                    }
+                                },
+                                {
+                                    "type": "text",
+                                    "text": prompt
+                                }
+                            ]
+                        }
+                    ]
+                )
+                result_text = response.choices[0].message.content
+                
+            elif self.provider == "google":
+                if not self.google_client:
+                    raise ValueError("Google API key not configured")
+                
+                # Google Gemini can accept base64 image directly
+                model = self.google_client.GenerativeModel(self.model or "gemini-1.5-pro")
+                
+                # Create image part for Gemini
+                image_part = {
+                    "mime_type": media_type,
+                    "data": image_data
+                }
+                
+                response = model.generate_content([prompt, image_part])
+                result_text = response.text
+                
+            else:
+                raise ValueError(f"Unsupported provider: {self.provider}")
+            
+            # Try to extract JSON from the response
+            json_match = re.search(r'\{[^{}]*\}', result_text, re.DOTALL)
+            if json_match:
+                result = json.loads(json_match.group())
+            else:
+                # If no JSON found, try to parse the whole response
+                result = json.loads(result_text)
+            
+            # Validate required fields
+            if 'sfen' not in result:
+                raise ValueError("No SFEN found in response")
+            
+            # Ensure confidence is valid
+            if result.get('confidence') not in ['high', 'medium', 'low']:
+                result['confidence'] = 'medium'
+            
+            return result
+            
+        except json.JSONDecodeError as e:
+            # If JSON parsing fails, try to extract SFEN from text
+            sfen_match = re.search(r'[lnsgkrp1-9+/]+\s+[bw]\s+[-\w]+\s+\d+', result_text, re.IGNORECASE)
+            if sfen_match:
+                return {
+                    'sfen': sfen_match.group(),
+                    'confidence': 'low',
+                    'notes': 'SFEN extracted from non-JSON response'
+                }
+            raise ValueError(f"Failed to parse LLM response: {e}")
+        except Exception as e:
+            raise ValueError(f"Image analysis failed: {str(e)}")

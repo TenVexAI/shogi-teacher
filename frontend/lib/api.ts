@@ -349,6 +349,42 @@ export async function updateLLMConfig(config: {
 }
 
 
+// ===== Image Analysis =====
+
+export interface ImageAnalysisResponse {
+    sfen: string;
+    confidence: 'high' | 'medium' | 'low';
+    notes?: string;
+}
+
+export async function analyzeShogiBoardImage(imageBase64: string): Promise<ImageAnalysisResponse> {
+    const response = await fetch(`${API_BASE_URL}/game/analyze-image`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ image: imageBase64 }),
+    });
+    
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Failed to analyze image');
+    }
+    
+    return response.json();
+}
+
+export async function checkLLMConfigured(): Promise<boolean> {
+    try {
+        const config = await getLLMConfig();
+        const selectedProvider = config.selected_provider;
+        const apiKey = config.api_keys?.[selectedProvider];
+        return !!apiKey && apiKey.length > 0;
+    } catch {
+        return false;
+    }
+}
+
 // ===== Game Import/Export =====
 
 export interface GameImportResponse {

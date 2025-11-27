@@ -342,3 +342,17 @@ class ComputerMoveResponse(BaseModel):
     engine_name: Optional[str] = None
     thinking_time: float = 0.0
     message: str = ""
+
+
+# ===== Image Analysis Models =====
+
+class ImageAnalysisRequest(BaseModel):
+    """Request to analyze a shogi board image"""
+    image: str  # Base64 encoded image data (data URL format)
+
+
+class ImageAnalysisResponse(BaseModel):
+    """Response from image analysis"""
+    sfen: str
+    confidence: Literal['high', 'medium', 'low']
+    notes: Optional[str] = None

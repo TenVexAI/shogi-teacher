@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { X, Upload, Users, Monitor, Bot, Settings, ArrowLeftRight, Globe } from 'lucide-react';
+import { X, Upload, Users, Monitor, Bot, Settings, ArrowLeftRight, Globe, Camera } from 'lucide-react';
 import { GameMode } from '@/types/game';
+import ImageToBoardModal from './ImageToBoardModal';
 
 interface EngineConfig {
     black: { engineId: string | null; engineName: string };
@@ -21,9 +22,11 @@ interface NewGameModalProps {
     onClose: () => void;
     onStartGame: (config: GameConfig) => void;
     onImportGame: (content: string, format?: string) => void;
+    onLoadFromSfen: (sfen: string) => void;
     currentEngineConfig: EngineConfig | null;
     onOpenEngineManagement: () => void;
     onlinePlayState?: OnlinePlayState;
+    hasLLMConfigured?: boolean;
 }
 
 export interface GameConfig {
@@ -159,9 +162,11 @@ export default function NewGameModal({
     onClose,
     onStartGame,
     onImportGame,
+    onLoadFromSfen,
     currentEngineConfig,
     onOpenEngineManagement,
     onlinePlayState,
+    hasLLMConfigured = false,
 }: NewGameModalProps) {
     // Check if we're in online P2P mode
     const isOnlineP2P = onlinePlayState?.isInGame && onlinePlayState?.isP2PConnected;
@@ -175,6 +180,7 @@ export default function NewGameModal({
     const [blackName, setBlackName] = useState(getInitialBlackName);
     const [whiteName, setWhiteName] = useState(getInitialWhiteName);
     const [showImport, setShowImport] = useState(false);
+    const [showImageToBoard, setShowImageToBoard] = useState(false);
     const [importContent, setImportContent] = useState('');
     const [importFormat, setImportFormat] = useState<string>('');
     const [handicapEnabled, setHandicapEnabled] = useState(false);
@@ -308,15 +314,28 @@ export default function NewGameModal({
                 </div>
 
                 <div className="p-6">
-                    {/* Import Game button - only shown when not importing */}
+                    {/* Import Game and Game From Image buttons - only shown when not importing */}
                     {!showImport && (
-                        <div className="flex gap-2 mb-6">
+                        <div className="flex gap-2 mb-6 flex-wrap">
                             <button
                                 onClick={() => setShowImport(true)}
                                 className="px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 bg-background-primary text-text-secondary hover:text-text-primary hover:bg-background-secondary"
                             >
                                 <Upload className="w-4 h-4" />
                                 Import Game Instead
+                            </button>
+                            <button
+                                onClick={() => setShowImageToBoard(true)}
+                                disabled={!hasLLMConfigured}
+                                className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+                                    hasLLMConfigured
+                                        ? 'bg-background-primary text-text-secondary hover:text-text-primary hover:bg-background-secondary'
+                                        : 'bg-background-primary/50 text-text-secondary/50 cursor-not-allowed'
+                                }`}
+                                title={hasLLMConfigured ? 'Load position from image' : 'Requires LLM API key configured in Settings'}
+                            >
+                                <Camera className="w-4 h-4" />
+                                Game From Image
                             </button>
                         </div>
                     )}
@@ -662,6 +681,18 @@ export default function NewGameModal({
                     )}
                 </div>
             </div>
+
+            {/* Image to Board Modal */}
+            <ImageToBoardModal
+                isOpen={showImageToBoard}
+                onClose={() => setShowImageToBoard(false)}
+                onConfirm={(sfen) => {
+                    onLoadFromSfen(sfen);
+                    setShowImageToBoard(false);
+                    onClose();
+                }}
+                hasLLMConfigured={hasLLMConfigured}
+            />
         </div>
     );
 }
