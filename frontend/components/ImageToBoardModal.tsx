@@ -14,6 +14,8 @@ interface AnalysisResult {
     sfen: string;
     confidence: string;
     notes?: string;
+    valid?: boolean;
+    validation_error?: string;
 }
 
 // Standard piece counts in shogi
@@ -95,12 +97,13 @@ export default function ImageToBoardModal({
     }, [isOpen]);
 
     // Parse SFEN into board state, hands, and validate piece counts
+    // This parser is robust and handles malformed SFEN gracefully
     const parseSfenToState = useCallback((sfen: string) => {
         const parts = sfen.split(' ');
-        const boardPart = parts[0];
+        const boardPart = parts[0] || '';
         const handPart = parts[2] || '-';
         
-        // Parse board
+        // Parse board - be forgiving of malformed rows
         const newBoard: BoardState = Array(9).fill(null).map(() => Array(9).fill(null));
         const rows = boardPart.split('/');
         
@@ -112,20 +115,24 @@ export default function ImageToBoardModal({
             while (i < row.length && colIdx < 9) {
                 const char = row[i];
                 if (char >= '1' && char <= '9') {
-                    colIdx += parseInt(char);
+                    // Limit empty squares to not exceed column 9
+                    const emptyCount = Math.min(parseInt(char), 9 - colIdx);
+                    colIdx += emptyCount;
                 } else if (char === '+') {
                     // Promoted piece
                     i++;
-                    if (i < row.length) {
+                    if (i < row.length && colIdx < 9) {
                         newBoard[rowIdx][colIdx] = '+' + row[i];
                         colIdx++;
                     }
-                } else {
+                } else if (/[a-zA-Z]/.test(char)) {
+                    // Only accept valid piece letters
                     newBoard[rowIdx][colIdx] = char;
                     colIdx++;
                 }
                 i++;
             }
+            // Note: if row has too many or too few pieces, we just stop at 9 or leave empty
         }
         
         // Parse hands
@@ -834,6 +841,14 @@ export default function ImageToBoardModal({
                                 Drag pieces to correct positions. Pieces not on the board go to hands or handicap area.
                             </p>
 
+                            {/* SFEN parsing error warning */}
+                            {analysisResult.valid === false && (
+                                <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                                    <p className="text-red-400 text-xs font-medium mb-1">⚠️ LLM generated invalid notation - please fix manually:</p>
+                                    <p className="text-red-400/80 text-xs font-mono">{analysisResult.validation_error}</p>
+                                </div>
+                            )}
+
                             {/* Validation warnings */}
                             {!validation.valid && (
                                 <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
@@ -916,23 +931,25 @@ export default function ImageToBoardModal({
                                 <div className="flex gap-3">
                                     <button
                                         onClick={() => setSelectedTurn('b')}
-                                        className={`flex-1 py-2 rounded-lg font-medium transition-colors ${
+                                        className={`flex-1 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
                                             selectedTurn === 'b'
-                                                ? 'bg-gray-800 text-white'
-                                                : 'bg-background-secondary text-text-secondary hover:text-text-primary'
+                                                ? 'bg-amber-100 ring-2 ring-amber-500'
+                                                : 'bg-background-secondary hover:bg-amber-50'
                                         }`}
                                     >
-                                        ☗ Black
+                                        <span className="text-black text-lg">☗</span>
+                                        <span className="text-gray-800">Black (Sente)</span>
                                     </button>
                                     <button
                                         onClick={() => setSelectedTurn('w')}
-                                        className={`flex-1 py-2 rounded-lg font-medium transition-colors ${
+                                        className={`flex-1 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
                                             selectedTurn === 'w'
-                                                ? 'bg-gray-200 text-gray-800'
-                                                : 'bg-background-secondary text-text-secondary hover:text-text-primary'
+                                                ? 'bg-gray-100 ring-2 ring-gray-400'
+                                                : 'bg-background-secondary hover:bg-gray-50'
                                         }`}
                                     >
-                                        ☖ White
+                                        <span className="text-gray-800 text-lg">☖</span>
+                                        <span className="text-gray-600">White (Gote)</span>
                                     </button>
                                 </div>
                             </div>

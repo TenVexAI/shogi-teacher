@@ -356,3 +356,5 @@ class ImageAnalysisResponse(BaseModel):
     sfen: str
     confidence: Literal['high', 'medium', 'low']
     notes: Optional[str] = None
+    valid: bool = True
+    validation_error: Optional[str] = None

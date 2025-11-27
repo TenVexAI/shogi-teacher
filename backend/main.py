@@ -1763,19 +1763,22 @@ async def analyze_board_image(request: ImageAnalysisRequest):
         result = teacher.analyze_board_image(request.image)
         
         # Validate the SFEN by trying to create a board
+        is_valid = True
+        validation_error = None
         try:
             shogi.Board(result['sfen'])
             # If it works, the SFEN is valid
         except Exception as e:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid SFEN detected: {result['sfen']}. Error: {str(e)}"
-            )
+            # Don't raise an error - return the SFEN anyway so user can fix it manually
+            is_valid = False
+            validation_error = str(e)
         
         return ImageAnalysisResponse(
             sfen=result['sfen'],
             confidence=result.get('confidence', 'medium'),
-            notes=result.get('notes')
+            notes=result.get('notes'),
+            valid=is_valid,
+            validation_error=validation_error
         )
         
     except HTTPException:
