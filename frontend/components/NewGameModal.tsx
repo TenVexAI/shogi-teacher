@@ -44,13 +44,6 @@ export interface GameConfig {
 // Note: "Left" from White's perspective = file 1 side (right side from Black's view)
 export const HANDICAPS = [
     {
-        id: 'sente',
-        nameEn: 'Black',
-        nameJp: '先手 (sente)',
-        description: 'Standard position, White moves first',
-        sfen: 'lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1',
-    },
-    {
         id: 'lance',
         nameEn: 'Lance',
         nameJp: '香落ち (kyō ochi)',
@@ -185,7 +178,7 @@ export default function NewGameModal({
     const [importContent, setImportContent] = useState('');
     const [importFormat, setImportFormat] = useState<string>('');
     const [handicapEnabled, setHandicapEnabled] = useState(false);
-    const [selectedHandicap, setSelectedHandicap] = useState<string>('2-piece');
+    const [selectedHandicap, setSelectedHandicap] = useState<string>('lance');
     const fileInputRef = useRef<HTMLInputElement>(null);
     
     // Track previous online state to detect changes

@@ -116,6 +116,21 @@ if analysis_cfg.get("engineId"):
         analysis_cfg.get("enabled", False)
     )
 
+# Load random move settings from preferences
+if black_cfg.get("randomMoveEnabled") is not None:
+    engine_manager.set_random_move_settings(
+        "black",
+        black_cfg.get("randomMoveEnabled", False),
+        black_cfg.get("randomMoveInterval", 10)
+    )
+
+if white_cfg.get("randomMoveEnabled") is not None:
+    engine_manager.set_random_move_settings(
+        "white",
+        white_cfg.get("randomMoveEnabled", False),
+        white_cfg.get("randomMoveInterval", 10)
+    )
+
 teacher = ClaudeTeacher()
 print("✓ Initialization complete\n")
 
@@ -720,11 +735,15 @@ async def get_engine_config():
             "engineId": engine_manager.active_engines.get("black"),
             "strengthLevel": engine_manager.strength_levels.get("black", 10),
             "customOptions": engine_manager.custom_options.get("black", {}),
+            "randomMoveEnabled": engine_manager.random_move_settings.get("black", {}).get("enabled", False),
+            "randomMoveInterval": engine_manager.random_move_settings.get("black", {}).get("interval", 10),
         },
         "white": {
             "engineId": engine_manager.active_engines.get("white"),
             "strengthLevel": engine_manager.strength_levels.get("white", 10),
             "customOptions": engine_manager.custom_options.get("white", {}),
+            "randomMoveEnabled": engine_manager.random_move_settings.get("white", {}).get("enabled", False),
+            "randomMoveInterval": engine_manager.random_move_settings.get("white", {}).get("interval", 10),
         },
         "analysis": {
             "engineId": engine_manager.active_engines.get("analysis"),
@@ -740,6 +759,8 @@ class EngineConfigUpdate(BaseModel):
     strengthLevel: int = 10  # 1-10
     customOptions: Optional[Dict[str, str]] = None  # Custom USI options
     enabled: Optional[bool] = None  # For analysis engine only
+    randomMoveEnabled: Optional[bool] = None  # For black/white: enable random mistakes
+    randomMoveInterval: Optional[int] = None  # For black/white: moves between random moves (4-20)
 
 @app.post("/engines/config")
 async def update_engine_config(config: EngineConfigUpdate):
@@ -762,6 +783,14 @@ async def update_engine_config(config: EngineConfigUpdate):
             )
         )
         
+        # Handle random move settings for black/white engines
+        if config.side in ["black", "white"]:
+            if config.randomMoveEnabled is not None or config.randomMoveInterval is not None:
+                current_settings = engine_manager.random_move_settings.get(config.side, {})
+                enabled = config.randomMoveEnabled if config.randomMoveEnabled is not None else current_settings.get("enabled", False)
+                interval = config.randomMoveInterval if config.randomMoveInterval is not None else current_settings.get("interval", 10)
+                engine_manager.set_random_move_settings(config.side, enabled, interval)
+        
         if not success:
             raise HTTPException(status_code=500, detail="Failed to set engine")
         
@@ -772,11 +801,15 @@ async def update_engine_config(config: EngineConfigUpdate):
                     "engineId": engine_manager.active_engines.get("black"),
                     "strengthLevel": engine_manager.strength_levels.get("black", 10),
                     "customOptions": engine_manager.custom_options.get("black", {}),
+                    "randomMoveEnabled": engine_manager.random_move_settings.get("black", {}).get("enabled", False),
+                    "randomMoveInterval": engine_manager.random_move_settings.get("black", {}).get("interval", 10),
                 },
                 "white": {
                     "engineId": engine_manager.active_engines.get("white"),
                     "strengthLevel": engine_manager.strength_levels.get("white", 10),
                     "customOptions": engine_manager.custom_options.get("white", {}),
+                    "randomMoveEnabled": engine_manager.random_move_settings.get("white", {}).get("enabled", False),
+                    "randomMoveInterval": engine_manager.random_move_settings.get("white", {}).get("interval", 10),
                 },
                 "analysis": {
                     "engineId": engine_manager.active_engines.get("analysis"),
@@ -848,6 +881,9 @@ def _build_game_state(board: shogi.Board, last_move_notation: Optional[str] = No
 async def create_game_session(request: GameSessionCreate):
     """Create a new game session"""
     try:
+        # Reset random move counters for new game
+        engine_manager.reset_random_move_counters()
+        
         session = session_manager.create_session(request)
         return session
     except Exception as e:

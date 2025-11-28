@@ -5,6 +5,7 @@ Manages multiple engines with hot-swapping support.
 """
 
 import json
+import random
 from pathlib import Path
 from typing import Optional, List, Dict, Callable
 from .engine_config import EngineConfig, load_engine_configs
@@ -58,6 +59,17 @@ class EngineManager:
         
         # Analysis engine state
         self.analysis_enabled = False
+        
+        # Random move settings (for learning mode)
+        self.random_move_settings = {
+            "black": {"enabled": False, "interval": 10},
+            "white": {"enabled": False, "interval": 10}
+        }
+        # Track move count for random move feature
+        self.random_move_counters = {
+            "black": 0,
+            "white": 0
+        }
         
         # Game state for synchronization
         self.current_position = "startpos"
@@ -359,6 +371,77 @@ class EngineManager:
         for engine_id in self.running_engines:
             self._sync_game_state(engine_id)
     
+    def set_random_move_settings(self, side: str, enabled: bool, interval: int) -> None:
+        """
+        Set random move settings for a side.
+        
+        Args:
+            side: "black" or "white"
+            enabled: Whether random moves are enabled
+            interval: Number of engine moves before a random move
+        """
+        if side in ["black", "white"]:
+            self.random_move_settings[side] = {
+                "enabled": enabled,
+                "interval": max(4, min(20, interval))  # Clamp to 4-20
+            }
+            print(f"✓ Random move settings for {side}: enabled={enabled}, interval={interval}")
+    
+    def reset_random_move_counters(self) -> None:
+        """Reset move counters (call when starting a new game)."""
+        self.random_move_counters = {"black": 0, "white": 0}
+    
+    def _should_make_random_move(self, side: str) -> bool:
+        """
+        Check if this move should be random based on the interval setting.
+        
+        Returns True if a random move should be made, False otherwise.
+        """
+        settings = self.random_move_settings.get(side, {})
+        if not settings.get("enabled", False):
+            return False
+        
+        interval = settings.get("interval", 10)
+        self.random_move_counters[side] += 1
+        
+        if self.random_move_counters[side] >= interval:
+            self.random_move_counters[side] = 0  # Reset counter
+            return True
+        
+        return False
+    
+    def _get_random_legal_move(self, position: str, moves: List[str] = None) -> Optional[str]:
+        """
+        Get a random legal move from the current position.
+        Uses python-shogi to generate legal moves.
+        """
+        try:
+            import shogi
+            
+            # Set up board
+            if position == "startpos":
+                board = shogi.Board()
+            else:
+                board = shogi.Board(position)
+            
+            # Apply moves
+            if moves:
+                for move_usi in moves:
+                    board.push_usi(move_usi)
+            
+            # Get all legal moves
+            legal_moves = list(board.legal_moves)
+            if not legal_moves:
+                return None
+            
+            # Pick a random move
+            random_move = random.choice(legal_moves)
+            return random_move.usi()
+            
+        except Exception as e:
+            print(f"Error getting random legal move: {e}")
+            return None
+
     def get_move(
         self,
         side: str,
@@ -386,6 +469,23 @@ class EngineManager:
         if not engine_id or engine_id not in self.running_engines:
             return None
         
+        # Check if we should make a random move instead
+        if self._should_make_random_move(side):
+            random_move = self._get_random_legal_move(self.current_position, self.move_history)
+            if random_move:
+                print(f"🎲 Random move for {side}: {random_move} (learning mode)")
+                return {
+                    "bestmove": random_move,
+                    "ponder": None,
+                    "score_cp": None,
+                    "mate": None,
+                    "depth": 0,
+                    "nodes": 0,
+                    "nps": 0,
+                    "pv": [],
+                    "is_random": True  # Flag to indicate this was a random move
+                }
+        
         process = self.running_engines[engine_id]
         
         try:
@@ -405,7 +505,8 @@ class EngineManager:
                 "depth": info.get("depth"),
                 "nodes": info.get("nodes"),
                 "nps": info.get("nps"),
-                "pv": info.get("pv", [])
+                "pv": info.get("pv", []),
+                "is_random": False
             }
         except Exception as e:
             print(f"Error getting move from {engine_id}: {e}")

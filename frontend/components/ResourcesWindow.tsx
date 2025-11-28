@@ -371,7 +371,6 @@ export default function ResourcesWindow({ isOpen, onClose, sessionId }: Resource
                 >
                   <option value="txt">Text (.txt)</option>
                   <option value="md">Markdown (.md)</option>
-                  <option value="sgf">SGF Game (.sgf)</option>
                 </select>
               </div>
             </div>
@@ -390,7 +389,7 @@ export default function ResourcesWindow({ isOpen, onClose, sessionId }: Resource
               <div className="mb-2">
                 <input
                   type="file"
-                  accept=".txt,.md,.sgf"
+                  accept=".txt,.md"
                   onChange={handleFileRead}
                   className="text-xs text-text-secondary"
                 />

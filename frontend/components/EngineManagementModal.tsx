@@ -35,11 +35,15 @@ interface EngineConfig {
     engineId: string | null;
     strengthLevel: number;
     customOptions: Record<string, string>;
+    randomMoveEnabled?: boolean;
+    randomMoveInterval?: number;
   };
   white: {
     engineId: string | null;
     strengthLevel: number;
     customOptions: Record<string, string>;
+    randomMoveEnabled?: boolean;
+    randomMoveInterval?: number;
   };
   analysis: {
     engineId: string | null;
@@ -72,8 +76,8 @@ interface SystemInfo {
 export default function EngineManagementModal({ isOpen, onClose }: EngineManagementModalProps) {
   const [engines, setEngines] = useState<Engine[]>([]);
   const [config, setConfig] = useState<EngineConfig>({
-    black: { engineId: null, strengthLevel: 10, customOptions: {} },
-    white: { engineId: null, strengthLevel: 10, customOptions: {} },
+    black: { engineId: null, strengthLevel: 10, customOptions: {}, randomMoveEnabled: false, randomMoveInterval: 10 },
+    white: { engineId: null, strengthLevel: 10, customOptions: {}, randomMoveEnabled: false, randomMoveInterval: 10 },
     analysis: { engineId: null, strengthLevel: 10, enabled: false, customOptions: {} }
   });
   const [loading, setLoading] = useState(true);
@@ -302,6 +306,60 @@ export default function EngineManagementModal({ isOpen, onClose }: EngineManagem
     setAdvancedSettingsOpen(true);
   };
 
+  const handleRandomMoveChange = async (side: 'black' | 'white', enabled: boolean, interval: number) => {
+    // Update local state immediately for responsive UI
+    setConfig(prev => ({
+      ...prev,
+      [side]: { ...prev[side], randomMoveEnabled: enabled, randomMoveInterval: interval }
+    }));
+
+    // Save to backend
+    setSaving(true);
+    setError(null);
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      const response = await fetch('http://127.0.0.1:8000/engines/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          side,
+          engineId: config[side].engineId,
+          strengthLevel: config[side].strengthLevel,
+          customOptions: config[side].customOptions,
+          randomMoveEnabled: enabled,
+          randomMoveInterval: interval
+        }),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        // Success - keep the optimistic update (don't overwrite from server)
+        // The local state was already updated at the start
+        setError(null);
+      } else {
+        // Revert on error
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        setError(`Failed to update random move settings: ${errorData.detail || response.statusText}`);
+        // Fetch fresh config to revert
+        fetchConfig();
+      }
+    } catch (error: unknown) {
+      console.error('Failed to update random move settings:', error);
+      if (error instanceof Error && error.name === 'AbortError') {
+        setError('Request timed out. Please try again.');
+      }
+      // Fetch fresh config to revert on error
+      fetchConfig();
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleSaveAdvancedSettings = async (options: Record<string, string>) => {
     const role = advancedSettingsRole;
     setSaving(true);
@@ -426,12 +484,71 @@ export default function EngineManagementModal({ isOpen, onClose }: EngineManagem
                 <div className="border-t border-border -mx-6"></div>
               )}
 
-              {/* Black Engine */}
+              {/* White Engine */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-xl font-semibold text-text-primary">Black (王)</h3>
+                  <h3 className="text-xl font-semibold text-text-primary">White (王)</h3>
                   {saving && <span className="text-xs text-text-secondary">Saving...</span>}
                 </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm text-text-secondary">Engine</label>
+                  <select
+                    value={config.white.engineId || 'none'}
+                    onChange={(e) => handleEngineChange('white', e.target.value)}
+                    className="w-full bg-background-primary border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-purple"
+                    disabled={saving}
+                  >
+                    <option value="none">No Engine</option>
+                    {engines.map(engine => (
+                      <option key={engine.id} value={engine.id}>
+                        {engine.name} - {engine.author}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {config.white.engineId && (
+                  <EngineStrengthControl
+                    engine={getSelectedEngine('white')}
+                    onStrengthChange={(level) => handleStrengthChange('white', level)}
+                    disabled={saving}
+                    customOptions={config.white.customOptions}
+                  />
+                )}
+
+                {config.white.engineId && (
+                  <EngineInfo engine={getSelectedEngine('white')} cudaStatus={cudaStatus} />
+                )}
+
+                {config.white.engineId && (
+                  <button
+                    onClick={() => handleAdvancedSettings('white')}
+                    className="flex items-center gap-2 px-4 py-2 border border-border bg-background-primary text-text-primary rounded-lg hover:bg-background-secondary transition-colors text-sm"
+                    disabled={saving}
+                  >
+                    <Settings2 className="w-4 h-4" />
+                    Advanced Settings
+                  </button>
+                )}
+
+                {config.white.engineId && (
+                  <RandomMoveControl
+                    enabled={config.white.randomMoveEnabled || false}
+                    interval={config.white.randomMoveInterval || 10}
+                    onEnabledChange={(enabled) => handleRandomMoveChange('white', enabled, config.white.randomMoveInterval || 10)}
+                    onIntervalChange={(interval) => handleRandomMoveChange('white', config.white.randomMoveEnabled || false, interval)}
+                    disabled={saving}
+                  />
+                )}
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-border" />
+
+              {/* Black Engine */}
+              <div className="space-y-4">
+                <h3 className="text-xl font-semibold text-text-primary">Black (玉)</h3>
 
                 <div className="space-y-2">
                   <label className="text-sm text-text-secondary">Engine</label>
@@ -473,54 +590,15 @@ export default function EngineManagementModal({ isOpen, onClose }: EngineManagem
                     Advanced Settings
                   </button>
                 )}
-              </div>
 
-              {/* Divider */}
-              <div className="border-t border-border" />
-
-              {/* White Engine */}
-              <div className="space-y-4">
-                <h3 className="text-xl font-semibold text-text-primary">White (玉)</h3>
-
-                <div className="space-y-2">
-                  <label className="text-sm text-text-secondary">Engine</label>
-                  <select
-                    value={config.white.engineId || 'none'}
-                    onChange={(e) => handleEngineChange('white', e.target.value)}
-                    className="w-full bg-background-primary border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-purple"
+                {config.black.engineId && (
+                  <RandomMoveControl
+                    enabled={config.black.randomMoveEnabled || false}
+                    interval={config.black.randomMoveInterval || 10}
+                    onEnabledChange={(enabled) => handleRandomMoveChange('black', enabled, config.black.randomMoveInterval || 10)}
+                    onIntervalChange={(interval) => handleRandomMoveChange('black', config.black.randomMoveEnabled || false, interval)}
                     disabled={saving}
-                  >
-                    <option value="none">No Engine</option>
-                    {engines.map(engine => (
-                      <option key={engine.id} value={engine.id}>
-                        {engine.name} - {engine.author}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {config.white.engineId && (
-                  <EngineStrengthControl
-                    engine={getSelectedEngine('white')}
-                    onStrengthChange={(level) => handleStrengthChange('white', level)}
-                    disabled={saving}
-                    customOptions={config.white.customOptions}
                   />
-                )}
-
-                {config.white.engineId && (
-                  <EngineInfo engine={getSelectedEngine('white')} cudaStatus={cudaStatus} />
-                )}
-
-                {config.white.engineId && (
-                  <button
-                    onClick={() => handleAdvancedSettings('white')}
-                    className="flex items-center gap-2 px-4 py-2 border border-border bg-background-primary text-text-primary rounded-lg hover:bg-background-secondary transition-colors text-sm"
-                    disabled={saving}
-                  >
-                    <Settings2 className="w-4 h-4" />
-                    Advanced Settings
-                  </button>
                 )}
               </div>
 
@@ -780,6 +858,80 @@ function EngineInfo({ engine, cudaStatus }: { engine: Engine | null; cudaStatus:
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function RandomMoveControl({
+  enabled,
+  interval,
+  onEnabledChange,
+  onIntervalChange,
+  disabled
+}: {
+  enabled: boolean;
+  interval: number;
+  onEnabledChange: (enabled: boolean) => void;
+  onIntervalChange: (interval: number) => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className="bg-background-primary border border-border rounded-lg p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex-1">
+          <h4 className="text-sm font-semibold text-text-primary">Introduce Random Mistakes</h4>
+          <p className="text-xs text-text-secondary mt-1">
+            Makes the engine play a random legal move periodically, creating learning opportunities
+          </p>
+        </div>
+        <label className="relative inline-flex items-center cursor-pointer ml-4">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => onEnabledChange(e.target.checked)}
+            disabled={disabled}
+            className="sr-only peer"
+          />
+          <div className="w-11 h-6 bg-background-secondary peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent-purple rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent-purple peer-disabled:opacity-50 peer-disabled:cursor-not-allowed"></div>
+        </label>
+      </div>
+
+      {enabled && (
+        <div className="space-y-2 pt-2 border-t border-border">
+          <div className="flex items-center justify-between">
+            <label className="text-sm text-text-secondary">
+              Random move every
+            </label>
+            <span className="text-sm font-mono text-accent-purple font-semibold">
+              {interval} moves
+            </span>
+          </div>
+
+          <input
+            type="range"
+            min={4}
+            max={20}
+            step={1}
+            value={interval}
+            onChange={(e) => onIntervalChange(parseInt(e.target.value))}
+            disabled={disabled}
+            className="w-full h-2 bg-background-secondary rounded-lg appearance-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 accent-accent-purple"
+            style={{
+              background: `linear-gradient(to right, #a78bfa ${((interval - 4) / 16) * 100}%, #1a1d2e ${((interval - 4) / 16) * 100}%)`
+            }}
+          />
+
+          <div className="flex justify-between text-xs text-text-secondary">
+            <span>4 (More mistakes)</span>
+            <span>20 (Fewer mistakes)</span>
+          </div>
+
+          <p className="text-xs text-text-secondary italic mt-2">
+            After every {interval} engine moves, one random legal move will be played instead. 
+            Lower values = weaker/more error-prone play.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
