@@ -108,6 +108,11 @@ export default function OnlinePlayPage() {
   const handleWebRTCAnswerRef = useRef<(answer: RTCSessionDescriptionInit) => Promise<void>>(async () => {});
   const handleWebRTCIceCandidateRef = useRef<(candidate: RTCIceCandidateInit) => Promise<void>>(async () => {});
 
+  // Set window title
+  useEffect(() => {
+    document.title = 'Shogi Teacher Online';
+  }, []);
+
   // Handle server messages - defined first so it can be referenced
   const handleServerMessage = useCallback((message: Record<string, unknown>) => {
     console.log('Server message:', message.type, message);

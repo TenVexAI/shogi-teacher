@@ -205,7 +205,7 @@ function createOnlinePlayWindow() {
     minWidth: 400,
     minHeight: 600,
     icon: path.join(__dirname, '../public/icon.png'),
-    title: 'Online Play',
+    title: 'Shogi Teacher Online',
     autoHideMenuBar: true,
     backgroundColor: '#141414',
     webPreferences: {
