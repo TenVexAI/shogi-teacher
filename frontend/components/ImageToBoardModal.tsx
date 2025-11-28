@@ -1,13 +1,16 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { X, Upload, RotateCw, Check, Loader2, AlertCircle, Camera } from 'lucide-react';
+import { X, Upload, RotateCw, Check, Loader2, AlertCircle, Camera, Edit2 } from 'lucide-react';
 
 interface ImageToBoardModalProps {
     isOpen: boolean;
     onClose: () => void;
     onConfirm: (sfen: string) => void;
     hasLLMConfigured: boolean;
+    // For custom board mode
+    mode?: 'image' | 'custom';
+    initialSfen?: string;
 }
 
 interface AnalysisResult {
@@ -45,11 +48,19 @@ const PIECE_NAMES: Record<string, string> = {
 type BoardState = (string | null)[][];
 type HandPieces = Record<string, number>;
 
+// Standard starting position SFEN
+const STARTING_SFEN = 'lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1';
+
+// Pieces that can be promoted (not King or Gold)
+const PROMOTABLE_PIECES = ['R', 'r', 'B', 'b', 'S', 's', 'N', 'n', 'L', 'l', 'P', 'p'];
+
 export default function ImageToBoardModal({
     isOpen,
     onClose,
     onConfirm,
     hasLLMConfigured,
+    mode = 'image',
+    initialSfen,
 }: ImageToBoardModalProps) {
     const [, setImageFile] = useState<File | null>(null);
     const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
@@ -77,7 +88,7 @@ export default function ImageToBoardModal({
     const fileInputRef = useRef<HTMLInputElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
-    // Reset state when modal opens/closes
+    // Reset state when modal closes
     useEffect(() => {
         if (!isOpen) {
             setImageFile(null);
@@ -194,6 +205,18 @@ export default function ImageToBoardModal({
         setRemovedPieces(newRemoved);
         setSelectedTurn(parts[1] === 'w' ? 'w' : 'b');
     }, []);
+
+    // Initialize custom board mode when modal opens
+    useEffect(() => {
+        if (isOpen && mode === 'custom') {
+            // For custom board mode, skip directly to preview with initial or starting position
+            const sfenToUse = initialSfen || STARTING_SFEN;
+            parseSfenToState(sfenToUse);
+            setStep('preview');
+            // Set a dummy analysis result to show the preview
+            setAnalysisResult({ sfen: sfenToUse, confidence: '' });
+        }
+    }, [isOpen, mode, initialSfen, parseSfenToState]);
 
     // Generate SFEN from current state
     const generateSfen = useCallback((): string => {
@@ -608,11 +631,36 @@ export default function ImageToBoardModal({
         onClose();
     };
 
+    // Toggle promotion on a piece
+    const handleTogglePromotion = (row: number, col: number) => {
+        const piece = boardState[row][col];
+        if (!piece) return;
+        
+        const isPromoted = piece.startsWith('+');
+        const basePiece = isPromoted ? piece.substring(1) : piece;
+        
+        // Check if this piece can be promoted (not King or Gold)
+        if (!PROMOTABLE_PIECES.includes(basePiece)) {
+            return; // Kings and Golds cannot be promoted
+        }
+        
+        // Toggle promotion
+        const newPiece = isPromoted ? basePiece : '+' + basePiece;
+        
+        setBoardState(prev => {
+            const newBoard = prev.map(r => [...r]);
+            newBoard[row][col] = newPiece;
+            return newBoard;
+        });
+    };
+
     // Render a piece cell for the interactive board
     const renderPieceCell = (piece: string | null, row: number, col: number) => {
         const isBlack = piece && piece.replace('+', '') === piece.replace('+', '').toUpperCase();
         const displayChar = piece ? (PIECE_NAMES[piece] || piece.replace('+', '')) : '';
         const isPromoted = piece?.startsWith('+');
+        const basePiece = piece ? (isPromoted ? piece.substring(1) : piece) : null;
+        const canPromote = basePiece && PROMOTABLE_PIECES.includes(basePiece);
         
         return (
             <div
@@ -626,7 +674,11 @@ export default function ImageToBoardModal({
                 onDragStart={() => piece && handleDragStart(piece, 'board', row, col)}
                 onDragOver={handleDragOver}
                 onDrop={() => handleDropOnBoard(row, col)}
-                title={piece ? `${piece} (${displayChar})` : `${9-col}${String.fromCharCode(97+row)}`}
+                onClick={() => piece && canPromote && handleTogglePromotion(row, col)}
+                title={piece 
+                    ? `${piece} (${displayChar})${canPromote ? ' - Click to ' + (isPromoted ? 'demote' : 'promote') : ''}` 
+                    : `${9-col}${String.fromCharCode(97+row)}`
+                }
             >
                 <span className={`text-xs font-bold ${isPromoted ? 'text-red-400' : ''}`}>
                     {displayChar}
@@ -700,8 +752,17 @@ export default function ImageToBoardModal({
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b border-border">
                     <h2 className="text-xl font-bold text-text-primary flex items-center gap-2">
-                        <Camera className="w-5 h-5" />
-                        Game From Image
+                        {mode === 'custom' ? (
+                            <>
+                                <Edit2 className="w-5 h-5" />
+                                Custom Board
+                            </>
+                        ) : (
+                            <>
+                                <Camera className="w-5 h-5" />
+                                Game From Image
+                            </>
+                        )}
                     </h2>
                     <button
                         onClick={onClose}
@@ -834,11 +895,14 @@ export default function ImageToBoardModal({
                         </div>
                     )}
 
-                    {/* Step 3: Preview */}
+                    {/* Step 3: Preview / Board Editor */}
                     {step === 'preview' && analysisResult && (
                         <div className="space-y-4">
                             <p className="text-text-secondary text-sm">
-                                Drag pieces to correct positions. Pieces not on the board go to hands or handicap area.
+                                {mode === 'custom' 
+                                    ? 'Set up your custom board position. Drag pieces to move them, click to promote/demote.'
+                                    : 'Drag pieces to correct positions. Pieces not on the board go to hands or handicap area.'
+                                }
                             </p>
 
                             {/* SFEN parsing error warning */}
@@ -895,7 +959,8 @@ export default function ImageToBoardModal({
                                     <div className="text-xs text-text-secondary mt-2">
                                         <span className="text-text-primary font-bold">Black (☗)</span> | 
                                         <span className="text-accent-cyan ml-1">White (☖)</span> |
-                                        <span className="text-red-400 ml-1">Promoted</span>
+                                        <span className="text-red-400 ml-1">Promoted</span> |
+                                        <span className="text-accent-purple ml-1">Click piece to promote/demote</span>
                                     </div>
                                 </div>
                             </div>
@@ -970,12 +1035,21 @@ export default function ImageToBoardModal({
                             )}
 
                             <div className="flex justify-between gap-3">
-                                <button
-                                    onClick={handleBack}
-                                    className="px-4 py-2 bg-background-primary border border-border rounded-lg text-text-secondary hover:text-text-primary transition-colors"
-                                >
-                                    ← Try Again
-                                </button>
+                                {mode !== 'custom' ? (
+                                    <button
+                                        onClick={handleBack}
+                                        className="px-4 py-2 bg-background-primary border border-border rounded-lg text-text-secondary hover:text-text-primary transition-colors"
+                                    >
+                                        ← Try Again
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={onClose}
+                                        className="px-4 py-2 bg-background-primary border border-border rounded-lg text-text-secondary hover:text-text-primary transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                )}
                                 <button
                                     onClick={handleConfirm}
                                     className="flex items-center gap-2 px-6 py-2 bg-accent-green text-black rounded-lg font-medium hover:bg-[#2ed970] transition-colors"

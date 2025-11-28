@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { X, Upload, Users, Monitor, Bot, Settings, ArrowLeftRight, Globe, Camera } from 'lucide-react';
+import { X, Upload, Users, Monitor, Bot, Settings, ArrowLeftRight, Globe, Camera, Edit2 } from 'lucide-react';
 import { GameMode } from '@/types/game';
 import ImageToBoardModal from './ImageToBoardModal';
 
@@ -181,6 +181,7 @@ export default function NewGameModal({
     const [whiteName, setWhiteName] = useState(getInitialWhiteName);
     const [showImport, setShowImport] = useState(false);
     const [showImageToBoard, setShowImageToBoard] = useState(false);
+    const [showCustomBoard, setShowCustomBoard] = useState(false);
     const [importContent, setImportContent] = useState('');
     const [importFormat, setImportFormat] = useState<string>('');
     const [handicapEnabled, setHandicapEnabled] = useState(false);
@@ -336,6 +337,14 @@ export default function NewGameModal({
                             >
                                 <Camera className="w-4 h-4" />
                                 Game From Image
+                            </button>
+                            <button
+                                onClick={() => setShowCustomBoard(true)}
+                                className="px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 bg-background-primary text-text-secondary hover:text-text-primary hover:bg-background-secondary"
+                                title="Set up a custom board position"
+                            >
+                                <Edit2 className="w-4 h-4" />
+                                Custom Board
                             </button>
                         </div>
                     )}
@@ -692,6 +701,19 @@ export default function NewGameModal({
                     onClose();
                 }}
                 hasLLMConfigured={hasLLMConfigured}
+            />
+
+            {/* Custom Board Modal */}
+            <ImageToBoardModal
+                isOpen={showCustomBoard}
+                onClose={() => setShowCustomBoard(false)}
+                onConfirm={(sfen) => {
+                    onLoadFromSfen(sfen);
+                    setShowCustomBoard(false);
+                    onClose();
+                }}
+                hasLLMConfigured={true} // Not needed for custom mode
+                mode="custom"
             />
         </div>
     );
