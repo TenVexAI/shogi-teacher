@@ -358,26 +358,39 @@ async def analyze_for_game_record(request: GameAnalysisRequest):
                 analysis['bestmove_notation'] = analysis['bestmove']
         
         # Parse info_lines for MultiPV alternatives
-        alternatives = []
+        # Use dict to keep only the last (deepest) info for each multipv
+        alternatives_dict = {}
         info_lines = analysis.get('info_lines', [])
         
+        print(f"[DEBUG] Got {len(info_lines)} info lines from engine")
+        if info_lines:
+            # Show last few lines for debugging
+            for line in info_lines[-5:]:
+                print(f"[DEBUG] Info line: {line[:150]}...")
+        
         for line in info_lines:
-            # Look for multipv lines with score and pv
-            if 'multipv' in line and 'score cp' in line and ' pv ' in line:
+            # Look for lines with score and pv (multipv might not always be present)
+            if 'score cp' in line and ' pv ' in line:
                 try:
-                    # Extract multipv number
+                    # Extract multipv number (default to 1 if not present)
                     multipv_match = re.search(r'multipv (\d+)', line)
                     # Extract score
                     score_match = re.search(r'score cp (-?\d+)', line)
-                    # Extract pv (first move)
-                    pv_match = re.search(r' pv (\S+)', line)
+                    # Extract full pv (all moves after " pv ")
+                    pv_match = re.search(r' pv (.+)$', line)
                     
-                    if multipv_match and score_match and pv_match:
-                        multipv = int(multipv_match.group(1))
+                    if score_match and pv_match:
+                        # Default to multipv 1 if not specified
+                        multipv = int(multipv_match.group(1)) if multipv_match else 1
                         score_cp = int(score_match.group(1))
-                        move_usi = pv_match.group(1)
+                        pv_moves = pv_match.group(1).strip().split()
                         
-                        # Convert to notation
+                        if not pv_moves:
+                            continue
+                            
+                        move_usi = pv_moves[0]
+                        
+                        # Convert first move to notation
                         try:
                             move = shogi.Move.from_usi(move_usi)
                             if move in board.legal_moves:
@@ -387,19 +400,51 @@ async def analyze_for_game_record(request: GameAnalysisRequest):
                         except:
                             move_notation = move_usi
                         
-                        alternatives.append({
+                        # Convert continuation moves (up to 5 more moves)
+                        continuation = []
+                        temp_board = shogi.Board(board.sfen())
+                        for pv_move in pv_moves[:6]:  # First move + 5 continuation
+                            try:
+                                m = shogi.Move.from_usi(pv_move)
+                                if m in temp_board.legal_moves:
+                                    notation = usi_to_standard_notation(temp_board, m)
+                                    continuation.append(notation)
+                                    temp_board.push(m)
+                                else:
+                                    continuation.append(pv_move)
+                                    break
+                            except:
+                                continuation.append(pv_move)
+                                break
+                        
+                        # Store by multipv key - later entries overwrite earlier (deeper search)
+                        alternatives_dict[multipv] = {
                             'multipv': multipv,
                             'move_usi': move_usi,
                             'move_notation': move_notation,
-                            'score_cp': score_cp
-                        })
+                            'score_cp': score_cp,
+                            'continuation': continuation  # Full line
+                        }
                 except Exception as e:
                     print(f"Error parsing info line: {e}")
                     continue
         
-        # Sort by multipv and take top alternatives (skip first if it's the best move)
-        alternatives.sort(key=lambda x: x['multipv'])
-        analysis['alternatives'] = alternatives[:5]  # Top 5 alternatives
+        # Convert dict to sorted list and take top 5
+        alternatives = sorted(alternatives_dict.values(), key=lambda x: x['multipv'])
+        
+        # Fallback: if no alternatives found, create one from bestmove
+        if not alternatives and analysis.get('bestmove'):
+            print("[DEBUG] No alternatives parsed, creating from bestmove")
+            alternatives = [{
+                'multipv': 1,
+                'move_usi': analysis['bestmove'],
+                'move_notation': analysis.get('bestmove_notation', analysis['bestmove']),
+                'score_cp': analysis.get('score_cp', 0),
+                'continuation': [analysis.get('bestmove_notation', analysis['bestmove'])]
+            }]
+        
+        print(f"[DEBUG] Returning {len(alternatives)} alternatives")
+        analysis['alternatives'] = alternatives[:5]
         
         return analysis
     except HTTPException:
@@ -1602,8 +1647,7 @@ async def parse_game(request: GameParseRequest):
                 if move not in board.legal_moves:
                     continue
                 
-                # Get algebraic notation
-                from notation_converter import usi_to_standard_notation
+                # Get algebraic notation (function defined earlier in this file)
                 move_notation = usi_to_standard_notation(board, move)
                 
                 # Make the move

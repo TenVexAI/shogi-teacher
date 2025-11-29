@@ -27,6 +27,7 @@ interface MoveAnalysis {
     move_usi: string;
     move_notation: string;
     eval: number;
+    continuation?: string[];  // Full PV line
   }>;
   analyzed: boolean;
 }
@@ -62,6 +63,12 @@ export default function AnalysisPage() {
   
   // UI state
   const [showLoadDialog, setShowLoadDialog] = useState(true);
+  const [pendingCurrentGame, setPendingCurrentGame] = useState<{
+    moves: Array<{ move_usi: string; move_notation: string; sfen_after: string }>;
+    startingSfen?: string;
+    blackName?: string;
+    whiteName?: string;
+  } | null>(null);
   
   // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -124,10 +131,17 @@ export default function AnalysisPage() {
     if (!electron) return;
     
     const unsubscribe = electron.onAnalysisInitialData((data) => {
-      if (data.type === 'current_game' && data.moves) {
-        loadGameFromMoves(data.moves, data.startingSfen, data.blackName, data.whiteName);
-        setShowLoadDialog(false);
+      // Store current game data if available, but don't auto-load
+      // User will choose whether to analyze current game or load from file
+      if (data.type === 'current_game' && data.moves && data.moves.length > 0) {
+        setPendingCurrentGame({
+          moves: data.moves,
+          startingSfen: data.startingSfen,
+          blackName: data.blackName,
+          whiteName: data.whiteName,
+        });
       }
+      // Always show load dialog so user can choose
     });
     
     return unsubscribe;
@@ -203,9 +217,17 @@ export default function AnalysisPage() {
   };
 
   const handleLoadCurrentGame = () => {
-    // Request current game from main window
-    // This will be populated via the initial data mechanism
-    alert('Please use the main app to open this window with the current game.');
+    if (pendingCurrentGame && pendingCurrentGame.moves.length > 0) {
+      loadGameFromMoves(
+        pendingCurrentGame.moves,
+        pendingCurrentGame.startingSfen,
+        pendingCurrentGame.blackName,
+        pendingCurrentGame.whiteName
+      );
+      setShowLoadDialog(false);
+    } else {
+      alert('No current game available. Please load a game file instead.');
+    }
   };
 
   // Effect to start analysis when game data is loaded
@@ -291,15 +313,16 @@ export default function AnalysisPage() {
             ...analyzedMoves[i],
             quality,
             eval_before: evalBefore,
-            eval_after: evalAfterOurPov, // Store from our perspective
+            eval_after: evalAfter, // Store raw engine value (from opponent's POV after move)
             cp_loss: cpLoss,
             played_best_move: playedBestMove,
             best_move: analysis.bestmove,
             best_move_notation: analysis.bestmove_notation || analysis.bestmove,
-            alternatives: analysis.alternatives?.slice(0, 5).map((alt: { move_usi: string; move_notation: string; score_cp: number }) => ({
+            alternatives: analysis.alternatives?.slice(0, 5).map((alt: { move_usi: string; move_notation: string; score_cp: number; continuation?: string[] }) => ({
               move_usi: alt.move_usi,
               move_notation: alt.move_notation,
               eval: alt.score_cp,
+              continuation: alt.continuation,
             })),
             analyzed: true,
           };
@@ -374,9 +397,16 @@ export default function AnalysisPage() {
           <div className="space-y-4">
             <button
               onClick={handleLoadCurrentGame}
-              className="w-full py-3 px-4 bg-accent-purple hover:bg-accent-purple/80 text-white rounded-lg font-medium transition-colors"
+              disabled={!pendingCurrentGame}
+              className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
+                pendingCurrentGame
+                  ? 'bg-accent-purple hover:bg-accent-purple/80 text-white'
+                  : 'bg-background-primary border border-border text-text-secondary cursor-not-allowed'
+              }`}
             >
-              Analyze Current Game
+              {pendingCurrentGame 
+                ? `Analyze Current Game (${pendingCurrentGame.moves.length} moves)`
+                : 'No Current Game Available'}
             </button>
             
             <div className="relative">
@@ -566,14 +596,35 @@ export default function AnalysisPage() {
             {/* Center line (equal position) */}
             <div className="absolute left-0 right-0 top-1/2 h-px bg-border" />
             
-            {/* Evaluation line - show only selected player's moves */}
+            {/* Evaluation line - show only selected player's moves that have been analyzed */}
             {gameData && gameData.moves.length > 0 && (() => {
               const isBlackSelected = selectedMoveIndex === -1 || selectedMoveIndex % 2 === 0;
-              const playerMoves = gameData.moves
+              // Get all analyzed moves with their indices
+              const allMoves = gameData.moves
                 .map((m, i) => ({ ...m, originalIndex: i }))
-                .filter((_, i) => isBlackSelected ? i % 2 === 0 : i % 2 === 1);
+                .filter(m => m.analyzed && m.eval_after !== null);
+              
+              // Filter to selected player's moves
+              const playerMoves = allMoves.filter(m => 
+                isBlackSelected ? m.originalIndex % 2 === 0 : m.originalIndex % 2 === 1
+              );
               
               if (playerMoves.length === 0) return null;
+              
+              // Build points, using last known value for any gaps
+              const points: string[] = [];
+              playerMoves.forEach((m, i) => {
+                // eval_after is raw engine value (from side-to-move after this move)
+                // For Black's move: engine returned from White's POV, flip to get Black's
+                // For White's move: engine returned from Black's POV, already Black's
+                const eval_cp = m.eval_after!;
+                const isBlackMove = m.originalIndex % 2 === 0;
+                // Normalize to Black's perspective
+                const blackPovEval = isBlackMove ? -eval_cp : eval_cp;
+                // Then flip to selected player's perspective for display
+                const displayEval = isBlackSelected ? blackPovEval : -blackPovEval;
+                points.push(`${i},${100 - getEvalForGraph(displayEval)}`);
+              });
               
               return (
                 <svg 
@@ -586,14 +637,7 @@ export default function AnalysisPage() {
                     stroke={isBlackSelected ? '#a78bfa' : '#60a5fa'}
                     strokeWidth="2"
                     vectorEffect="non-scaling-stroke"
-                    points={playerMoves
-                      .map((m, i) => {
-                        // Normalize eval to be from selected player's perspective
-                        const eval_cp = m.eval_after || 0;
-                        const normalizedEval = isBlackSelected ? eval_cp : -eval_cp;
-                        return `${i},${100 - getEvalForGraph(normalizedEval)}`;
-                      })
-                      .join(' ')}
+                    points={points.join(' ')}
                   />
                 </svg>
               );
@@ -602,16 +646,23 @@ export default function AnalysisPage() {
             {/* Current position indicator */}
             {gameData && selectedMoveIndex >= 0 && (() => {
               const isBlackSelected = selectedMoveIndex % 2 === 0;
-              const playerMoves = gameData.moves.filter((_, i) => isBlackSelected ? i % 2 === 0 : i % 2 === 1);
-              const playerMoveIndex = Math.floor(selectedMoveIndex / 2);
+              // Use same filter as the graph line - only analyzed moves with eval data
+              const analyzedPlayerMoves = gameData.moves
+                .map((m, i) => ({ ...m, originalIndex: i }))
+                .filter(m => m.analyzed && m.eval_after !== null)
+                .filter(m => isBlackSelected ? m.originalIndex % 2 === 0 : m.originalIndex % 2 === 1);
               
-              if (playerMoves.length === 0) return null;
+              if (analyzedPlayerMoves.length === 0) return null;
+              
+              // Find position of current move in the filtered list
+              const currentPosInFiltered = analyzedPlayerMoves.findIndex(m => m.originalIndex === selectedMoveIndex);
+              if (currentPosInFiltered === -1) return null;
               
               return (
                 <div 
                   className="absolute top-0 bottom-0 w-px bg-accent-cyan"
                   style={{ 
-                    left: `${((playerMoveIndex + 0.5) / playerMoves.length) * 100}%` 
+                    left: `${((currentPosInFiltered + 0.5) / analyzedPlayerMoves.length) * 100}%` 
                   }}
                 />
               );
@@ -694,10 +745,12 @@ export default function AnalysisPage() {
                         </div>
                       )}
                       
-                      {/* Centipawn loss */}
+                      {/* Centipawn change */}
                       {cpLoss !== null && (
                         <div className="flex justify-between">
-                          <span className="text-text-secondary">Centipawn loss:</span>
+                          <span className="text-text-secondary">
+                            {cpLoss <= 0 ? 'Centipawn gain:' : 'Centipawn loss:'}
+                          </span>
                           <span className={`font-mono ${
                             cpLoss <= 0 ? 'text-cyan-400' :
                             cpLoss <= 10 ? 'text-green-400' :
@@ -711,10 +764,10 @@ export default function AnalysisPage() {
                         </div>
                       )}
                       
-                      {/* Position eval before/after */}
+                      {/* Position eval before/after - both normalized to Black's perspective */}
                       <div className="border-t border-border pt-2 mt-2">
                         <div className="flex justify-between">
-                          <span className="text-text-secondary">Eval before:</span>
+                          <span className="text-text-secondary">Position before (Black POV):</span>
                           <span className="text-text-primary font-mono">
                             {move.eval_before !== null
                               ? `${move.eval_before > 0 ? '+' : ''}${move.eval_before}cp`
@@ -722,10 +775,10 @@ export default function AnalysisPage() {
                           </span>
                         </div>
                         <div className="flex justify-between mt-1">
-                          <span className="text-text-secondary">Eval after:</span>
+                          <span className="text-text-secondary">Position after (Black POV):</span>
                           <span className="text-text-primary font-mono">
                             {move.eval_after !== null
-                              ? `${move.eval_after > 0 ? '+' : ''}${move.eval_after}cp`
+                              ? `${-move.eval_after > 0 ? '+' : ''}${-move.eval_after}cp`
                               : '—'}
                           </span>
                         </div>
@@ -746,14 +799,22 @@ export default function AnalysisPage() {
                     {gameData.moves[selectedMoveIndex].alternatives && 
                      gameData.moves[selectedMoveIndex].alternatives!.length > 0 ? (
                       gameData.moves[selectedMoveIndex].alternatives!.map((alt, i) => {
-                        const isBlackMove = selectedMoveIndex % 2 === 0;
-                        const normalizedEval = isBlackMove ? alt.eval : -alt.eval;
+                        // Scores are from the moving player's perspective (how they see the position)
+                        const evalScore = alt.eval;
+                        const continuation = alt.continuation || [];
                         return (
-                          <div key={i} className="bg-background-primary rounded-lg p-2 flex justify-between items-center">
-                            <span className="font-mono">{alt.move_notation || alt.move_usi}</span>
-                            <span className="text-sm font-mono text-text-secondary">
-                              {normalizedEval > 0 ? '+' : ''}{normalizedEval}
-                            </span>
+                          <div key={i} className="bg-background-primary rounded-lg p-2">
+                            <div className="flex justify-between items-center">
+                              <span className="font-mono font-semibold">{alt.move_notation || alt.move_usi}</span>
+                              <span className={`text-sm font-mono ${evalScore > 0 ? 'text-green-400' : evalScore < 0 ? 'text-red-400' : 'text-text-secondary'}`}>
+                                {evalScore > 0 ? '+' : ''}{evalScore}cp
+                              </span>
+                            </div>
+                            {continuation.length > 1 && (
+                              <div className="text-xs text-text-secondary mt-1 font-mono truncate">
+                                → {continuation.slice(1).join(' ')}
+                              </div>
+                            )}
                           </div>
                         );
                       })
