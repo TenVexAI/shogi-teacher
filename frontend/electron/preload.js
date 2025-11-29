@@ -42,5 +42,13 @@ contextBridge.exposeInMainWorld('electron', {
   },
   
   // File save with dialog
-  saveFile: (content, defaultFilename, filters) => ipcRenderer.invoke('save-file', { content, defaultFilename, filters })
+  saveFile: (content, defaultFilename, filters) => ipcRenderer.invoke('save-file', { content, defaultFilename, filters }),
+  
+  // Analysis window management
+  openAnalysisWindow: (initialData) => ipcRenderer.invoke('open-analysis-window', initialData),
+  getAnalysisWindowCount: () => ipcRenderer.invoke('get-analysis-window-count'),
+  onAnalysisInitialData: (callback) => {
+    ipcRenderer.on('analysis-initial-data', (event, data) => callback(data));
+    return () => ipcRenderer.removeAllListeners('analysis-initial-data');
+  }
 });

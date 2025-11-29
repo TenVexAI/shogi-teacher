@@ -695,11 +695,14 @@ class EngineManager:
             return None
     
     def _analyze_with_callback(self, process, position: str, moves: List[str], 
-                               movetime: int) -> Optional[Dict]:
+                               movetime: int, multipv: int = 5) -> Optional[Dict]:
         """
         Analyze position and collect all info lines (for MultiPV).
         """
         try:
+            # Set MultiPV option for multiple lines
+            process.set_option("MultiPV", str(multipv))
+            
             # Set position
             process.set_position(position, moves)
             
@@ -726,6 +729,9 @@ class EngineManager:
                 "pv": final_info.get("pv", []),
                 "info_lines": info_lines  # For MultiPV parsing
             }
+            
+            # Reset MultiPV back to 1
+            process.set_option("MultiPV", "1")
             
             # Restore game state
             if hasattr(self, 'current_position') and hasattr(self, 'move_history'):

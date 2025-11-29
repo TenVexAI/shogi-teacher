@@ -308,6 +308,109 @@ async def explain_position(sfen: str, analysis: Dict[str, Any]):
     explanation = await teacher.explain(sfen, analysis)
     return {"explanation": explanation}
 
+class GameAnalysisRequest(BaseModel):
+    sfen: str
+    movetime: int = 1000
+
+@app.post("/game/analyze")
+async def analyze_for_game_record(request: GameAnalysisRequest):
+    """
+    Analyze a position using the ANALYSIS engine (Engine 3).
+    Used for game record analysis window.
+    """
+    try:
+        import re
+        
+        # Parse SFEN to extract position and moves
+        parts = request.sfen.split(" moves ")
+        position = parts[0]
+        moves = parts[1].split() if len(parts) > 1 else []
+        
+        # Use the analyst engine specifically (Engine 3)
+        analysis = engine_manager.request_post_move_analysis(
+            position=position,
+            moves=moves,
+            movetime=request.movetime
+        )
+        
+        if not analysis:
+            raise HTTPException(status_code=500, detail="Analysis engine not available")
+        
+        # Create board at this position to convert moves
+        board = shogi.Board(position)
+        for m in moves:
+            try:
+                move = shogi.Move.from_usi(m)
+                if move in board.legal_moves:
+                    board.push(move)
+            except:
+                pass
+        
+        # Convert bestmove to notation
+        if analysis.get('bestmove'):
+            try:
+                best_move = shogi.Move.from_usi(analysis['bestmove'])
+                if best_move in board.legal_moves:
+                    analysis['bestmove_notation'] = usi_to_standard_notation(board, best_move)
+                else:
+                    analysis['bestmove_notation'] = analysis['bestmove']
+            except:
+                analysis['bestmove_notation'] = analysis['bestmove']
+        
+        # Parse info_lines for MultiPV alternatives
+        alternatives = []
+        info_lines = analysis.get('info_lines', [])
+        
+        for line in info_lines:
+            # Look for multipv lines with score and pv
+            if 'multipv' in line and 'score cp' in line and ' pv ' in line:
+                try:
+                    # Extract multipv number
+                    multipv_match = re.search(r'multipv (\d+)', line)
+                    # Extract score
+                    score_match = re.search(r'score cp (-?\d+)', line)
+                    # Extract pv (first move)
+                    pv_match = re.search(r' pv (\S+)', line)
+                    
+                    if multipv_match and score_match and pv_match:
+                        multipv = int(multipv_match.group(1))
+                        score_cp = int(score_match.group(1))
+                        move_usi = pv_match.group(1)
+                        
+                        # Convert to notation
+                        try:
+                            move = shogi.Move.from_usi(move_usi)
+                            if move in board.legal_moves:
+                                move_notation = usi_to_standard_notation(board, move)
+                            else:
+                                move_notation = move_usi
+                        except:
+                            move_notation = move_usi
+                        
+                        alternatives.append({
+                            'multipv': multipv,
+                            'move_usi': move_usi,
+                            'move_notation': move_notation,
+                            'score_cp': score_cp
+                        })
+                except Exception as e:
+                    print(f"Error parsing info line: {e}")
+                    continue
+        
+        # Sort by multipv and take top alternatives (skip first if it's the best move)
+        alternatives.sort(key=lambda x: x['multipv'])
+        analysis['alternatives'] = alternatives[:5]  # Top 5 alternatives
+        
+        return analysis
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = f"Analysis error: {type(e).__name__}: {str(e)}"
+        print(error_msg)
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=error_msg)
+
 class ConversationHistoryRequest(BaseModel):
     user_question: Optional[str] = None
     conversation_history: Optional[List[Dict[str, str]]] = None
@@ -1445,6 +1548,94 @@ async def toggle_session_reference(session_id: str, file_id: int, enabled: bool,
 
 
 # ===== Game Import/Export Endpoints =====
+
+class GameParseRequest(BaseModel):
+    content: str
+    format: Optional[str] = None
+
+class ParsedMoveResponse(BaseModel):
+    move_number: int
+    player: str
+    move_usi: str
+    move_notation: Optional[str] = None
+    sfen_after: str
+    time_spent: Optional[int] = None
+
+class GameParseResponse(BaseModel):
+    success: bool
+    message: str
+    moves: Optional[List[ParsedMoveResponse]] = None
+    starting_sfen: Optional[str] = None
+    black_name: Optional[str] = None
+    white_name: Optional[str] = None
+    detected_format: Optional[str] = None
+
+@app.post("/game/parse", response_model=GameParseResponse)
+async def parse_game(request: GameParseRequest):
+    """
+    Parse a game file without creating a session.
+    Returns the moves and metadata for analysis.
+    """
+    try:
+        from game_formats import parse_game_file, detect_format
+        
+        # Detect format if not specified
+        detected_format = request.format or detect_format(request.content)
+        
+        # Parse the game file
+        try:
+            record = parse_game_file(request.content, detected_format)
+        except Exception as e:
+            return GameParseResponse(
+                success=False,
+                message=f"Failed to parse {detected_format.upper()} file: {str(e)}",
+                detected_format=detected_format
+            )
+        
+        # Replay moves to get SFEN after each move
+        board = shogi.Board(record.starting_sfen)
+        moves_with_sfen = []
+        
+        for parsed_move in record.moves:
+            try:
+                move = shogi.Move.from_usi(parsed_move.move_usi)
+                if move not in board.legal_moves:
+                    continue
+                
+                # Get algebraic notation
+                from notation_converter import usi_to_standard_notation
+                move_notation = usi_to_standard_notation(board, move)
+                
+                # Make the move
+                board.push(move)
+                
+                moves_with_sfen.append(ParsedMoveResponse(
+                    move_number=parsed_move.move_number,
+                    player=parsed_move.player,
+                    move_usi=parsed_move.move_usi,
+                    move_notation=move_notation,
+                    sfen_after=board.sfen(),
+                    time_spent=parsed_move.time_spent
+                ))
+            except Exception as e:
+                print(f"Error parsing move {parsed_move.move_usi}: {e}")
+                continue
+        
+        return GameParseResponse(
+            success=True,
+            message=f"Successfully parsed {len(moves_with_sfen)} moves",
+            moves=moves_with_sfen,
+            starting_sfen=record.starting_sfen,
+            black_name=record.metadata.black_name,
+            white_name=record.metadata.white_name,
+            detected_format=detected_format
+        )
+        
+    except Exception as e:
+        return GameParseResponse(
+            success=False,
+            message=f"Error parsing game: {str(e)}"
+        )
 
 @app.post("/game/import", response_model=GameImportResponse)
 async def import_game(request: GameImportRequest):

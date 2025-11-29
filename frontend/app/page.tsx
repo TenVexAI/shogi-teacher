@@ -1406,6 +1406,28 @@ export default function Home() {
     }
   };
 
+  const handleOpenAnalysis = async () => {
+    // Check if running in Electron
+    if (typeof window !== 'undefined' && window.electron) {
+      // Open analysis window with current game data
+      const initialData = {
+        type: 'current_game' as const,
+        moves: moveHistory.map(m => ({
+          move_usi: m.move, // MoveRecord uses 'move' for the move string
+          move_notation: m.move,
+          sfen_after: m.sfen,
+        })),
+        startingSfen: 'lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1',
+        blackName: currentSession?.black_name || 'Black',
+        whiteName: currentSession?.white_name || 'White',
+      };
+      await window.electron.openAnalysisWindow(initialData);
+    } else {
+      // In browser, open in new tab
+      window.open('/analysis', '_blank');
+    }
+  };
+
   const handleOpenEngineManagement = () => {
     // Auto-pause clock when opening engine management
     if (isClockRunning) {
@@ -1808,6 +1830,7 @@ export default function Home() {
             onOpenEngineManagement={handleOpenEngineManagement}
             onOpenGameModeSettings={handleOpenGameModeSettings}
             onOpenExport={() => setIsExportModalOpen(true)}
+            onOpenAnalysis={handleOpenAnalysis}
             isOnlineP2PConnected={onlinePlayState.isInGame && onlinePlayState.isP2PConnected}
           />
 

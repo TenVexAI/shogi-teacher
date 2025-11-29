@@ -9,6 +9,8 @@ const isDev = process.env.NODE_ENV === 'development';
 let mainWindow;
 let learnWindow = null;
 let onlinePlayWindow = null;
+let analysisWindows = new Map(); // Track multiple analysis windows by ID
+let analysisWindowCounter = 0;
 let backendProcess = null;
 const BACKEND_PORT = 8000;
 const BACKEND_URL = `http://localhost:${BACKEND_PORT}`;
@@ -268,6 +270,60 @@ ipcMain.handle('send-to-main-window', (event, message) => {
     return true;
   }
   return false;
+});
+
+// Create analysis window (can have multiple)
+function createAnalysisWindow(initialData = null) {
+  const windowId = ++analysisWindowCounter;
+  
+  const analysisWindow = new BrowserWindow({
+    width: 1400,
+    height: 900,
+    minWidth: 1200,
+    minHeight: 700,
+    icon: path.join(__dirname, '../public/icon.png'),
+    title: 'Game Record Analysis',
+    autoHideMenuBar: true,
+    backgroundColor: '#141414',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js')
+    }
+  });
+
+  // Store window with its ID
+  analysisWindows.set(windowId, { window: analysisWindow, initialData });
+
+  const analysisUrl = isDev ? 'http://localhost:3000/analysis' : path.join(__dirname, '../out/analysis/index.html');
+  
+  if (isDev) {
+    analysisWindow.loadURL(analysisUrl);
+  } else {
+    analysisWindow.loadFile(analysisUrl);
+  }
+
+  // Send initial data once the window is ready
+  analysisWindow.webContents.on('did-finish-load', () => {
+    if (initialData) {
+      analysisWindow.webContents.send('analysis-initial-data', initialData);
+    }
+  });
+
+  analysisWindow.on('closed', () => {
+    analysisWindows.delete(windowId);
+  });
+
+  return windowId;
+}
+
+// Analysis Window IPC Handlers
+ipcMain.handle('open-analysis-window', (event, initialData) => {
+  return createAnalysisWindow(initialData);
+});
+
+ipcMain.handle('get-analysis-window-count', () => {
+  return analysisWindows.size;
 });
 
 // Save file with dialog

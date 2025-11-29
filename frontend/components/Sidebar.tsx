@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Power, Volume2, VolumeX, BookOpen, Cpu, Gamepad2, Globe, Save } from 'lucide-react';
+import { Settings, Power, Volume2, VolumeX, BookOpen, Cpu, Gamepad2, Globe, Save, BarChart2 } from 'lucide-react';
 
 interface SidebarProps {
   onOpenSettings: () => void;
@@ -10,10 +10,11 @@ interface SidebarProps {
   onOpenGameModeSettings: () => void;
   onOpenOnlinePlay: () => void;
   onOpenExport: () => void;
+  onOpenAnalysis: () => void;
   isOnlineP2PConnected?: boolean;
 }
 
-export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllSounds, onOpenLearn, onOpenEngineManagement, onOpenGameModeSettings, onOpenOnlinePlay, onOpenExport, isOnlineP2PConnected }: SidebarProps) {
+export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllSounds, onOpenLearn, onOpenEngineManagement, onOpenGameModeSettings, onOpenOnlinePlay, onOpenExport, onOpenAnalysis, isOnlineP2PConnected }: SidebarProps) {
   const [isLearnWindowOpen, setIsLearnWindowOpen] = useState(false);
   const [isOnlinePlayWindowOpen, setIsOnlinePlayWindowOpen] = useState(false);
 
@@ -106,6 +107,15 @@ export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllS
           title="Save/Export Game"
         >
           <Save className="w-6 h-6 text-text-secondary group-hover:text-accent-green transition-colors" />
+        </button>
+
+        {/* Game Analysis Button */}
+        <button
+          onClick={onOpenAnalysis}
+          className="w-10 h-10 flex items-center justify-center group transition-colors"
+          title="Game Record Analysis"
+        >
+          <BarChart2 className="w-6 h-6 text-text-secondary group-hover:text-accent-purple transition-colors" />
         </button>
       </div>
 
