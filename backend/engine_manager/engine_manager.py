@@ -606,6 +606,27 @@ class EngineManager:
         if not engine_id:
             return None
         
+        # Check if we should make a random move instead
+        if self._should_make_random_move(side):
+            random_move = self._get_random_legal_move(position, moves)
+            if random_move:
+                print(f"🎲 Random move for {side}: {random_move} (learning mode)")
+                config = self.available_engines[engine_id]
+                return {
+                    'bestmove': random_move,
+                    'ponder': None,
+                    'score_cp': 0,
+                    'mate': None,
+                    'depth': 0,
+                    'nodes': 0,
+                    'nps': 0,
+                    'pv': [random_move],
+                    'info_lines': [],
+                    'engine_id': engine_id,
+                    'engine_name': config.name,
+                    'is_random': True
+                }
+        
         # Start engine if not running
         if engine_id not in self.running_engines:
             if not self._start_engine(engine_id):
@@ -623,6 +644,7 @@ class EngineManager:
             config = self.available_engines[engine_id]
             analysis['engine_id'] = engine_id
             analysis['engine_name'] = config.name
+            analysis['is_random'] = False
             
             return analysis
             

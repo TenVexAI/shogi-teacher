@@ -1677,10 +1677,12 @@ async def computer_move(session_id: str, request: ComputerMoveRequest):
         position = parts[0]
         moves = parts[1].split() if len(parts) > 1 else []
         
-        # Get move from engine
+        # Get move from engine (uses request_hint which supports random moves)
         start_time = time.time()
+        print(f"→ Using {side} engine: {engine_id}")
         
-        analysis = engine_manager.analyze_position(
+        analysis = engine_manager.request_hint(
+            side=side,
             position=position,
             moves=moves,
             movetime=request.movetime
