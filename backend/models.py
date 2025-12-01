@@ -358,3 +358,36 @@ class ImageAnalysisResponse(BaseModel):
     notes: Optional[str] = None
     valid: bool = True
     validation_error: Optional[str] = None
+
+
+# ===== Puzzle Models =====
+
+class PuzzleRequest(BaseModel):
+    """Request for a random puzzle"""
+    min_moves: int = 3  # Minimum moves to mate (3, 5, 7, 9, or 11)
+    max_moves: int = 11  # Maximum moves to mate
+
+class PuzzleResponse(BaseModel):
+    """Response with a puzzle"""
+    sfen: str
+    moves_to_mate: int
+    side_to_move: str  # 'b' for black, 'w' for white
+
+class PuzzleVerifyRequest(BaseModel):
+    """Request to verify a puzzle move"""
+    sfen: str  # Current position SFEN
+    move_usi: str  # Move to verify in USI format
+    target_moves: int  # Original puzzle's moves to mate
+    moves_made: int  # How many moves already made by the player
+
+class PuzzleVerifyResponse(BaseModel):
+    """Response from puzzle move verification"""
+    is_correct: bool
+    is_checkmate: bool = False
+    is_puzzle_complete: bool = False
+    message: str = ""
+    best_move: Optional[str] = None  # USI format
+    best_move_notation: Optional[str] = None
+    opponent_move: Optional[str] = None  # Engine's response move (USI)
+    opponent_move_notation: Optional[str] = None
+    new_sfen: Optional[str] = None  # Position after opponent's move

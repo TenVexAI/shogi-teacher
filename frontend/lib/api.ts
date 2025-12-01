@@ -226,6 +226,21 @@ export async function getHint(sessionId: string, side?: string) {
     return response.json() as Promise<HintResponse>;
 }
 
+// Get hint directly from SFEN position (for puzzles/analysis without a session)
+export async function getHintFromPosition(sfen: string, movetime: number = 2000) {
+    const response = await fetch(`${API_BASE_URL}/game/analyze`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ sfen, movetime }),
+    });
+    if (!response.ok) {
+        throw new Error('Failed to get hint from position');
+    }
+    return response.json();
+}
+
 export async function recordMove(sessionId: string, moveUsi: string, timeSpent: number = 0) {
     const response = await fetch(`${API_BASE_URL}/session/${sessionId}/move`, {
         method: 'POST',

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Power, Volume2, VolumeX, BookOpen, Cpu, Gamepad2, Globe, Save, BarChart2 } from 'lucide-react';
+import { Settings, Power, Volume2, VolumeX, BookOpen, Cpu, Gamepad2, Globe, Save, BarChart2, Swords } from 'lucide-react';
 
 interface SidebarProps {
   onOpenSettings: () => void;
@@ -11,12 +11,14 @@ interface SidebarProps {
   onOpenOnlinePlay: () => void;
   onOpenExport: () => void;
   onOpenAnalysis: () => void;
+  onOpenEndgameTraining: () => void;
   isOnlineP2PConnected?: boolean;
 }
 
-export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllSounds, onOpenLearn, onOpenEngineManagement, onOpenGameModeSettings, onOpenOnlinePlay, onOpenExport, onOpenAnalysis, isOnlineP2PConnected }: SidebarProps) {
+export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllSounds, onOpenLearn, onOpenEngineManagement, onOpenGameModeSettings, onOpenOnlinePlay, onOpenExport, onOpenAnalysis, onOpenEndgameTraining, isOnlineP2PConnected }: SidebarProps) {
   const [isLearnWindowOpen, setIsLearnWindowOpen] = useState(false);
   const [isOnlinePlayWindowOpen, setIsOnlinePlayWindowOpen] = useState(false);
+  const [isEndgameWindowOpen, setIsEndgameWindowOpen] = useState(false);
 
   useEffect(() => {
     // Check if running in Electron
@@ -24,6 +26,7 @@ export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllS
       // Check initial state
       window.electron.isLearnWindowOpen().then(setIsLearnWindowOpen);
       window.electron.isOnlinePlayWindowOpen().then(setIsOnlinePlayWindowOpen);
+      window.electron.isEndgameWindowOpen().then(setIsEndgameWindowOpen);
       
       // Listen for state changes
       const cleanupLearn = window.electron.onLearnWindowStateChange((isOpen: boolean) => {
@@ -34,12 +37,30 @@ export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllS
         setIsOnlinePlayWindowOpen(isOpen);
       });
       
+      const cleanupEndgame = window.electron.onEndgameWindowStateChange((isOpen: boolean) => {
+        setIsEndgameWindowOpen(isOpen);
+      });
+      
       return () => {
         cleanupLearn();
         cleanupOnline();
+        cleanupEndgame();
       };
     }
   }, []);
+  
+  // Handle endgame button click - open or close window
+  const handleEndgameClick = () => {
+    if (typeof window !== 'undefined' && window.electron) {
+      if (isEndgameWindowOpen) {
+        window.electron.closeEndgameWindow();
+      } else {
+        onOpenEndgameTraining();
+      }
+    } else {
+      onOpenEndgameTraining();
+    }
+  };
   const handleShutdown = () => {
     // Check if running in Electron
     const isElectron = typeof window !== 'undefined' && 'electron' in window;
@@ -116,6 +137,19 @@ export default function Sidebar({ onOpenSettings, allSoundsEnabled, onToggleAllS
           title="Game Record Analysis"
         >
           <BarChart2 className="w-6 h-6 text-text-secondary group-hover:text-accent-purple transition-colors" />
+        </button>
+
+        {/* Endgame Training Button */}
+        <button
+          onClick={handleEndgameClick}
+          className="w-10 h-10 flex items-center justify-center group transition-colors"
+          title={isEndgameWindowOpen ? "Close Endgame Training" : "Endgame Training (Tsume Shogi)"}
+        >
+          <Swords className={`w-6 h-6 transition-colors ${
+            isEndgameWindowOpen 
+              ? 'sound-active group-hover:text-red-500!' 
+              : 'text-text-secondary group-hover:text-accent-cyan'
+          }`} />
         </button>
       </div>
 

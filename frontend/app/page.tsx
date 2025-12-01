@@ -1428,6 +1428,16 @@ export default function Home() {
     }
   };
 
+  const handleOpenEndgameTraining = async () => {
+    // Check if running in Electron
+    if (typeof window !== 'undefined' && window.electron) {
+      await window.electron.openEndgameWindow();
+    } else {
+      // In browser, open in new tab
+      window.open('/endgame', '_blank');
+    }
+  };
+
   const handleOpenEngineManagement = () => {
     // Auto-pause clock when opening engine management
     if (isClockRunning) {
@@ -1831,6 +1841,7 @@ export default function Home() {
             onOpenGameModeSettings={handleOpenGameModeSettings}
             onOpenExport={() => setIsExportModalOpen(true)}
             onOpenAnalysis={handleOpenAnalysis}
+            onOpenEndgameTraining={handleOpenEndgameTraining}
             isOnlineP2PConnected={onlinePlayState.isInGame && onlinePlayState.isP2PConnected}
           />
 

@@ -11,6 +11,7 @@ let learnWindow = null;
 let onlinePlayWindow = null;
 let analysisWindows = new Map(); // Track multiple analysis windows by ID
 let analysisWindowCounter = 0;
+let endgameWindow = null;
 let backendProcess = null;
 const BACKEND_PORT = 8000;
 const BACKEND_URL = `http://localhost:${BACKEND_PORT}`;
@@ -324,6 +325,72 @@ ipcMain.handle('open-analysis-window', (event, initialData) => {
 
 ipcMain.handle('get-analysis-window-count', () => {
   return analysisWindows.size;
+});
+
+// Create endgame training window
+function createEndgameWindow() {
+  // If window already exists, focus it
+  if (endgameWindow && !endgameWindow.isDestroyed()) {
+    endgameWindow.focus();
+    return;
+  }
+  
+  endgameWindow = new BrowserWindow({
+    width: 1200,
+    height: 900,
+    minWidth: 1200,
+    minHeight: 900,
+    icon: path.join(__dirname, '../public/icon.png'),
+    title: 'Endgame Training',
+    autoHideMenuBar: true,
+    backgroundColor: '#141414',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
+    },
+  });
+
+  const endgameUrl = isDev ? 'http://localhost:3000/endgame' : path.join(__dirname, '../out/endgame/index.html');
+  
+  if (isDev) {
+    endgameWindow.loadURL(endgameUrl);
+  } else {
+    endgameWindow.loadFile(endgameUrl);
+  }
+
+  // Notify main window of state change
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('endgame-window-state-change', true);
+  }
+
+  endgameWindow.on('closed', () => {
+    endgameWindow = null;
+    // Notify main window of state change
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('endgame-window-state-change', false);
+    }
+  });
+}
+
+// Close endgame window
+function closeEndgameWindow() {
+  if (endgameWindow && !endgameWindow.isDestroyed()) {
+    endgameWindow.close();
+  }
+}
+
+// Endgame Window IPC Handlers
+ipcMain.handle('open-endgame-window', () => {
+  createEndgameWindow();
+});
+
+ipcMain.handle('close-endgame-window', () => {
+  closeEndgameWindow();
+});
+
+ipcMain.handle('is-endgame-window-open', () => {
+  return endgameWindow !== null && !endgameWindow.isDestroyed();
 });
 
 // Save file with dialog

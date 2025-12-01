@@ -28,7 +28,7 @@ class EndpointFilter(logging.Filter):
 # Add filter to uvicorn access logger
 logging.getLogger("uvicorn.access").addFilter(EndpointFilter())
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
@@ -49,8 +49,10 @@ from models import (
     GameImportRequest, GameImportResponse,
     GameExportRequest, GameExportResponse,
     ComputerMoveRequest, ComputerMoveResponse,
-    ImageAnalysisRequest, ImageAnalysisResponse
+    ImageAnalysisRequest, ImageAnalysisResponse,
+    PuzzleRequest, PuzzleResponse, PuzzleVerifyRequest, PuzzleVerifyResponse
 )
+import random
 
 # Fix for Windows asyncio subprocess support
 if sys.platform == 'win32':
@@ -235,7 +237,21 @@ async def get_game_state(sfen: Optional[str] = None):
         board = shogi.Board()
     else:
         try:
-            board = shogi.Board(sfen)
+            # Handle "sfen moves move1 move2 ..." format
+            if " moves " in sfen:
+                parts = sfen.split(" moves ")
+                position = parts[0]
+                moves = parts[1].split() if len(parts) > 1 else []
+                board = shogi.Board(position)
+                for move_usi in moves:
+                    try:
+                        move = shogi.Move.from_usi(move_usi)
+                        if move in board.legal_moves:
+                            board.push(move)
+                    except:
+                        pass
+            else:
+                board = shogi.Board(sfen)
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid SFEN")
             
@@ -2063,3 +2079,283 @@ async def analyze_board_image(request: ImageAnalysisRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Image analysis failed: {str(e)}")
 
+
+# ===== Puzzle Manager =====
+
+class PuzzleManager:
+    """Manages puzzle file loading and random selection"""
+    
+    def __init__(self, puzzles_dir: str):
+        self.puzzles_dir = Path(puzzles_dir)
+        self.file_line_counts: Dict[int, int] = {}
+        self.available_moves = []
+        self._index_files()
+    
+    def _index_files(self):
+        """Index puzzle files and count lines for efficient random access"""
+        print("\n=== Indexing Puzzle Files ===")
+        for moves in [3, 5, 7, 9, 11]:
+            filepath = self.puzzles_dir / f"mate{moves}.sfen"
+            if filepath.exists():
+                # Count lines efficiently
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    line_count = sum(1 for _ in f)
+                self.file_line_counts[moves] = line_count
+                self.available_moves.append(moves)
+                print(f"✓ mate{moves}.sfen: {line_count:,} puzzles")
+            else:
+                print(f"✗ mate{moves}.sfen not found")
+        print(f"Total puzzle types available: {self.available_moves}")
+    
+    def get_random_puzzle(self, min_moves: int, max_moves: int) -> Optional[Dict]:
+        """Get a random puzzle within the specified move range"""
+        # Filter to available move counts in range
+        valid_moves = [m for m in self.available_moves if min_moves <= m <= max_moves]
+        if not valid_moves:
+            return None
+        
+        # Pick a random move count
+        moves = random.choice(valid_moves)
+        
+        # Pick a random line from that file
+        line_count = self.file_line_counts[moves]
+        line_num = random.randint(0, line_count - 1)
+        
+        filepath = self.puzzles_dir / f"mate{moves}.sfen"
+        with open(filepath, 'r', encoding='utf-8') as f:
+            for i, line in enumerate(f):
+                if i == line_num:
+                    sfen = line.strip()
+                    # Parse side to move
+                    parts = sfen.split()
+                    side = parts[1] if len(parts) > 1 else 'b'
+                    return {
+                        'sfen': sfen,
+                        'moves_to_mate': moves,
+                        'side_to_move': side
+                    }
+        return None
+
+
+# Initialize puzzle manager
+puzzles_path = Path(__file__).parent / "puzzles"
+puzzle_manager = PuzzleManager(str(puzzles_path))
+
+
+@app.post("/puzzle/random", response_model=PuzzleResponse)
+async def get_random_puzzle(request: PuzzleRequest):
+    """Get a random puzzle within the specified move range"""
+    puzzle = puzzle_manager.get_random_puzzle(request.min_moves, request.max_moves)
+    if not puzzle:
+        raise HTTPException(status_code=404, detail="No puzzles found in the specified range")
+    return PuzzleResponse(**puzzle)
+
+
+@app.post("/puzzle/verify", response_model=PuzzleVerifyResponse)
+async def verify_puzzle_move(request: PuzzleVerifyRequest):
+    """
+    Verify if a puzzle move is correct.
+    A move is correct if it still leads to checkmate in the required moves.
+    """
+    try:
+        # Create board from current position
+        board = shogi.Board(request.sfen)
+        
+        # Check if the move is legal
+        try:
+            move = shogi.Move.from_usi(request.move_usi)
+            if move not in board.legal_moves:
+                return PuzzleVerifyResponse(
+                    is_correct=False,
+                    message="Illegal move"
+                )
+        except:
+            return PuzzleVerifyResponse(
+                is_correct=False,
+                message="Invalid move format"
+            )
+        
+        # Make the move
+        board.push(move)
+        
+        # Check if this is checkmate
+        if board.is_checkmate():
+            return PuzzleVerifyResponse(
+                is_correct=True,
+                is_checkmate=True,
+                is_puzzle_complete=True,
+                message="Checkmate! Puzzle complete!"
+            )
+        
+        # Calculate remaining moves allowed
+        # In tsume, player makes all odd-numbered moves (1, 3, 5, etc.)
+        # So for a mate-in-3, player makes move 1 and 3
+        remaining_moves = request.target_moves - (request.moves_made + 1)
+        
+        # Use engine to check if position still leads to mate
+        # The opponent will play, then we need to find mate in remaining-1 moves
+        # Use longer analysis time for accurate tsume verification
+        analysis = engine_manager.request_post_move_analysis(
+            position=board.sfen(),
+            moves=[],
+            movetime=5000  # Longer time for tsume accuracy
+        )
+        
+        if not analysis:
+            return PuzzleVerifyResponse(
+                is_correct=False,
+                message="Could not verify move - engine unavailable"
+            )
+        
+        # Debug: log the analysis result
+        print(f"[PUZZLE DEBUG] After player move, engine analysis:")
+        print(f"  Position: {board.sfen()}")
+        print(f"  Best move: {analysis.get('bestmove')}")
+        print(f"  Mate: {analysis.get('mate')}")
+        print(f"  Score CP: {analysis.get('score_cp')}")
+        
+        # For tsume problems, after player's move, opponent should have no escape
+        # If engine finds mate for opponent, player's move was wrong
+        # If engine finds that the original attacker can still mate, it's correct
+        mate_value = analysis.get('mate')
+        score_cp = analysis.get('score_cp')
+        
+        # The engine evaluates from the side to move's perspective
+        # After player's move, it's opponent's turn
+        # If mate is negative (opponent gets mated), player's move is correct
+        # Also accept if score is extremely negative (overwhelming disadvantage for defender)
+        is_winning = (mate_value is not None and mate_value < 0) or \
+                     (mate_value is None and score_cp is not None and score_cp < -5000)
+        
+        print(f"[PUZZLE DEBUG] is_winning={is_winning} (mate={mate_value}, score_cp={score_cp})")
+        
+        if is_winning:
+            # Opponent will be mated - player's move is correct
+            # Now get opponent's best defense move
+            opponent_move = analysis.get('bestmove')
+            if opponent_move and opponent_move != 'resign':
+                try:
+                    opp_move_obj = shogi.Move.from_usi(opponent_move)
+                    opponent_notation = usi_to_standard_notation(board, opp_move_obj)
+                    board.push(opp_move_obj)
+                    new_sfen = board.sfen()
+                    
+                    return PuzzleVerifyResponse(
+                        is_correct=True,
+                        is_checkmate=False,
+                        is_puzzle_complete=False,
+                        message="Correct! Continue...",
+                        opponent_move=opponent_move,
+                        opponent_move_notation=opponent_notation,
+                        new_sfen=new_sfen
+                    )
+                except:
+                    pass
+            
+            # If opponent resigned or no valid move
+            return PuzzleVerifyResponse(
+                is_correct=True,
+                is_checkmate=False,
+                is_puzzle_complete=True,
+                message="Correct! Opponent has no defense."
+            )
+        else:
+            # Player's move doesn't lead to mate
+            # Get the correct move as a hint
+            board_before = shogi.Board(request.sfen)
+            hint_analysis = engine_manager.request_post_move_analysis(
+                position=request.sfen,
+                moves=[],
+                movetime=2000
+            )
+            best_move = hint_analysis.get('bestmove') if hint_analysis else None
+            best_notation = None
+            if best_move:
+                try:
+                    bm = shogi.Move.from_usi(best_move)
+                    best_notation = usi_to_standard_notation(board_before, bm)
+                except:
+                    best_notation = best_move
+            
+            return PuzzleVerifyResponse(
+                is_correct=False,
+                message="This move doesn't lead to checkmate in the required moves.",
+                best_move=best_move,
+                best_move_notation=best_notation
+            )
+            
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Verification failed: {str(e)}")
+
+
+@app.post("/puzzle/hint")
+async def get_puzzle_hint(sfen: str = Body(...), target_moves: int = Body(...)):
+    """
+    Get a hint for a tsume puzzle, checking if the move leads to optimal mate.
+    """
+    try:
+        board = shogi.Board(sfen)
+        
+        print(f"[PUZZLE HINT] Getting hint for mate-in-{target_moves}")
+        
+        # Use longer analysis time for accurate mate detection
+        analysis = engine_manager.request_post_move_analysis(
+            position=sfen,
+            moves=[],
+            movetime=5000  # 5 seconds for more accurate mate detection
+        )
+        
+        if analysis and analysis.get('bestmove'):
+            bestmove = analysis['bestmove']
+            mate_value = analysis.get('mate')
+            
+            try:
+                move = shogi.Move.from_usi(bestmove)
+                notation = usi_to_standard_notation(board, move)
+            except:
+                notation = bestmove
+            
+            # Check if the mate value matches the target
+            is_optimal = mate_value is not None and mate_value > 0 and mate_value <= target_moves
+            
+            # Calculate how player moves remain based on current position
+            # Player makes odd moves: 1, 3, 5, etc.
+            # If this is a mate-in-3 and engine finds mate-in-5, warn user
+            warning = None
+            if mate_value is not None and mate_value > 0:
+                if mate_value > target_moves:
+                    warning = f"This move leads to mate in {mate_value}, but there's a faster mate in {target_moves}. Try to find the optimal solution!"
+            elif mate_value is None or mate_value <= 0:
+                # Engine found winning position but didn't report explicit mate
+                warning = "The engine found a winning move, but couldn't confirm the exact mate sequence."
+            
+            return {
+                "bestmove": bestmove,
+                "bestmove_notation": notation,
+                "mate": mate_value,
+                "target_moves": target_moves,
+                "is_optimal": is_optimal,
+                "warning": warning,
+                "score_cp": analysis.get('score_cp'),
+                "engine": "Analysis"
+            }
+        
+        raise HTTPException(status_code=500, detail="Could not get hint")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Hint failed: {str(e)}")
+
+
+@app.get("/puzzle/available")
+async def get_available_puzzles():
+    """Get information about available puzzle types"""
+    return {
+        "available_moves": puzzle_manager.available_moves,
+        "counts": puzzle_manager.file_line_counts
+    }

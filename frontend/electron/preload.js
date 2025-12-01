@@ -50,5 +50,18 @@ contextBridge.exposeInMainWorld('electron', {
   onAnalysisInitialData: (callback) => {
     ipcRenderer.on('analysis-initial-data', (event, data) => callback(data));
     return () => ipcRenderer.removeAllListeners('analysis-initial-data');
+  },
+  
+  // Endgame training window management
+  openEndgameWindow: () => ipcRenderer.invoke('open-endgame-window'),
+  closeEndgameWindow: () => ipcRenderer.invoke('close-endgame-window'),
+  isEndgameWindowOpen: () => ipcRenderer.invoke('is-endgame-window-open'),
+  onEndgameWindowStateChange: (callback) => {
+    ipcRenderer.on('endgame-window-state-change', (event, isOpen) => callback(isOpen));
+    return () => ipcRenderer.removeAllListeners('endgame-window-state-change');
+  },
+  onEndgameSettings: (callback) => {
+    ipcRenderer.on('endgame-settings', (event, settings) => callback(settings));
+    return () => ipcRenderer.removeAllListeners('endgame-settings');
   }
 });
