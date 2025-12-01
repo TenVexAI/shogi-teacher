@@ -2175,6 +2175,18 @@ async def verify_puzzle_move(request: PuzzleVerifyRequest):
                 message="Invalid move format"
             )
         
+        # Check if player has already used all their moves
+        # In tsume, player makes odd moves (1, 3, 5...), opponent makes even (2, 4, 6...)
+        # For mate-in-N, player can make at most ceil(N/2) moves
+        player_moves_made = (request.moves_made + 1) // 2  # +1 for this move, //2 for player only
+        max_player_moves = (request.target_moves + 1) // 2
+        
+        if player_moves_made >= max_player_moves:
+            return PuzzleVerifyResponse(
+                is_correct=False,
+                message=f"Out of moves! This is a mate-in-{request.target_moves} puzzle. Try again from the start."
+            )
+        
         # Make the move
         board.push(move)
         

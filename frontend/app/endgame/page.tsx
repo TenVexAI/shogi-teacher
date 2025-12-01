@@ -25,6 +25,7 @@ interface PuzzleState {
   move_history: MoveRecord[];
   is_complete: boolean;
   is_failed: boolean;
+  has_been_counted: boolean; // Track if this puzzle has been counted in stats
 }
 
 interface HintData {
@@ -144,6 +145,7 @@ export default function EndgameTrainingPage() {
         move_history: [],
         is_complete: false,
         is_failed: false,
+        has_been_counted: false,
       };
       
       setPuzzle(newPuzzle);
@@ -209,14 +211,18 @@ export default function EndgameTrainingPage() {
         
         if (result.is_puzzle_complete) {
           // Puzzle solved!
+          const shouldCountSolve = !puzzle.has_been_counted;
           setPuzzle({
             ...puzzle,
             current_sfen: stateAfterMove?.sfen || puzzle.current_sfen,
             moves_made: puzzle.moves_made + 1,
             move_history: newMoveHistory,
             is_complete: true,
+            has_been_counted: true,
           });
-          setPuzzlesSolved(prev => prev + 1);
+          if (shouldCountSolve) {
+            setPuzzlesSolved(prev => prev + 1);
+          }
           setSelectedMoveIndex(newMoveHistory.length - 1);
           await updateBoardState(stateAfterMove?.sfen || puzzle.current_sfen);
           
@@ -246,7 +252,7 @@ export default function EndgameTrainingPage() {
             
             setMessages(prev => [...prev, {
               role: 'assistant',
-              content: `✓ Correct! Opponent plays: **${result.opponent_move_notation || result.opponent_move}**\n\nContinue the attack...`,
+              content: `Opponent plays: **${result.opponent_move_notation || result.opponent_move}**\n\nContinue the attack...`,
               messageType: 'system'
             }]);
           }
