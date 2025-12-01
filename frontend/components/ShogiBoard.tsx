@@ -428,6 +428,7 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
                 isTopPanel={true}
                 useWesternNotation={useWesternNotation}
                 playerName={boardFlipped ? playerNames?.black : playerNames?.white}
+                showMovementOverlay={showMovementOverlay}
             />
 
 
@@ -684,6 +685,7 @@ export default function ShogiBoard({ gameState, onMove, showBestMove = false, on
                 isTopPanel={false}
                 useWesternNotation={useWesternNotation}
                 playerName={boardFlipped ? playerNames?.white : playerNames?.black}
+                showMovementOverlay={showMovementOverlay}
             />
 
             {/* Board Controls Row */}
